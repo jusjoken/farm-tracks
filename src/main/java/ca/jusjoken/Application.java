@@ -2,6 +2,7 @@ package ca.jusjoken;
 
 import ca.jusjoken.data.SamplePersonRepository;
 import com.vaadin.flow.component.page.AppShellConfigurator;
+import com.vaadin.flow.server.PWA;
 import com.vaadin.flow.theme.Theme;
 import com.vaadin.flow.theme.lumo.Lumo;
 import javax.sql.DataSource;
@@ -19,7 +20,9 @@ import org.springframework.context.annotation.Bean;
  *
  */
 @SpringBootApplication
-@Theme(value = "farm-tracks", variant = Lumo.DARK)
+@Theme(value = "vaadin+")
+//@Theme(value = "farm-tracks", variant = Lumo.DARK)
+@PWA(name = "Farm Tracks", shortName = "FT")
 public class Application implements AppShellConfigurator {
 
     public static void main(String[] args) {

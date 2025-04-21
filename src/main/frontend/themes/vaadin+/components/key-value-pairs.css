@@ -1,0 +1,3 @@
+dl[theme~="stripes"] > *:nth-child(odd) {
+    background-image: linear-gradient(var(--lumo-contrast-5pct), var(--lumo-contrast-5pct));
+}

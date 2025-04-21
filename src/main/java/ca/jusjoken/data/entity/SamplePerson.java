@@ -1,4 +1,4 @@
-package ca.jusjoken.data;
+package ca.jusjoken.data.entity;
 
 import jakarta.persistence.Entity;
 import jakarta.validation.constraints.Email;

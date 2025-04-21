@@ -12,13 +12,13 @@
 
     <properties>
         <java.version>21</java.version>
-        <vaadin.version>24.6.6</vaadin.version>
+        <vaadin.version>24.7.2</vaadin.version>
     </properties>
 
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.3</version>
+        <version>3.4.4</version>
     </parent>
 
     <repositories>
@@ -52,6 +52,10 @@
         <dependency>
             <groupId>com.vaadin</groupId>
             <artifactId>vaadin-spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
         <dependency>
             <groupId>org.parttio</groupId>
@@ -89,6 +93,12 @@
             <artifactId>vaadin-testbench-junit5</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.opencsv</groupId>
+            <artifactId>opencsv</artifactId>
+            <version>5.10</version>
+        </dependency>
+        
     </dependencies>
 
     <build>

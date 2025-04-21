@@ -1,0 +1,3 @@
+:host([theme~="outline"]:not([disabled]):not([invalid]):not([readonly])) {
+    background-color: var(--lumo-base-color);
+}

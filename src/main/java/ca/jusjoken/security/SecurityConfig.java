@@ -1,0 +1,44 @@
+package ca.jusjoken.security;
+
+
+import ca.jusjoken.views.login.LoginView;
+import com.vaadin.flow.spring.security.VaadinWebSecurity;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.provisioning.UserDetailsManager;
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
+
+/**
+ *
+ * @author birch
+ */
+@EnableWebSecurity
+@Configuration
+class SecurityConfig extends VaadinWebSecurity {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        super.configure(http); 
+        setLoginView(http, LoginView.class, "/login");
+    }
+    
+    @Bean
+    public UserDetailsManager userDetailsManager() {
+        var user = User.withUsername("user")
+                .password("{noop}user")
+                .roles("USER")
+                .build();
+        var admin = User.withUsername("admin")
+                .password("{noop}admin")
+                .roles("ADMIN")
+                .build();
+        return new InMemoryUserDetailsManager(user, admin);
+    }
+}

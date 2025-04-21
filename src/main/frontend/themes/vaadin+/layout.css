@@ -1,0 +1,124 @@
+/* Display */
+
+.contents {
+  display: contents;
+}
+
+/* Min height */
+
+.min-h-xs {
+  min-height: var(--lumo-size-xs);
+}
+
+.min-h-s {
+  min-height: var(--lumo-size-s);
+}
+
+.min-h-m {
+  min-height: var(--lumo-size-m);
+}
+
+.min-h-l {
+  min-height: var(--lumo-size-l);
+}
+
+.min-h-xl {
+  min-height: var(--lumo-size-xl);
+}
+
+/* Responsive design */
+
+@media (min-width: 640px) {
+  /* TODO: Workaround until contents is part of the utility classes */
+  .sm\:flex {
+    display: flex;
+  }
+  /* Overflow */
+  .sm\:overflow-hidden {
+    overflow: hidden;
+  }
+  /* Position */
+  .sm\:top-s {
+    top: var(--lumo-space-s);
+  }
+  /* Width */
+  .sm\:w-auto {
+    width: auto;
+  }
+}
+
+@media (min-width: 768px) {
+  /* TODO: Workaround until contents is part of the utility classes */
+  .md\:flex {
+    display: flex;
+  }
+  /* Overflow */
+  .md\:overflow-hidden {
+    overflow: hidden;
+  }
+  /* Position */
+  .md\:top-s {
+    top: var(--lumo-space-s);
+  }
+  /* Width */
+  .md\:w-auto {
+    width: auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  /* TODO: Workaround until contents is part of the utility classes */
+  .lg\:flex {
+    display: flex;
+  }
+  /* Overflow */
+  .lg\:overflow-hidden {
+    overflow: hidden;
+  }
+  /* Position */
+  .lg\:top-s {
+    top: var(--lumo-space-s);
+  }
+  /* Width */
+  .lg\:w-auto {
+    width: auto;
+  }
+}
+
+@media (min-width: 1280px) {
+  /* TODO: Workaround until contents is part of the utility classes */
+  .xl\:flex {
+    display: flex;
+  }
+  /* Overflow */
+  .xl\:overflow-hidden {
+    overflow: hidden;
+  }
+  /* Position */
+  .xl\:top-s {
+    top: var(--lumo-space-s);
+  }
+  /* Width */
+  .xl\:w-auto {
+    width: auto;
+  }
+}
+
+@media (min-width: 1536px) {
+  /* TODO: Workaround until contents is part of the utility classes */
+  .\32xl\:flex {
+    display: flex;
+  }
+  /* Overflow */
+  .\32xl\:overflow-hidden {
+    overflow: hidden;
+  }
+  /* Position */
+  .\32xl\:top-s {
+    top: var(--lumo-space-s);
+  }
+  /* Width */
+  .\32xl\:w-auto {
+    width: auto;
+  }
+}

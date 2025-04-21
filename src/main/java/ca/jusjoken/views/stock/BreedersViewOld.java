@@ -1,6 +1,6 @@
-package ca.jusjoken.views.breeders;
+package ca.jusjoken.views.stock;
 
-import ca.jusjoken.data.SamplePerson;
+import ca.jusjoken.data.entity.SamplePerson;
 import ca.jusjoken.services.SamplePersonService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Text;
@@ -25,6 +25,7 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.spring.data.VaadinSpringDataHelpers;
 import com.vaadin.flow.theme.lumo.LumoUtility;
+import jakarta.annotation.security.PermitAll;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
@@ -35,18 +36,19 @@ import java.util.List;
 import org.springframework.data.jpa.domain.Specification;
 import org.vaadin.lineawesome.LineAwesomeIconUrl;
 
-@PageTitle("Breeders")
-@Route("")
-@Menu(order = 0, icon = LineAwesomeIconUrl.TH_LIST_SOLID)
+@PageTitle("Remove this")
+@Route("old")
+@Menu(order = 3, icon = LineAwesomeIconUrl.TH_LIST_SOLID)
 @Uses(Icon.class)
-public class BreedersView extends Div {
+@PermitAll
+public class BreedersViewOld extends Div {
 
     private Grid<SamplePerson> grid;
 
     private Filters filters;
     private final SamplePersonService samplePersonService;
 
-    public BreedersView(SamplePersonService SamplePersonService) {
+    public BreedersViewOld(SamplePersonService SamplePersonService) {
         this.samplePersonService = SamplePersonService;
         setSizeFull();
         addClassNames("breeders-view");

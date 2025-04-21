@@ -1,6 +1,6 @@
 package ca.jusjoken.services;
 
-import ca.jusjoken.data.SamplePerson;
+import ca.jusjoken.data.entity.SamplePerson;
 import ca.jusjoken.data.SamplePersonRepository;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
