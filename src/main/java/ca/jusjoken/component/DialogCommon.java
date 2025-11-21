@@ -667,12 +667,22 @@ public class DialogCommon {
                     .set("font-size", "var(--lumo-font-size-s)");
             columnInfo.add(customerAddress);
         }
-
-        Span ids = new Span("ID:" + item.getId().toString() + " Breed:" + item.getBreed());
-        ids.getStyle()
+        String extraInfo = "";
+        if(!item.getTattoo().isEmpty()){
+            extraInfo = "(" + item.getTattoo() + ")";
+        }
+        if(!item.getBreed().isEmpty()){
+            extraInfo += "(" + item.getBreed() + ")";
+        }
+        if(!item.getColor().isEmpty()){
+            extraInfo += "(" + item.getColor() + ")";
+        }
+        
+        Span xInfo = new Span(extraInfo);
+        xInfo.getStyle()
                 .set("color", "var(--lumo-tertiary-text-color)")
                 .set("font-size", "var(--lumo-font-size-s)");
-        columnInfo.add(ids);
+        columnInfo.add(xInfo);
 
         if(fullHeader){
             /*
