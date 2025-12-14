@@ -4,9 +4,11 @@
  */
 package ca.jusjoken.data.service;
 
+import ca.jusjoken.data.ColumnSort;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
+import ca.jusjoken.data.entity.StockSavedQuery;
 import ca.jusjoken.data.entity.StockType;
 import java.util.ArrayList;
 import org.springframework.data.domain.Example;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.springframework.data.domain.ExampleMatcher.*;
 import org.springframework.data.domain.Sort;
@@ -50,9 +53,22 @@ public class StockService {
         return kitsForParent;
     }
     
+    public String getStockNameById(Integer id){
+        if(id==null) return "N/A";
+        Optional<Stock> stockForName = stockRepository.findById(Long.valueOf(id));
+        if(stockForName.isPresent()){
+            return stockForName.get().getName();
+        }
+        return "N/A";
+    }
+    
     
     // Find stock with custom matching rules
-    public List<Stock> findStockWithCustomMatcher(String name, Boolean breeder, StockType stockType, StockStatus status, StockSort stockSort) {
+    public List<Stock> findStockWithCustomMatcher(String name, StockSavedQuery savedQuery) {
+        return findStockWithCustomMatcher(name, savedQuery.getBreeder(), savedQuery.getStockType(), savedQuery.getStockStatus(), savedQuery.getSort1(), savedQuery.getSort2());
+    }
+
+    public List<Stock> findStockWithCustomMatcher(String name, Boolean breeder, StockType stockType, StockStatus status, ColumnSort sort1, ColumnSort sort2) {
         Stock stock = new Stock();
         stock.setName(name);
         stock.setStockType(stockType);
@@ -71,27 +87,37 @@ public class StockService {
             stock.setActive(null);
         }
         System.out.println("findStockWithCustomMatcher: stock:" + stock);
-        System.out.println("findStockWithCustomMatcher: sort:" + stockSort);
+        System.out.println("findStockWithCustomMatcher: sort:" + sort1.getColumnName() + "/" + sort1.getColumnSortDirection() + "," + sort2.getColumnName() + "/" + sort2.getColumnSortDirection());
         
         // Create a custom ExampleMatcher
         ExampleMatcher matcher = matchingAll()
                 .withIgnoreCase()                          // Ignore case for all string matches
                 .withStringMatcher(StringMatcher.CONTAINING)// Use LIKE %value% for strings
                 .withIgnoreNullValues()                    // Ignore null values
-                .withIgnorePaths("needsSaving")
+                .withIgnorePaths("needsSaving","profileImage","defaultImageSource","sexText","sex","category","prefix","tattoo","cage","fatherName","motherName","fatherId","motherId","color","breed","weightText","weight","doB","acquired","regNo","champNo","legs","genotype","kitsCount","notes","litter","fosterLitter","ageInDays","litterCount","kitCount")
                 .withMatcher("name", ExampleMatcher.GenericPropertyMatchers.startsWith()); // make name startsWith
-
+        
         Example<Stock> example = Example.of(stock, matcher);
-        return stockRepository.findBy(example, q -> q
-        .sortBy(Sort.by(stockSort.getSortOrderList())).all());
+        if(sort2==null || sort2.getSortOrder()==null){
+            return stockRepository.findBy(example, q -> q
+            .sortBy(Sort.by(sort1.getSortOrder())).all());
+        }else{
+            return stockRepository.findBy(example, q -> q
+            .sortBy(Sort.by(sort1.getSortOrder(), sort2.getSortOrder())).all());
+        }
     }
 
-    public List<Stock> findById(Long id) {
+    public List<Stock> findById(Integer id) {
         throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
     public List<Stock> findAll() {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        //throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        return null;
+    }
+
+    public void save(Stock entity){
+        this.stockRepository.save(entity);
     }
 
 }

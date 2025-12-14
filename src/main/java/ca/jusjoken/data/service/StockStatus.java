@@ -29,6 +29,10 @@ private Boolean stopsAgeCalculation;
         this.stopsAgeCalculation = stopsAgeCalculation;
         this.sortOrder = sortOrder;
     }
+    
+    public StockStatus getDefault(){
+        return new StockStatus("active", Utility.ICONS.STATUS_ACTIVE, "Active",Boolean.FALSE,1);
+    }
 
     @Override
     public int hashCode() {

@@ -1,15 +1,23 @@
 package ca.jusjoken.views;
 
+import ca.jusjoken.component.ComponentConfirmEvent;
 import ca.jusjoken.component.UserDialog;
+import ca.jusjoken.data.entity.StockSavedQuery;
+import ca.jusjoken.data.service.Registry;
+import ca.jusjoken.data.service.StockSavedQueryService;
+import ca.jusjoken.views.stock.StockView;
+import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.ComponentUtil;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.avatar.Avatar;
-import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.Footer;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.Header;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.SvgIcon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
@@ -17,6 +25,7 @@ import com.vaadin.flow.router.Layout;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.menu.MenuEntry;
+import com.vaadin.flow.shared.Registration;
 import com.vaadin.flow.spring.security.AuthenticationContext;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 import java.util.List;
@@ -27,14 +36,22 @@ import org.springframework.security.core.userdetails.UserDetails;
  */
 @Layout
 @AnonymousAllowed
-public class MainLayout extends AppLayout {
+public class MainLayout extends AppLayout{
     
     private final transient AuthenticationContext authContext;
+    private final StockSavedQueryService queryService;
+    //private StockView stockView = new StockView();
+    
+    private Registration registration;
+    private SideNav nav = new SideNav();
 
     private H1 viewTitle;
 
     public MainLayout(AuthenticationContext authContext) {
+        this.queryService = Registry.getBean(StockSavedQueryService.class);
         this.authContext = authContext;
+        
+        //StockView.class.addListener(this);
         setPrimarySection(Section.DRAWER);
         addDrawerContent();
         addHeaderContent();
@@ -68,13 +85,13 @@ public class MainLayout extends AppLayout {
         appName.addClassNames(LumoUtility.FontWeight.SEMIBOLD, LumoUtility.FontSize.LARGE);
         Header header = new Header(appName);
 
-        Scroller scroller = new Scroller(createNavigation());
-
+        Scroller scroller = new Scroller(nav);
+        createNavigation();
         addToDrawer(header, scroller, createFooter());
     }
 
-    private SideNav createNavigation() {
-        SideNav nav = new SideNav();
+    private void createNavigation() {
+        nav.removeAll();
 
         List<MenuEntry> menuEntries = MenuConfiguration.getMenuEntries();
         menuEntries.forEach(entry -> {
@@ -85,9 +102,19 @@ public class MainLayout extends AppLayout {
             }
         });
 
-        return nav;
+        //TODO build nav items for each stock query from database
+        List<StockSavedQuery> stockQueryList = queryService.getSavedQueryList();
+        for(StockSavedQuery query: stockQueryList){
+            SideNavItem sn = new SideNavItem(query.getSavedQueryName(), StockView.class, query.getId().toString());
+            sn.setPrefixComponent(VaadinIcon.LIST.create());
+            sn.getElement().addEventListener("click", click -> {
+                viewTitle.setText(query.getSavedQueryName());
+            });
+            nav.addItem(sn);
+        }
+        
     }
-
+    
     private Footer createFooter() {
         Footer layout = new Footer();
 
@@ -103,4 +130,15 @@ public class MainLayout extends AppLayout {
     private String getCurrentPageTitle() {
         return MenuConfiguration.getPageHeader(getContent()).orElse("");
     }
+
+    @Override
+    protected void onAttach(AttachEvent attachEvent) {
+        super.onAttach(attachEvent); 
+        registration = ComponentUtil.addListener(attachEvent.getUI(), ComponentConfirmEvent.class, event ->{
+            createNavigation();
+        });
+    }
+
+    
+    
 }

@@ -10,6 +10,7 @@
                 <Env.DM_DB_PASSWORD>FarmTracks2025</Env.DM_DB_PASSWORD>
                 <Env.DM_DB_URL>jdbc:mariadb://192.168.0.30:3306/FARMTRACKS</Env.DM_DB_URL>
                 <Env.DM_DB_USER>farmtracks</Env.DM_DB_USER>
+                <Env.PROFILE_IMAGE_PATH>/home/birch/Documents</Env.PROFILE_IMAGE_PATH>
             </properties>
         </action>
         <action>

@@ -31,22 +31,22 @@ public interface StockRepository extends JpaRepository<Stock, Long>, QueryByExam
     List<Stock> findAllKitsByLitterName(@Param("litterName") String litterName);
     
     @Query("select s from Stock s where s.motherId = :motherId and s.fatherId = :fatherId and s.doB = :doB")
-    List<Stock> findAllKitsByMotherFatherDoB(@Param("motherId") Long motherId, @Param("fatherId") Long fatherId, @Param("doB") LocalDate doB);
+    List<Stock> findAllKitsByMotherFatherDoB(@Param("motherId") Integer motherId, @Param("fatherId") Integer fatherId, @Param("doB") LocalDate doB);
 
     @Query("select s from Stock s where s.breeder = true")
     List<Stock> findAllBreeders();
 
-    public Long countByMotherId(Long id);
+    public Long countByMotherId(Integer id);
 
-    public Long countByFatherId(Long id);
+    public Long countByFatherId(Integer id);
     
     public Long countByStockType(StockType stockType);
 
-    public List<Stock> findAllKitsByLitterId(Long id);
+    public List<Stock> findAllKitsByLitterId(Integer id);
 
-    public List<Stock> findAllByMotherId(Long id);
+    public List<Stock> findAllByMotherId(Integer id);
 
-    public List<Stock> findAllByFatherId(Long id);
+    public List<Stock> findAllByFatherId(Integer id);
 
     
     

@@ -4,6 +4,7 @@
  */
 package ca.jusjoken.data;
 
+import ca.jusjoken.data.service.ColumnNameComparator;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockStatusComparator;
 import java.math.BigDecimal;
@@ -27,11 +28,13 @@ public class Utility {
         if (Utility.instance == null) {
             Utility.instance = new Utility();
             createStockStatusList();
+            createStockColumnNameList();
         }
         return Utility.instance;
     }
     
     private static final Map<String, StockStatus> stockStatusList = new HashMap();
+    private static final Map<String, ColumnName> stockColumnNameList = new HashMap();
 
     public static enum Gender{
         MALE("M"), FEMALE("F"), NA("NA");
@@ -118,6 +121,43 @@ public class Utility {
     }
     
     public static final String emptyValue = "--";
+    
+    private static void createStockColumnNameList(){
+        stockColumnNameList.clear();
+        stockColumnNameList.put("ageInDays", new ColumnName("Age", "ageInDays"));
+        stockColumnNameList.put("breed", new ColumnName("Breed", "breed"));
+        stockColumnNameList.put("doB", new ColumnName("Birthdate", "doB"));
+        stockColumnNameList.put("color", new ColumnName("Color", "color"));
+        stockColumnNameList.put("tattoo", new ColumnName("ID", "tattoo"));
+        stockColumnNameList.put("sex", new ColumnName("Gender", "sex"));
+        stockColumnNameList.put("name", new ColumnName("Name", "name"));
+        stockColumnNameList.put("prefix", new ColumnName("Prefix", "prefix"));
+        stockColumnNameList.put("status", new ColumnName("Status", "status"));
+        stockColumnNameList.put("weight", new ColumnName("Weight", "weight"));
+        stockColumnNameList.put("litterCount", new ColumnName("# of Litters", "litterCount"));
+        stockColumnNameList.put("kitCount", new ColumnName("# of Kits", "kitCount"));
+    }
+
+    public Collection<ColumnName> getStockColumnNameList() {
+        List<ColumnName> list = new ArrayList<ColumnName>(stockColumnNameList.values());
+        Collections.sort(list, new ColumnNameComparator());
+        return list;
+    }
+
+    public Boolean hasColumnName(String name){
+        return stockColumnNameList.containsKey(name);
+    }
+    
+    public ColumnName getColumnName(String name){
+        if(name==null || name.isEmpty()){
+            return stockColumnNameList.get("name");
+        }
+        if(stockColumnNameList.containsKey(name)){
+            return stockColumnNameList.get(name);
+        }else{
+            return null;
+        }
+    }
 
     private static void createStockStatusList(){
         stockStatusList.clear();

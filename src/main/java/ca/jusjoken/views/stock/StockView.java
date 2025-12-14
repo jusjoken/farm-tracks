@@ -1,36 +1,39 @@
 package ca.jusjoken.views.stock;
 
 import ca.jusjoken.UIUtilities;
-import ca.jusjoken.component.Badge;
+import ca.jusjoken.component.ComponentConfirmEvent;
 import ca.jusjoken.component.DialogCommon;
-import ca.jusjoken.component.GridCompact;
 import ca.jusjoken.component.Item;
 import ca.jusjoken.component.Layout;
 import ca.jusjoken.component.LazyComponent;
 import ca.jusjoken.component.ListRefreshNeededListener;
+import ca.jusjoken.data.ColumnName;
 import ca.jusjoken.data.Utility;
-import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.Utility.TabType;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
+import ca.jusjoken.data.entity.StockSavedQuery;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.StockRepository;
 import ca.jusjoken.data.service.StockService;
-import ca.jusjoken.data.service.StockSort;
+import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockTypeRepository;
 import ca.jusjoken.theme.RadioButtonTheme;
-import ca.jusjoken.utility.BadgeVariant;
 import ca.jusjoken.views.MainLayout;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.ComponentUtil;
 import com.vaadin.flow.component.Html;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
+import com.vaadin.flow.component.avatar.Avatar;
+import com.vaadin.flow.component.avatar.AvatarVariant;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.contextmenu.ContextMenu;
 import com.vaadin.flow.component.details.Details;
-import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.SvgIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -43,13 +46,16 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.virtuallist.VirtualList;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
-import com.vaadin.flow.component.orderedlayout.Scroller;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
-import com.vaadin.flow.router.Menu;
-import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.BeforeEvent;
+import com.vaadin.flow.router.HasDynamicTitle;
+import com.vaadin.flow.router.HasUrlParameter;
+import com.vaadin.flow.router.OptionalParameter;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.streams.DownloadHandler;
 import com.vaadin.flow.theme.lumo.LumoIcon;
 import com.vaadin.flow.theme.lumo.LumoUtility.*;
 import jakarta.annotation.security.PermitAll;
@@ -59,52 +65,55 @@ import org.vaadin.lineawesome.LineAwesomeIcon;
 
 import java.util.List;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.domain.Sort.Direction;
-import org.vaadin.lineawesome.LineAwesomeIconUrl;
 
-@PageTitle("Stock List")
 @Route(value = "stock", layout = MainLayout.class)
-@Menu(order = 1, icon = LineAwesomeIconUrl.TH_LIST_SOLID)
 @PermitAll
-public class StockView extends Main implements ListRefreshNeededListener {
+public class StockView extends Main implements ListRefreshNeededListener, HasDynamicTitle, HasUrlParameter<String> {
 
     private final StockRepository stockRepository;
     private final StockTypeRepository stockTypeRepository;
     private final LitterService litterService;
     private final StockService stockService;
-    private Boolean currentActiveFilterType = Boolean.TRUE;
-    private Boolean currentBreederFilterType = Boolean.TRUE;
+    private final StockSavedQueryService queryService;
     private String currentSearchName = "";
-    private StockType currentStockType;
-    private StockStatus currentStockStatus = Utility.getInstance().getStockStatus("active");
-    private Direction currentSortDirection = Sort.Direction.ASC;
-    private StockSort defaultStockSort = new StockSort("Name, ID", new Sort.Order(currentSortDirection, "name"));
-    private StockSort currentStockSort = defaultStockSort;
+    private StockSavedQuery currentStockSavedQuery;
+    private String currentSavedQueryId = null;
     private List<Stock> stockList = new ArrayList();
     private Long stockListCountAll = 0L;
     private VirtualList<Stock> list = new VirtualList<>();
     private Section sidebar;
     private NativeLabel countLabel = new NativeLabel();
+    private Button saveOptionsButton = new Button(LineAwesomeIcon.SAVE_SOLID.create());
+    private Button applyOptionsButton = new Button(LineAwesomeIcon.CHECK_SQUARE_SOLID.create());
     private DialogCommon dialogCommon;
-    
-    public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockService stockService) {
+    private ConfirmDialog saveQueryDialog = new ConfirmDialog();
+    private TextField saveQueryName = new TextField("Stock query name");
+    private Select<StockType> stockTypeChoice = new Select<>();
+    private RadioButtonGroup<String> breederFilter = new RadioButtonGroup<>();
+    private Select<StockStatus> stockStatusFilter = new Select<>();
+    private Select<ColumnName> stockSort1Column = new Select<>();
+    private RadioButtonGroup<String> sort1Direction = new RadioButtonGroup<>();
+    private Select<ColumnName> stockSort2Column = new Select<>();
+    private RadioButtonGroup<String> sort2Direction = new RadioButtonGroup<>();
+    private Boolean skipSidebarUpdates = Boolean.FALSE;
+
+    public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockService stockService, StockSavedQueryService queryService) {
         this.stockRepository = stockRepository;
         this.stockTypeRepository = stockTypeRepository;
         this.litterService = litterService;
         this.stockService = stockService;
-        this.defaultStockSort.addOrder(new Sort.Order(currentSortDirection, "tattoo"));
+        this.queryService = queryService;
+        //this.defaultStockSort.addOrder(new SortOrder(currentSortDirection.name(), "tattoo"));
         this.dialogCommon = new DialogCommon();
         dialogCommon.addListener(this);
         
-        //setSizeFull();
-        //addClassNames(Display.FLEX, FlexDirection.COLUMN, Gap.LARGE, Padding.Left.NONE, Padding.Bottom.XSMALL);
-        //add(createToolbar(), createHr(), createContent());
-
         addClassNames(Display.FLEX, Height.FULL, Overflow.HIDDEN);
+        //loadFilters();
         add(createSidebar(), createContent());
+        //applyFilters();
         closeSidebar();
+        saveOptionsConfigure();
         updateStockTypeCount();
-        applyFilters();
     }
 
     private Hr createHr() {
@@ -116,35 +125,49 @@ public class StockView extends Main implements ListRefreshNeededListener {
     private Section createSidebar() {
         H2 title = new H2("Options");
         title.addClassNames(FontSize.MEDIUM);
+        saveOptionsButton.addClickListener(click -> {
+            saveOptions();
+        });
+        applyOptionsButton.addClickListener(click -> {
+            applyFilters();
+        });
+        
+        saveOptionsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        saveOptionsButton.setAriaLabel("Save current options");
+        saveOptionsButton.setTooltipText("Save current options");
+
+        applyOptionsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        applyOptionsButton.setAriaLabel("Apply current options");
+        applyOptionsButton.setTooltipText("Apply current options");
 
         Button close = new Button(LineAwesomeIcon.TIMES_SOLID.create(), e -> closeSidebar());
         close.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         close.setAriaLabel("Close options");
         close.setTooltipText("Close options");
 
-        Layout header = new Layout(title, close);
+        HorizontalLayout buttonLayout = UIUtilities.getHorizontalLayoutNoWidthCentered();
+        buttonLayout.add(applyOptionsButton,saveOptionsButton,close);
+        
+        Layout header = new Layout(title, buttonLayout);
         header.addClassNames(Padding.End.MEDIUM, Padding.Start.LARGE, Padding.Vertical.SMALL);
         header.setAlignItems(Layout.AlignItems.CENTER);
         header.setJustifyContent(Layout.JustifyContent.BETWEEN);
 
-        Select<StockType> stockTypeChoice = new Select<>();
         stockTypeChoice.setAriaLabel("Stock type");
         stockTypeChoice.setLabel("Stock type");
         stockTypeChoice.addClassNames(MinWidth.NONE, Padding.Top.MEDIUM);
-        List<StockType> stockTypeList = stockTypeRepository.findAll();
         stockTypeChoice.setItemLabelGenerator(StockType::getName);
-        stockTypeChoice.setItems(stockTypeList);
-        currentStockType = stockTypeRepository.findFirstByOrderByDefaultTypeDesc();
-        stockTypeChoice.setValue(currentStockType);
         stockTypeChoice.addValueChangeListener(event -> {
-            currentStockType = event.getValue();
+            currentStockSavedQuery.setStockType(event.getValue());
             updateStockTypeCount();
-            applyFilters();
+            sidebarChanged(Boolean.TRUE);
         });
+        stockTypeChoice.setItems(stockTypeRepository.findAll());
+        if(currentStockSavedQuery!=null){
+            stockTypeChoice.setValue(currentStockSavedQuery.getStockType());
+        }
         
-        RadioButtonGroup<String> breederFilter = new RadioButtonGroup<>();
         breederFilter.setAriaLabel("Breeder Filter");
-        breederFilter.setItems("All", stockTypeChoice.getValue().getBreederName(), stockTypeChoice.getValue().getNonBreederName());
         breederFilter.addClassNames(BoxSizing.BORDER, Padding.XSMALL, Padding.Top.MEDIUM);
         breederFilter.addThemeNames(RadioButtonTheme.EQUAL_WIDTH, RadioButtonTheme.PRIMARY, RadioButtonTheme.TOGGLE);
         breederFilter.getChildren().forEach(component -> {
@@ -153,19 +176,21 @@ public class StockView extends Main implements ListRefreshNeededListener {
         });
         breederFilter.setLabel("Breeder Filter");
         breederFilter.setTooltipText("Breeder Filter");
-        breederFilter.setValue(stockTypeChoice.getValue().getBreederName());
+        if(stockTypeChoice.getValue()!=null){
+            breederFilter.setItems("All", stockTypeChoice.getValue().getBreederName(), stockTypeChoice.getValue().getNonBreederName());
+            breederFilter.setValue(stockTypeChoice.getValue().getBreederName());
+        }
         breederFilter.addValueChangeListener(event -> {
             if(event.getValue().equals("All")) {
-                currentBreederFilterType = null;
+                currentStockSavedQuery.setBreeder(null);
             }else if(event.getValue().equals(stockTypeChoice.getValue().getNonBreederName())) {
-                currentBreederFilterType = Boolean.FALSE;
+                currentStockSavedQuery.setBreeder(Boolean.FALSE);
             }else{
-                currentBreederFilterType = Boolean.TRUE;
+                currentStockSavedQuery.setBreeder(Boolean.TRUE);
             }
-            applyFilters();
+            sidebarChanged(Boolean.TRUE);
         });
 
-        Select<StockStatus> stockStatusFilter = new Select<>();
         stockStatusFilter.setAriaLabel("Status Filter");
         stockStatusFilter.setLabel("Status Filter");
         stockStatusFilter.addClassNames(MinWidth.NONE);
@@ -175,68 +200,81 @@ public class StockView extends Main implements ListRefreshNeededListener {
         }));        
         
         Collection<StockStatus> stockStatusList = Utility.getInstance().getStockStatusList();
-        System.out.println("StusList:" + stockStatusList);
-        //stockStatusFilter.setItemLabelGenerator(StockStatus::getLongName);
         stockStatusFilter.setItems(stockStatusList);
         stockStatusFilter.addComponents(Utility.getInstance().getStockStatus("all"), new Hr());
-        stockStatusFilter.setValue(currentStockStatus);
         stockStatusFilter.addValueChangeListener(event -> {
-            currentStockStatus = event.getValue();
-            applyFilters();
+            currentStockSavedQuery.setStockStatus(event.getValue());
+            sidebarChanged(Boolean.TRUE);
         });
         
         Layout filterForm = new Layout(stockTypeChoice, breederFilter, stockStatusFilter);
         filterForm.addClassNames(Padding.Horizontal.LARGE);
         filterForm.setFlexDirection(Layout.FlexDirection.COLUMN);
 
-        Select<StockSort> stockSortOptions = new Select<>();
-        stockSortOptions.setAriaLabel("Sort by");
-        stockSortOptions.setLabel("Sort by");
-        stockSortOptions.addClassNames(MinWidth.NONE);
-        List<StockSort> sortItems = new ArrayList<>();
-        sortItems.add(defaultStockSort);
-        sortItems.add(new StockSort("Age", new Sort.Order(Sort.Direction.ASC, "ageInDays")));
-        sortItems.add(new StockSort("Breed", new Sort.Order(Sort.Direction.ASC, "breed")));
-        sortItems.add(new StockSort("Birthdate", new Sort.Order(Sort.Direction.ASC, "doB")));
-        sortItems.add(new StockSort("Color", new Sort.Order(Sort.Direction.ASC, "color")));
-        sortItems.add(new StockSort("ID", new Sort.Order(Sort.Direction.ASC, "tattoo")));
-        sortItems.add(new StockSort("Gender", new Sort.Order(Sort.Direction.ASC, "sex")));
-        sortItems.add(new StockSort("Name", new Sort.Order(Sort.Direction.ASC, "name")));
-        sortItems.add(new StockSort("Prefix", new Sort.Order(Sort.Direction.ASC, "prefix")));
-        sortItems.add(new StockSort("Status", new Sort.Order(Sort.Direction.ASC, "status"), new Sort.Order(Sort.Direction.ASC, "name")));
-        sortItems.add(new StockSort("Weight", new Sort.Order(Sort.Direction.ASC, "weight")));
-        sortItems.add(new StockSort("# of Litters", new Sort.Order(Sort.Direction.ASC, "litterCount")));
-        sortItems.add(new StockSort("# of Kits", new Sort.Order(Sort.Direction.ASC, "kitCount")));
-        stockSortOptions.setItems(sortItems);
-        stockSortOptions.setItemLabelGenerator(StockSort::getName);
-        stockSortOptions.setValue(defaultStockSort);
-        stockSortOptions.addValueChangeListener(event -> {
-            currentStockSort = event.getValue();
-            applyFilters();
+        stockSort1Column.setAriaLabel("Sort by (first column)");
+        stockSort1Column.setLabel("Sort by (first column)");
+        stockSort1Column.addClassNames(MinWidth.NONE);
+        stockSort1Column.setItems(Utility.getInstance().getStockColumnNameList());
+        stockSort1Column.setItemLabelGenerator(ColumnName::getDisplayName);
+        stockSort1Column.addValueChangeListener(event -> {
+            currentStockSavedQuery.setSort1Column(event.getValue().getColumnName());
+            sidebarChanged(Boolean.TRUE);
         });
         
-        RadioButtonGroup<String> sortDirection = new RadioButtonGroup<>();
-        sortDirection.setAriaLabel("Sort Direction");
-        sortDirection.setItems(Sort.Direction.ASC.name(), Sort.Direction.DESC.name());
-        sortDirection.addClassNames(BoxSizing.BORDER, Padding.XSMALL, Padding.Top.MEDIUM);
-        sortDirection.addThemeNames(RadioButtonTheme.EQUAL_WIDTH, RadioButtonTheme.PRIMARY, RadioButtonTheme.TOGGLE);
-        sortDirection.getChildren().forEach(component -> {
+        sort1Direction.setAriaLabel("Sort Direction");
+        sort1Direction.setItems(Sort.Direction.ASC.name(), Sort.Direction.DESC.name());
+        sort1Direction.addClassNames(BoxSizing.BORDER, Padding.XSMALL, Padding.Top.MEDIUM);
+        sort1Direction.addThemeNames(RadioButtonTheme.EQUAL_WIDTH, RadioButtonTheme.PRIMARY, RadioButtonTheme.TOGGLE);
+        sort1Direction.getChildren().forEach(component -> {
             component.getElement().getThemeList().add(RadioButtonTheme.PRIMARY);
             component.getElement().getThemeList().add(RadioButtonTheme.TOGGLE);
         });
-        sortDirection.setLabel("Sort Direction");
-        sortDirection.setTooltipText("Sort Direction");
-        sortDirection.setValue(currentSortDirection.name());
-        sortDirection.addValueChangeListener(event -> {
-            if(event.getValue().equals(Sort.Direction.ASC.name())) {
-                currentSortDirection = Sort.Direction.ASC;
-            }else{
-                currentSortDirection = Sort.Direction.DESC;
-            }
-            applyFilters();
+        sort1Direction.setLabel("Sort Direction");
+        sort1Direction.setTooltipText("Sort Direction");
+        sort1Direction.addValueChangeListener(event -> {
+            currentStockSavedQuery.setSort1Direction(event.getValue());
+            sidebarChanged(Boolean.TRUE);
         });
 
-        Layout sortForm = new Layout(stockSortOptions, sortDirection);
+        stockSort2Column.setEmptySelectionAllowed(true);
+        stockSort2Column.setAriaLabel("Sort by (second column)");
+        stockSort2Column.setLabel("Sort by (second column)");
+        stockSort2Column.addClassNames(MinWidth.NONE);
+        stockSort2Column.setItems(Utility.getInstance().getStockColumnNameList());
+        stockSort2Column.setEmptySelectionCaption("None selected");
+        stockSort2Column.setItemLabelGenerator(column -> {
+            if(column==null){
+                return "None selected";
+            }else{
+                return column.getDisplayName();
+            }
+        });
+        stockSort2Column.addValueChangeListener(event -> {
+            if(event.getValue()==null){
+                currentStockSavedQuery.setSort2Column(null);
+            }else{
+                currentStockSavedQuery.setSort2Column(event.getValue().getColumnName());
+            }
+            sidebarChanged(Boolean.TRUE);
+        });
+        
+        sort2Direction.setAriaLabel("Sort Direction");
+        sort2Direction.setItems(Sort.Direction.ASC.name(), Sort.Direction.DESC.name());
+        sort2Direction.addClassNames(BoxSizing.BORDER, Padding.XSMALL, Padding.Top.MEDIUM);
+        sort2Direction.addThemeNames(RadioButtonTheme.EQUAL_WIDTH, RadioButtonTheme.PRIMARY, RadioButtonTheme.TOGGLE);
+        sort2Direction.getChildren().forEach(component -> {
+            component.getElement().getThemeList().add(RadioButtonTheme.PRIMARY);
+            component.getElement().getThemeList().add(RadioButtonTheme.TOGGLE);
+        });
+        sort2Direction.setLabel("Sort Direction");
+        sort2Direction.setTooltipText("Sort Direction");
+        sort2Direction.addValueChangeListener(event -> {
+            currentStockSavedQuery.setSort2Direction(event.getValue());
+            sidebarChanged(Boolean.TRUE);
+        });
+
+        Layout sortForm = new Layout(stockSort1Column, sort1Direction, stockSort2Column, sort2Direction);
+
         sortForm.addClassNames(Padding.Horizontal.LARGE);
         sortForm.setFlexDirection(Layout.FlexDirection.COLUMN);
         
@@ -246,6 +284,77 @@ public class StockView extends Main implements ListRefreshNeededListener {
                 "transition-all", "z-10");
         this.sidebar.setWidth(20, Unit.REM);
         return this.sidebar;
+    }
+    
+    private void sidebarSetValues(){
+        skipSidebarUpdates = Boolean.TRUE;
+        stockTypeChoice.setValue(currentStockSavedQuery.getStockType());
+        breederFilter.setValue(stockTypeChoice.getValue().getBreederName());
+        stockStatusFilter.setValue(currentStockSavedQuery.getStockStatus());
+        stockSort1Column.setValue(Utility.getInstance().getColumnName(currentStockSavedQuery.getSort1().getColumnName()));
+        sort1Direction.setValue(currentStockSavedQuery.getSort1Direction());
+        if(currentStockSavedQuery.getSort2().getColumnName()==null){
+            stockSort2Column.setValue(null);
+        }else{
+            stockSort2Column.setValue(Utility.getInstance().getColumnName(currentStockSavedQuery.getSort2().getColumnName()));
+        }
+        if(currentStockSavedQuery.getSort2()!=null){
+            sort2Direction.setValue(currentStockSavedQuery.getSort2Direction());
+        }
+        skipSidebarUpdates = Boolean.FALSE;
+    }
+    
+    private void sidebarChanged(Boolean changed){
+        if(skipSidebarUpdates){
+        }else{
+            currentStockSavedQuery.setDirty(changed);
+            currentStockSavedQuery.setNeedsSaving(changed);
+            applyOptionsButton.setEnabled(changed);
+            saveOptionsButton.setEnabled(changed);
+        }
+    }
+    
+    //call one time to configure save options dialog
+    private void saveOptionsConfigure() {
+        saveQueryDialog.setHeader("Save current options?");
+        Span message = new Span("Are you sure you want to save the current options to the following named saved query?");
+        saveQueryName.setHelperText("Change the name to save as a new query!");
+        saveQueryName.setWidthFull();
+        VerticalLayout messageLayout = UIUtilities.getVerticalLayout();
+        messageLayout.add(message,saveQueryName);
+        
+        saveQueryDialog.setText(messageLayout);
+                
+        saveQueryDialog.setCancelable(true);
+        saveQueryDialog.addCancelListener(event -> {
+            //do nothing
+        });
+
+        saveQueryDialog.setConfirmText("Save");
+        saveQueryDialog.setConfirmButtonTheme("error primary");
+        saveQueryDialog.addConfirmListener(event -> {
+            //save the item
+            if(currentStockSavedQuery.getSavedQueryName().equals(saveQueryName.getValue())){
+                UIUtilities.showNotification("Saving current query overwritting:id:" + currentStockSavedQuery.getId() + " :" + currentStockSavedQuery.getSavedQueryName());
+                //save the currentStockSavedQuery to the database
+                currentSavedQueryId = queryService.saveQuery(currentStockSavedQuery).toString();
+                loadFilters();
+                applyFilters();
+                sidebarChanged(Boolean.FALSE);
+            }else{
+                UIUtilities.showNotification("Saving current query as NEW :" + saveQueryName.getValue());
+                currentSavedQueryId = queryService.saveAsQuery(currentStockSavedQuery, saveQueryName.getValue()).toString();
+                loadFilters();
+                applyFilters();
+                sidebarChanged(Boolean.FALSE);
+            }
+            ComponentUtil.fireEvent(UI.getCurrent(), new ComponentConfirmEvent(saveQueryDialog, false));
+        });
+    }
+    
+    private void saveOptions() {
+        saveQueryName.setValue(currentStockSavedQuery.getSavedQueryName());
+        saveQueryDialog.open();
     }
     
     private Layout createSectionHeader(String title, Boolean topPadding){
@@ -303,22 +412,37 @@ public class StockView extends Main implements ListRefreshNeededListener {
     }
     
     private void updateCounts(){
-        countLabel.setText(stockList.size() + "/" + stockListCountAll + " " + currentStockType.getName());
+        countLabel.setText(stockList.size() + "/" + stockListCountAll + " " + currentStockSavedQuery.getStockType().getName());
         countLabel.addClassNames(FontSize.SMALL);
     }
     
     private void updateStockTypeCount(){
-        stockListCountAll = stockRepository.countByStockType(currentStockType);
+        if(currentStockSavedQuery!=null){
+            stockListCountAll = stockRepository.countByStockType(currentStockSavedQuery.getStockType());
+            
+        }
+    }
+    
+    private void loadFilters(){
+        if(currentSavedQueryId==null){
+            currentStockSavedQuery = queryService.getSavedQueryList().get(0);
+        }else{
+            currentStockSavedQuery = queryService.getSavedQueryById(currentSavedQueryId);
+        }
+        sidebarChanged(Boolean.FALSE);
     }
     
     private void applyFilters(){
-        currentStockSort.setSortDirection(currentSortDirection);
-        System.out.println("activeFilters: stock:" + currentStockType.getName() + " active:" + currentActiveFilterType + " breeder:" + currentBreederFilterType + " status:" + currentStockStatus + " sort:" + currentStockSort);
-        stockList = stockService.findStockWithCustomMatcher(currentSearchName, currentBreederFilterType, currentStockType, currentStockStatus, currentStockSort);
-        System.out.println("List: count:" + stockList.size() + " : " + stockList);
+        System.out.println("applyFilters: stock(start):" + currentStockSavedQuery.toString() );
+        stockList = stockService.findStockWithCustomMatcher(currentSearchName, currentStockSavedQuery);
         list.setItems(stockList);
         list.scrollToIndex(0);
+        applyOptionsButton.setEnabled(false);
+        currentStockSavedQuery.setDirty(Boolean.FALSE);
+        saveOptionsButton.setEnabled(currentStockSavedQuery.getNeedsSaving());
         updateCounts();
+        sidebarSetValues();
+        //System.out.println("applyFilters: stock(end):" + currentStockSavedQuery.toString() );
     }
     
     private Component createContent() {
@@ -332,7 +456,6 @@ public class StockView extends Main implements ListRefreshNeededListener {
     private Component createList(){
         list.setItems(stockList);
         list.setRenderer(stockCardRenderer);
-        //setBorders(list, null, Boolean.TRUE);
         list.setWidthFull();
         return list;        
     }
@@ -344,26 +467,25 @@ public class StockView extends Main implements ListRefreshNeededListener {
 
     private Details createListItemLayout(Stock stock) {
         // Image and favourite button
-        Image img = new Image(stock.getDefaultImageSource(), stock.getName());
-        img.addClassNames(Padding.NONE);
-        img.getStyle().set("max-width", "75px");
-        img.getStyle().set("max-height", "75px");
-        img.getStyle().set("width", "auto");
-        img.getStyle().set("height", "auto");
-        img.getStyle().set("border-radius", "50%");
-        img.getStyle().set("object-fit", "cover");
-        img.getStyle().set("display", "block");
+        Avatar avatar = new Avatar();
+        Div avatarDiv = new Div(avatar);
+        avatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
+        avatar.setHeight("8em");
+        avatar.setWidth("8em");
+        avatar.setImageHandler(DownloadHandler.forFile(stock.getProfileFile()));
         
-        UIUtilities.setBorders(img, stock, true);
-
-
+        UIUtilities.setBorders(avatar, stock, true);
+        
+        avatar.getElement().addEventListener("click", click -> {
+            //open image dialog
+            dialogCommon.setDialogMode(DialogCommon.DialogMode.EDIT);
+            //dialogCommon.setDisplayMode(DialogCommon.DisplayMode.PROFILE_IMAGE);
+            dialogCommon.setDialogTitle("Edit Profile Image");
+            dialogCommon.dialogOpen(stock,DialogCommon.DisplayMode.PROFILE_IMAGE);
+        }).addEventData("event.stopPropagation()");        
         
         Layout outerHeader = new Layout();
         outerHeader.add(stock.getHeader());
-        
-        Component actionMenu = UIUtilities.createDefaultActions();
-        actionMenu.getStyle().set("margin-left", "auto");
-        outerHeader.add(actionMenu);
         
         // Extra Info
         Layout extraInfo = new Layout();
@@ -373,11 +495,6 @@ public class StockView extends Main implements ListRefreshNeededListener {
         extraInfo.setAlignItems(Layout.AlignItems.START);
         extraInfo.setGap(Layout.Gap.XSMALL);
         extraInfo.setWidth(130, Unit.PIXELS);
-        //extraInfo.setFlexGrow();
-        //extraInfo.addClassNames(MaxWidth.FULL,"max-width", "15%");
-        //extraInfo.getStyle().set("max-width", "15%");
-
-        //extraInfo.setWidth(15, Unit.PERCENTAGE);
         
         String stockId = stock.getTattoo();
         if(!stockId.isEmpty() && !stockId.equals(stock.getDisplayName())){
@@ -403,7 +520,7 @@ public class StockView extends Main implements ListRefreshNeededListener {
         topLayout.setWidthFull();
 
         //top outer section layout
-        Layout topOuterLayout = new Layout(img,topLayout);
+        Layout topOuterLayout = new Layout(avatarDiv,topLayout);
         topOuterLayout.setFlexDirection(Layout.FlexDirection.ROW);
         topOuterLayout.setGap(Layout.Gap.SMALL);
         topOuterLayout.setWidthFull();
@@ -414,8 +531,6 @@ public class StockView extends Main implements ListRefreshNeededListener {
         layout.setFlexDirection(Layout.FlexDirection.COLUMN);
         layout.addClassNames(AlignItems.STRETCH);
         layout.setPosition(Layout.Position.RELATIVE);
-        //setBorders(layout, stock, false);
-        //layout.addClassNames(Border.ALL,BorderRadius.LARGE, BoxShadow.SMALL);
         layout.setSizeUndefined();
         layout.addClassNames(Margin.NONE);
 
@@ -425,6 +540,10 @@ public class StockView extends Main implements ListRefreshNeededListener {
         detailsPanel.addClassNames(Padding.NONE,Margin.Left.MEDIUM,Margin.Right.MEDIUM);
         UIUtilities.setBorders(detailsPanel, stock, false);
         detailsPanel.addClassNames(Border.ALL,BorderRadius.LARGE, BoxShadow.SMALL);
+        
+        ContextMenu menu = UIUtilities.createContextMenu(stock);
+        menu.setTarget(detailsPanel);
+        menu.setOpenOnClick(false);
         
         return detailsPanel;
     }
@@ -463,15 +582,11 @@ public class StockView extends Main implements ListRefreshNeededListener {
         }
     }
 
-    private Component createTabOverview(Stock stock) {
+    private LazyComponent createTabOverview(Stock stock) {
         Layout layout = new Layout();
-        layout.add(new Span("info..."));
-        return layout;
-    }
-    
-    private LazyComponent createTabKits(Stock stock) {
-        List<Stock> kits = stockService.getKitsForParent(stock);
-        return new LazyComponent(() -> getKitListPanel(kits));
+        DialogCommon overviewDialog = new DialogCommon(DialogCommon.DisplayMode.STOCK_DETAILS);
+        layout.add(overviewDialog.showItem(stock, DialogCommon.DisplayMode.STOCK_DETAILS,true,false));
+        return new LazyComponent(() -> layout);
     }
     
     private LazyComponent createTabLitters(Stock stock) {
@@ -503,10 +618,18 @@ public class StockView extends Main implements ListRefreshNeededListener {
         return new LazyComponent(() -> layout);
     }
 
+    private LazyComponent createTabKits(Stock stock) {
+        Layout layout = new Layout();
+        List<Stock> kits = stockService.getKitsForParent(stock);
+        
+        layout.add(getKitListGrid(kits));
+        return new LazyComponent(() -> layout);
+    }
+
     private Component getKitListGrid(List<Stock> kits){
-        GridCompact<Stock> kitGrid = new GridCompact();
-        //kitGrid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_NO_BORDER);
-        //kitGrid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
+        Grid<Stock> kitGrid = new Grid();
+        //GridCompact<Stock> kitGrid = new GridCompact();
+        kitGrid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
         kitGrid.setHeight("200px");
 
         kitGrid.addColumn(Stock::getDisplayName).setHeader("Name");
@@ -517,67 +640,6 @@ public class StockView extends Main implements ListRefreshNeededListener {
         kitGrid.setItems(kits);
         return kitGrid;
     }
-    
-    private Scroller getKitListPanel(List<Stock> kits){
-            Layout div = new Layout();
-            Scroller scroll = new Scroller(div);
-            scroll.setScrollDirection(Scroller.ScrollDirection.VERTICAL);
-            scroll.setMaxHeight("128px");
-            div.setFlexWrap(Layout.FlexWrap.WRAP);
-            div.addClassNames(Margin.NONE, Padding.NONE);
-            for(Stock kit : kits){
-                div.add(createMiniKitPanel(kit));
-            }
-            
-            return scroll;
-        
-    }
-    
-    /*
-    private Card createMiniKitCard(Stock kit){
-        Card card = new Card();
-        //card.setTitle(new Span(kit.getDisplayName()));
-        //card.setSubtitle(new Span(kit.getColor()));
-        Layout headerRow = new Layout(new Span(kit.getDisplayName()));
-        headerRow.setAlignItems(Layout.AlignItems.BASELINE);
-        card.setHeader(headerRow);
-        Component actionMenu = createDefaultActions();
-        actionMenu.getStyle().set("margin-left", "auto");
-        actionMenu.addClassNames(Padding.NONE, Margin.Top.NONE,Margin.Bottom.NONE);
-        card.setHeaderSuffix(actionMenu);
-        
-        card.add(new Html(kit.getWeightInLbsOz()));
-        card.addThemeVariants(CardVariant.LUMO_ELEVATED,CardVariant.LUMO_HORIZONTAL,CardVariant.LUMO_OUTLINED);
-        card.addClassNames(Margin.XSMALL, Padding.NONE);
-        card.setWidth("134px");
-        card.setHeight("62px");
-        return card;
-    }
-    */
-
-    private Layout createMiniKitPanel(Stock kit){
-        Layout box = new Layout();
-        box.setFlexDirection(Layout.FlexDirection.COLUMN);
-        box.addClassNames(FontSize.XSMALL);
-        box.addClassNames(FontWeight.LIGHT);
-        box.setWidth("134px");
-        box.setHeight("62px");
-        box.addClassNames(Margin.XSMALL, Padding.XSMALL);
-        Layout headerRow = new Layout(new Span(kit.getDisplayName()));
-        headerRow.setAlignItems(Layout.AlignItems.BASELINE);
-        Component actionMenu = UIUtilities.createDefaultActions();
-        actionMenu.getStyle().set("margin-left", "auto");
-        actionMenu.addClassNames(Padding.NONE, Margin.Top.NONE,Margin.Bottom.NONE);
-        headerRow.add(actionMenu);
-        box.add(headerRow);
-        box.add(new Span(kit.getColor()));
-        box.add(new Html(kit.getWeightInLbsOz()));
-
-        UIUtilities.setBorders(box, null, false);
-        box.addClassNames(Border.ALL,BorderRadius.MEDIUM, BoxShadow.SMALL);
-        return box;
-    }
-    
     
     private Component createTabNotes(Stock stock) {
         //Add Edit and Save on this panel for notes
@@ -632,50 +694,8 @@ public class StockView extends Main implements ListRefreshNeededListener {
         panel.setId(panelType.typeName);
         panel.setFlexDirection(Layout.FlexDirection.COLUMN);
         panel.addClassNames(AlignItems.CENTER);
-        //panel.addClassNames(Border.ALL,BorderColor.CONTRAST_20,BorderRadius.MEDIUM,Padding.SMALL);
         panel.addClassNames(Padding.SMALL);
         
-        //Popover panelViewer = new Popover();
-        Dialog panelViewer = new Dialog();
-        //panelViewer.setTarget(panel);
-        panelViewer.setModal(false);
-        //panelViewer.setOpenOnClick(false);
-        //panelViewer.addThemeVariants(PopoverVariant.ARROW);
-        /*
-        if(panel.getId().equals(Utility.PanelType.LITTERS.typeName)){
-            panelViewer.add(createTabLitters(stock));
-        }else if(panel.getId().equals(Utility.PanelType.KITS.typeName)){
-            panelViewer.add(createTabKits(stock));
-        }
-        */
-        
-        panel.getElement().addEventListener("click", click -> {
-            String eventId = click.getSource().getAttribute("id");
-            if(eventId.equals(Utility.PanelType.LITTERS.typeName)){
-                dialogCommon.setDialogMode(DialogCommon.DialogMode.EDIT);
-                dialogCommon.setDisplayMode(DialogCommon.DisplayMode.LITTER_LIST);
-                dialogCommon.setDialogTitle("Litters");
-                dialogCommon.dialogOpen(stock);
-
-                //panelViewer.removeAll();
-                //panelViewer.add(createTabLitters(stock));
-                //panelViewer.setWidth("400px");
-                //panelViewer.open();
-                //open popover or dialog
-            }else if(eventId.equals(Utility.PanelType.KITS.typeName)){
-                dialogCommon.setDialogMode(DialogCommon.DialogMode.EDIT);
-                dialogCommon.setDisplayMode(DialogCommon.DisplayMode.KIT_LIST);
-                dialogCommon.setDialogTitle("Kits");
-                dialogCommon.dialogOpen(stock);
-                //panelViewer.removeAll();
-                //panelViewer.add(createTabKits(stock));
-                //panelViewer.setWidth("400px");
-                //panelViewer.open();
-                //open popover or dialog
-            }else{
-                //do nothing
-            }
-        }).addEventData("event.stopPropagation()");
         return panel;
     }
     
@@ -709,10 +729,23 @@ public class StockView extends Main implements ListRefreshNeededListener {
 
     @Override
     public void listRefreshNeeded() {
-        stockList = stockService.findAll();
-        //grid.setItems(stockList);
-        //grid.getDataProvider().refreshAll();
-        //onFilterChange();
+        applyFilters();
+        //list.getDataProvider().refreshItem(stockRepository.findByNameAndTattoo("Aspen", "BR29"),true);
+    }
+
+    @Override
+    public void setParameter(BeforeEvent event, @OptionalParameter String parameter) {
+
+        currentSavedQueryId = parameter;
+        loadFilters();
+        applyFilters();
+        
+    }    
+
+    @Override
+    public String getPageTitle() {
+        if(currentStockSavedQuery==null) return "Stock List";
+        return currentStockSavedQuery.getSavedQueryName();
     }
 
 }

@@ -8,19 +8,27 @@ import ca.jusjoken.data.entity.Litter;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  *
  * @author birch
  */
+@Transactional
 public interface LitterRepository extends JpaRepository<Litter, UUID>  {
 
-    public Long countByMotherId(Long motherId);
+    public Long countByMotherId(Integer motherId);
 
-    public Long countByFatherId(Long fatherId);
+    public Long countByFatherId(Integer fatherId);
 
-    public List<Litter> findByMotherId(Long id);
+    public List<Litter> findByMotherId(Integer id);
 
-    public List<Litter> findByFatherId(Long id);
+    public List<Litter> findByFatherId(Integer id);
+    
+    @Modifying
+    @Query(value = "DELETE FROM litter", nativeQuery = true)
+    public void deleteAllLittersNative();   
     
 }

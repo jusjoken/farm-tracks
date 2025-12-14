@@ -9,12 +9,13 @@ package ca.jusjoken.component;
  * @author birch
  */
 import ca.jusjoken.UIUtilities;
-import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
+import com.flowingcode.vaadin.addons.imagecrop.Crop;
+import com.flowingcode.vaadin.addons.imagecrop.ImageCrop;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.Key;
@@ -27,33 +28,47 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.card.Card;
 import com.vaadin.flow.component.card.CardVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
-import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
-import com.vaadin.flow.component.html.Image;
+import com.vaadin.flow.component.formlayout.FormLayout.ResponsiveStep;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
-import com.vaadin.flow.component.icon.SvgIcon;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
+import com.vaadin.flow.component.orderedlayout.FlexComponent.JustifyContentMode;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextArea;
-import com.vaadin.flow.component.textfield.TextAreaVariant;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.virtuallist.VirtualList;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
+import com.vaadin.flow.dom.ElementFactory;
+import com.vaadin.flow.server.streams.DownloadHandler;
+import com.vaadin.flow.server.streams.InMemoryUploadHandler;
+import com.vaadin.flow.server.streams.UploadHandler;
 import com.vaadin.flow.theme.lumo.LumoUtility.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import javax.imageio.ImageIO;
+import org.imgscalr.Scalr;
 
 public class DialogCommon {
 
@@ -65,19 +80,18 @@ public class DialogCommon {
     private DialogMode dialogMode = DialogMode.EDIT;
 
     public enum DisplayMode{
-        LITTER_LIST, KIT_LIST, STOCK_DETAILS
+        LITTER_LIST, KIT_LIST, STOCK_DETAILS, PROFILE_IMAGE
     }
-    private DisplayMode displayMode = DisplayMode.STOCK_DETAILS;
+    //private DisplayMode displayMode = DisplayMode.PROFILE_IMAGE;
 
     private Boolean superUser = Boolean.FALSE;
     private Boolean validationEnabled = Boolean.FALSE;
     private Logger log = LoggerFactory.getLogger(DialogCommon.class);
     private Dialog dialog = new Dialog();
-    private Dialog dialogAdv = new Dialog();
     private Long taskID = 0L;
     private Stock stockEntity;
     private String dialogTitle = "";
-    
+
     private List<Stock> stockList = new ArrayList<>();
     private List<Litter> litterList = new ArrayList<>();
     
@@ -86,15 +100,35 @@ public class DialogCommon {
     private Button dialogOkButton = new Button("OK");
     private Button dialogCancelButton = new Button("Cancel");
     private Button dialogCloseButton = new Button(new Icon("lumo", "cross"));
-    private Button dialogConvertCustom = new Button(new Icon("vaadin","exchange"));
 
-    private Button dialogAdvOkButton = new Button("OK");
-    private Button dialogAdvCancelButton = new Button("Cancel");
-    private Button dialogAdvCloseButton = new Button(new Icon("lumo", "cross"));
+    private Upload dialogUploadComponent;
 
+    private static final String[] ACCEPTED_MIME_TYPES =
+      {"image/gif", "image/png", "image/jpeg", "image/bmp", "image/webp"};
+    private byte[] profileImageData = null;
+    private String profileImageMimeType = null;
 
     //Fields defined here
     //global fields
+    private Avatar fieldProfileAvatar = new Avatar();
+    private Div avatarDiv = new Div(fieldProfileAvatar);    
+    private ImageCrop fieldProfileImageCrop = new ImageCrop(fieldProfileAvatar.getImage());
+    private Checkbox fieldProfileUseCamera = new Checkbox("Use camera if available");
+    private Button dialogProfileImageRotateButton = new Button("Rotate");
+
+    private DatePicker fieldAquiredDate = new DatePicker();
+    private DatePicker fieldBornDate = new DatePicker();
+    private TextField fieldLegs = UIUtilities.getTextField();
+    private TextField fieldChampNo = UIUtilities.getTextField();
+    private TextField fieldRegNo = UIUtilities.getTextField();
+    private TextField fieldFatherName = UIUtilities.getTextField();
+    private TextField fieldMotherName = UIUtilities.getTextField();
+    private TextField fieldGenotype = UIUtilities.getTextField();
+    private TextField fieldCategory = UIUtilities.getTextField(); //TODO - needs to be a pickbox
+    private TextField fieldStatus = UIUtilities.getTextField(); //TODO - needs to be a pickbox
+    private DatePicker fieldStatusDate = new DatePicker();
+    private TextField fieldFoster = UIUtilities.getTextField(); //TODO - needs to figure this out
+    
     private NumberField fieldGlobalSubTotal = UIUtilities.getNumberField(Boolean.FALSE);
     private ButtonNumberField fieldGlobalTaxes = UIUtilities.getButtonNumberField("",Boolean.FALSE,"$");
 
@@ -132,15 +166,21 @@ public class DialogCommon {
 
     private List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
 
+    private String profileImagePath;
+
     public DialogCommon() {
+        this(DisplayMode.STOCK_DETAILS);
+    }
+
+    public DialogCommon(DisplayMode currentDisplayMode) {
         this.stockService = Registry.getBean(StockService.class);
         this.litterService = Registry.getBean(LitterService.class);
-        dialogConfigure();
-        dialogAdvConfigure();
+        profileImagePath = System.getenv("PROFILE_IMAGE_PATH");
+        dialogConfigure(currentDisplayMode);
     }
 
 
-    private void dialogConfigure() {
+    private void dialogConfigure(DisplayMode currentDisplayMode) {
 
         //configure the dialog internal layout for the form
         dialogLayout.setSpacing(false);
@@ -156,7 +196,7 @@ public class DialogCommon {
 
         dialogOkButton.addClickListener(
                 event -> {
-                    dialogSave();
+                    dialogSave(currentDisplayMode);
                 }
         );
         dialogOkButton.addClickShortcut(Key.ENTER);
@@ -166,20 +206,13 @@ public class DialogCommon {
         dialogResetButton.addClickListener(
                 event -> {
                     dialogOkButton.setEnabled(false);
-                    setValues();
-                    dialogValidate();
+                    setValues(this.stockEntity, currentDisplayMode);
+                    dialogValidate(currentDisplayMode);
+                    dialogUploadComponent.clearFileList();
                 }
         );
 
-        dialogConvertCustom.setVisible(false);
-        dialogConvertCustom.addClickListener(
-                event -> {
-                    dialogAdvOpen();
-                    dialogOkButton.setEnabled(true);
-                }
-        );
-
-        HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton,dialogCancelButton,dialogResetButton, dialogConvertCustom);
+        HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton,dialogCancelButton,dialogResetButton);
 
         // Prevent click shortcut of the OK button from also triggering when another button is focused
         ShortcutRegistration shortcutRegistration = Shortcuts
@@ -191,41 +224,49 @@ public class DialogCommon {
         dialog.getFooter().add(footerLayout);
 
         //one time configuration for any fields
+
+        //form fields need width full to fill the column they are in
+        fieldFatherName.setWidthFull();
+        fieldMotherName.setWidthFull();
+        fieldCategory.setWidthFull();
+        fieldStatus.setWidthFull();
+        fieldStatusDate.setWidthFull();
+        fieldFoster.setWidthFull();
+        fieldAquiredDate.setWidthFull();
+        fieldBornDate.setWidthFull();
+        fieldChampNo.setWidthFull();
+        fieldGenotype.setWidthFull();
+        fieldLegs.setWidthFull();
+        fieldRegNo.setWidthFull();
+        
+        //fieldStatus.setWidth("150px");
+        //fieldStatusDate.setWidth("150px");
+        
         //fieldPaymentMethod.setItems(Config.getInstance().getPaymentMethods());
-        fieldPaymentMethod.setReadOnly(false);
-        fieldPaymentMethod.setEmptySelectionAllowed(false);
-        fieldPaymentMethod.setRequiredIndicatorVisible(true);
-        fieldPaymentMethod.setWidth("150px");
-        fieldPaymentMethod.setPlaceholder("Select payment method");
-        fieldNotes.setReadOnly(true);
-        fieldNotes.addThemeVariants(TextAreaVariant.LUMO_SMALL);
 
-        fieldGlobalTaxes.setButtonIcon(new Icon("vaadin", "cogs"));
-        fieldTotalSale.setButtonIcon(new Icon("vaadin","calc"));
+//        fieldPaymentMethod.setEmptySelectionAllowed(false);
+//        fieldPaymentMethod.setRequiredIndicatorVisible(true);
+//        fieldPaymentMethod.setWidth("150px");
+//        fieldPaymentMethod.setPlaceholder("Select payment method");
+//        fieldNotes.setReadOnly(true);
+//        fieldNotes.addThemeVariants(TextAreaVariant.LUMO_SMALL);
+//
+//        fieldGlobalTaxes.setButtonIcon(new Icon("vaadin", "cogs"));
+//        fieldTotalSale.setButtonIcon(new Icon("vaadin","calc"));
 
-        fieldPaidToVendor.addValueChangeListener(item -> dialogValidate());
-        fieldReceiptTotal.addValueChangeListener(item -> dialogValidate());
-        fieldGlobalSubTotal.addValueChangeListener(item -> dialogValidate());
-        fieldGlobalTaxes.addValueChangeListener(item -> dialogValidate());
-        fieldGlobalTaxes.addClickListener(
-                event -> {
-                    dialogValidate();
-                }
-        );
-        fieldWebOrder.addValueChangeListener(item -> dialogValidate());
-        fieldFeesOnly.addValueChangeListener(item -> dialogValidate());
-        fieldPaymentMethod.addValueChangeListener(item -> dialogValidate());
-        fieldDeliveryFee.addValueChangeListener(item -> dialogValidate());
-        fieldServiceFeePercent.addValueChangeListener(item -> dialogValidate());
-        fieldServiceFee.addValueChangeListener(item -> dialogValidate());
-        fieldTotalSale.addValueChangeListener(item -> dialogValidate());
-        fieldTotalSale.addClickListener(
-                event -> {
-                    dialogValidate();
-                }
-        );
-        fieldTip.addValueChangeListener(item -> dialogValidate());
-        fieldTipIssue.addValueChangeListener(item -> dialogValidate());
+        //add change listeners for each editable field
+        fieldAquiredDate.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldBornDate.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldLegs.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldChampNo.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldRegNo.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldFatherName.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldMotherName.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldGenotype.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldCategory.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldStatus.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldStatusDate.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldFoster.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
 
     }
 
@@ -242,53 +283,46 @@ public class DialogCommon {
         dialog.close();
     }
 
-    private void dialogSave() {
+    private void dialogSave(DisplayMode currentDisplayMode) {
         //save here
         //update stockEntity from fields
-        /*
-        if(displayMode.equals(DisplayMode.GLOBAL)){
-            this.stockEntity.setGlobalSubtotal(fieldGlobalSubTotal.getValue());
-            this.stockEntity.setGlobalTotalTaxes(fieldGlobalTaxes.getNumberField().getValue());
-            if(posGlobal){
-                this.stockEntity.setPaidToVendor(fieldPaidToVendor.getValue());
-            }
-        }else if(displayMode.equals(DisplayMode.CUSTOM)){
-            this.stockEntity.setFeesOnly(fieldFeesOnly.getValue());
-            this.stockEntity.setReceiptTotal(fieldReceiptTotal.getValue());
+        if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
+            //this.stockEntity.setGlobalSubtotal(fieldGlobalSubTotal.getValue());
+            //this.stockEntity.setGlobalTotalTaxes(fieldGlobalTaxes.getNumberField().getValue());
+        }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
+            //write the profile image to file
+            try (OutputStream outputStream = Files.newOutputStream(stockEntity.getProfileFileToBeSaved().toPath())) {
+                outputStream.write(profileImageData);
+            } catch (IOException e) {
+                // Handle exception
+                e.printStackTrace();
+            }            
         }else{
-            this.stockEntity.setWebOrder(fieldWebOrder.getValue());
-            this.stockEntity.setReceiptTotal(fieldReceiptTotal.getValue());
+            //this.stockEntity.setWebOrder(fieldWebOrder.getValue());
+            //this.stockEntity.setReceiptTotal(fieldReceiptTotal.getValue());
         }
-        this.stockEntity.setPaymentMethod(fieldPaymentMethod.getValue());
-        this.stockEntity.setDeliveryFee(fieldDeliveryFee.getValue());
-        this.stockEntity.setServiceFeePercent(fieldServiceFeePercent.getValue());
-        this.stockEntity.setServiceFee(fieldServiceFee.getValue());
-        this.stockEntity.setTotalSale(fieldTotalSale.getNumberField().getValue());
-        this.stockEntity.setTip(fieldTip.getValue());
-        this.stockEntity.setTipInNotesIssue(fieldTipIssue.getValue());
 
-        taskDetailRepository.save(this.stockEntity);
+        stockService.save(this.stockEntity);
         //refresh if needed
-        */
         log.info("dialogSave: notifying listeners");
         dialog.close();
         notifyRefreshNeeded();
     }
 
-    public void dialogOpen(Long stockID){
+    public void dialogOpen(Integer stockID, DisplayMode currentDisplayMode){
         List<Stock> stockEntityList = stockService.findById(stockID);
-        if(stockEntityList!=null && stockEntityList.size()>0){
-            dialogOpen(stockEntityList.get(0));
+        if(stockEntityList!=null && !stockEntityList.isEmpty()){
+            dialogOpen(stockEntityList.get(0), currentDisplayMode);
         }else{
-            log.info("TaskEditDialog: dialogOpen: failed to find task with jobId:" + stockID);
+            log.info("StockEditDialog: dialogOpen: failed to find stock with Id:" + stockID);
         }
     }
-    public void dialogOpen(Stock stockEntity){
+    public void dialogOpen(Stock stockEntity, DisplayMode currentDisplayMode){
         this.stockEntity = stockEntity;
         //set values and visibility for fields
         clearLists();
         dialogLayout.removeAll();
-        if(displayMode.equals(DisplayMode.LITTER_LIST)){
+        if(currentDisplayMode.equals(DisplayMode.LITTER_LIST)){
             litterList = litterService.getLitters(this.stockEntity);
             //show list of litter items
             VirtualList<Litter> list = new VirtualList<>();
@@ -296,21 +330,22 @@ public class DialogCommon {
             list.setRenderer(litterCardRenderer);
             list.setWidthFull();
             dialogLayout.add(list);
-        }else if(displayMode.equals(DisplayMode.KIT_LIST)){
-            stockList = stockService.getKitsForParent(this.stockEntity);
-            //show list of kit items
-            VirtualList<Stock> list = new VirtualList<>();
-            list.setItems(stockList);
-            list.setRenderer(kitCardRenderer);
-            list.setWidthFull();
-            dialogLayout.add(getStockHeader(stockEntity, false), list);
-            
+        }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
+            //load stored image or if none load default image
+            fieldProfileAvatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
+            fieldProfileAvatar.setHeight("12em");
+            fieldProfileAvatar.setWidth("12em");
+
+            fieldProfileAvatar.setImageHandler(DownloadHandler.forFile(this.stockEntity.getProfileFile()));
+            fieldProfileAvatar.setName(this.stockEntity.getProfileImage());
+            profileImageData = getByteArrayFromImageFile(this.stockEntity.getProfileFile().getAbsolutePath());
+            profileImageMimeType = "image/*";
+            //dialogLayout.add(getStockHeader(stockEntity, false), avatarDiv, createImageUploadLayout());
+            dialogLayout.add(showItem(this.stockEntity,currentDisplayMode), createImageUploadLayout(currentDisplayMode));
         }else{
             //viewer for stock fields - READONLY
-            dialogLayout.add(showItem(this.stockEntity));
+            dialogLayout.add(showItem(this.stockEntity, currentDisplayMode));
         }
-        
-        
 
         customTaskConverted = Boolean.FALSE;
 
@@ -318,17 +353,197 @@ public class DialogCommon {
         dialog.getElement().setAttribute("aria-label", dialogTitle);
         dialog.getHeader().add(dialogCloseButton);
 
-        dialogValidate();
+        dialogValidate(currentDisplayMode);
         dialog.setModal(true);
         dialog.setDraggable(true);
         dialog.setResizable(true);
         //dialog.addClassNames("backdrop-blur-none");
 
         dialog.open();
-
-
     }
     
+    private VerticalLayout createImageUploadLayout(DisplayMode currentDisplayMode) {
+        VerticalLayout uploadLayout = UIUtilities.getVerticalLayout();
+
+        InMemoryUploadHandler inMemoryHandler = UploadHandler.inMemory(
+            (metadata, data) -> {
+                byte[] newData = null;
+                try {
+                    // Get other information about the file.
+                    newData = getResizedImage(data, 600);
+                } catch (Exception ex) {
+                    System.getLogger(DialogCommon.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+                }
+                
+                profileImageData = newData;
+                profileImageMimeType = metadata.contentType();
+                String src = getImageAsBase64(newData, metadata.contentType());
+                //System.out.println("***Upload file: Base64:" + src);
+                fieldProfileAvatar.setImage(src);
+                fieldProfileAvatar.setName(metadata.fileName());
+                dialogValidate(currentDisplayMode);
+            });
+
+        dialogUploadComponent = new Upload(inMemoryHandler);  
+        dialogUploadComponent.setMaxFiles(1);
+        dialogUploadComponent.setMaxFileSize(1024 * 1024 * 10);
+        dialogUploadComponent.setAcceptedFileTypes(ACCEPTED_MIME_TYPES);
+        Button uploadButton = new Button(getUploadButtonName(fieldProfileUseCamera.getValue()));
+        dialogUploadComponent.setUploadButton(uploadButton);
+        
+        fieldProfileUseCamera.addValueChangeListener(e -> {
+            if(e.getValue()){
+                dialogUploadComponent.getElement().setAttribute("capture", "environment");
+            }else{
+                dialogUploadComponent.getElement().removeAttribute("capture");
+            }
+            uploadButton.setText(getUploadButtonName(e.getValue()));
+        });
+
+        if(fieldProfileUseCamera.getValue()){
+            dialogUploadComponent.getElement().setAttribute("capture", "environment");
+            uploadButton.setText(getUploadButtonName(fieldProfileUseCamera.getValue()));
+        }
+        
+        dialogProfileImageRotateButton.addClickListener(click -> {
+            try {
+                profileImageData = getRotatedImage(profileImageData);
+                String src = getImageAsBase64(profileImageData, profileImageMimeType);
+                fieldProfileAvatar.setImage(src);
+                fieldProfileAvatar.setName(fieldProfileAvatar.getName() + "rcw-");
+                dialogValidate(currentDisplayMode);
+            } catch (Exception ex) {
+                System.getLogger(DialogCommon.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+            }
+        });
+
+        //error handler
+        dialogUploadComponent.addFileRejectedListener(event -> {
+          String errorMessage = event.getErrorMessage();
+          Notification notification =
+              Notification.show(errorMessage, 5000, Notification.Position.MIDDLE);
+          notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+          dialogValidate(currentDisplayMode);
+        });
+
+        fieldProfileUseCamera.setValue(false);
+        
+        Button getCropButton = new Button("Crop Image");
+
+        getCropButton.addClickListener(e -> {
+            openCropDialog(profileImageData, profileImageMimeType, currentDisplayMode);
+            dialogValidate(currentDisplayMode);
+        });
+        
+        HorizontalLayout cropAndRotate = UIUtilities.getHorizontalLayout(true,true,false);
+        cropAndRotate.add(getCropButton,dialogProfileImageRotateButton);
+
+        uploadLayout.add(dialogUploadComponent, fieldProfileUseCamera, cropAndRotate);
+        return uploadLayout;
+    }   
+    
+    private byte[] getResizedImage(byte[] imageBytes, int targetWidth) throws Exception {
+        // convert byte[] back to a BufferedImage
+        InputStream is = new ByteArrayInputStream(imageBytes);
+        BufferedImage newBi = ImageIO.read(is);
+        
+        System.out.println("Scale: BEFORE" + newBi.getWidth() + "x" + newBi.getHeight());
+        
+        BufferedImage resizedBi = Scalr.resize(newBi, Scalr.Method.QUALITY, Scalr.Mode.FIT_TO_WIDTH, targetWidth, Scalr.OP_ANTIALIAS);   
+        System.out.println("Scale: AFTER" + resizedBi.getWidth() + "x" + resizedBi.getHeight());
+        
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(resizedBi, "jpg", baos);
+        byte[] bytes = baos.toByteArray();
+        return bytes;
+    } 
+    
+    private byte[] getRotatedImage(byte[] imageBytes) throws Exception {
+        // convert byte[] back to a BufferedImage
+        InputStream is = new ByteArrayInputStream(imageBytes);
+        BufferedImage newBi = ImageIO.read(is);
+        
+        System.out.println("Rotate: BEFORE:" + newBi.getWidth() + "x" + newBi.getHeight());
+        newBi = Scalr.rotate(newBi, Scalr.Rotation.CW_90, Scalr.OP_ANTIALIAS);
+        System.out.println("Rotate: AFTER:" + newBi.getWidth() + "x" + newBi.getHeight());
+        
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(newBi, "jpg", baos);
+        byte[] bytes = baos.toByteArray();
+        return bytes;
+    } 
+    
+    private String getUploadButtonName(Boolean useCamera){
+        if(useCamera){
+            return "Capture";
+        }else{
+            return "Upload";
+        }
+    }
+    
+    private void openCropDialog(byte[] outputStream, String mimeType, DisplayMode currentDisplayMode) {
+      // Set up image crop dialog
+      Dialog cropDialog = new Dialog();
+      cropDialog.setCloseOnOutsideClick(false);
+      cropDialog.setMaxHeight("100%");
+      cropDialog.setMaxWidth(cropDialog.getHeight());
+
+      Button cropButton = new Button("Crop image");
+      Button cropDialogCancelButton = new Button("Cancel");
+      cropDialogCancelButton.addThemeVariants(ButtonVariant.LUMO_ERROR);
+
+      String src = getImageAsBase64(outputStream, mimeType);
+      fieldProfileImageCrop = new ImageCrop(src);
+      fieldProfileImageCrop.setAspect(1.0);
+      fieldProfileImageCrop.setCircularCrop(true);
+      fieldProfileImageCrop.setCrop(new Crop("%", 25, 25, 50, 50)); // centered crop
+      fieldProfileImageCrop.setKeepSelection(true);
+
+      cropDialogCancelButton.addClickListener(c -> {
+          cropDialog.close();
+      });
+
+      cropButton.addClickListener(event -> {
+          fieldProfileAvatar.setImage(fieldProfileImageCrop.getCroppedImageDataUri());
+          fieldProfileAvatar.setName(fieldProfileImageCrop.getImageSrc());
+          profileImageData = fieldProfileImageCrop.getCroppedImageBase64();
+          dialogValidate(currentDisplayMode);
+          cropDialog.close();
+      });
+
+      HorizontalLayout buttonLayout = new HorizontalLayout(cropDialogCancelButton, cropButton);
+      Div cropDialogLayout = new Div(fieldProfileImageCrop);
+      cropDialogLayout.setSizeFull();
+      buttonLayout.setWidthFull();
+      buttonLayout.setJustifyContentMode(JustifyContentMode.END);
+      cropDialog.add(cropDialogLayout);
+      cropDialog.getFooter().add(buttonLayout);
+      cropDialog.open();
+    }  
+    
+    private byte[] getByteArrayFromImageFile(String filePath){
+        //System.out.println("DialogCommon:getByteArrayFromImageFile:" + filePath);
+        BufferedImage image = null;
+        try {
+            image = ImageIO.read(new File(filePath));
+        } catch (IOException ex) {
+            System.getLogger(DialogCommon.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+        }
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try {
+            ImageIO.write(image, "png", baos);
+        } catch (IOException ex) {
+            System.getLogger(DialogCommon.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+        }
+        byte[] imageBytes = baos.toByteArray();   
+        return imageBytes;
+    }
+    
+    private String getImageAsBase64(byte[] src, String mimeType) {
+    return src != null ? "data:" + mimeType + ";base64," + Base64.getEncoder().encodeToString(src)
+        : null;
+    }    
+
     private void clearLists(){
         stockList.clear();
         litterList.clear();
@@ -402,35 +617,28 @@ public class DialogCommon {
         return card;
     }
     
-    private void dialogValidate() {
+    private void dialogValidate(DisplayMode currentDisplayMode) {
         //validate fields and enable OK button if valid
         if(validationEnabled && this.stockEntity!=null){
             hasChangedValues = Boolean.FALSE;
-            /*
-            if(displayMode.equals(DisplayMode.GLOBAL)){
-                log.info("dialogValidate: globalSubtotal:" + this.stockEntity.getGlobalSubtotal() + " field:" + fieldGlobalSubTotal.getValue());
-                validateField(fieldGlobalSubTotal,this.stockEntity.getGlobalSubtotal());
-                validateField(fieldGlobalTaxes.getNumberField(),this.stockEntity.getGlobalTotalTaxes());
-                if(posGlobal){
-                    validateField(fieldPaidToVendor,this.stockEntity.getPaidToVendor());
-                }
-            }else if(displayMode.equals(DisplayMode.CUSTOM)){
-                validateField(fieldReceiptTotal,this.stockEntity.getReceiptTotal());
-                validateCheckbox(fieldFeesOnly,this.stockEntity.getFeesOnly());
+            if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
+                validateAvatar(fieldProfileAvatar,avatarDiv,this.stockEntity.getProfileImage().toString());
+            }else if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
+                //validateField(fieldReceiptTotal,this.stockEntity.getReceiptTotal());
+                //validateCheckbox(fieldFeesOnly,this.stockEntity.getFeesOnly());
             }else{
-                validateField(fieldReceiptTotal,this.stockEntity.getReceiptTotal());
-                validateCheckbox(fieldWebOrder,this.stockEntity.getWebOrder());
+                //validateField(fieldReceiptTotal,this.stockEntity.getReceiptTotal());
+                //validateCheckbox(fieldWebOrder,this.stockEntity.getWebOrder());
             }
             //do common fields here
-            validateListbox(fieldPaymentMethod,this.stockEntity.getPaymentMethod());
-            validateField(fieldDeliveryFee,this.stockEntity.getDeliveryFee());
-            validateField(fieldServiceFee,this.stockEntity.getServiceFee());
-            validateField(fieldServiceFeePercent,getServiceFeePercent());
-            validateField(fieldTotalSale.getNumberField(),this.stockEntity.getTotalSale());
-            validateField(fieldTip,this.stockEntity.getTip());
-            validateCheckbox(fieldTipIssue,this.stockEntity.getTipInNotesIssue());
-            if(customTaskConverted) hasChangedValues = Boolean.TRUE;
-            */
+//            validateListbox(fieldPaymentMethod,this.stockEntity.getPaymentMethod());
+//            validateField(fieldDeliveryFee,this.stockEntity.getDeliveryFee());
+//            validateField(fieldServiceFee,this.stockEntity.getServiceFee());
+//            validateField(fieldServiceFeePercent,getServiceFeePercent());
+//            validateField(fieldTotalSale.getNumberField(),this.stockEntity.getTotalSale());
+//            validateField(fieldTip,this.stockEntity.getTip());
+//            validateCheckbox(fieldTipIssue,this.stockEntity.getTipInNotesIssue());
+//            if(customTaskConverted) hasChangedValues = Boolean.TRUE;
         }
         if(hasChangedValues){
             dialogOkButton.setEnabled(true);
@@ -454,6 +662,17 @@ public class DialogCommon {
         }else{
             field.getStyle().set("box-shadow",UIUtilities.boxShadowStyle);
             field.getStyle().set("border-radius",UIUtilities.boxShadowStyleRadius);
+            hasChangedValues = Boolean.TRUE;
+        }
+    }
+
+    private void validateAvatar(Avatar field, Div fieldDiv, String value){
+        if(field.getName().equals(value)){
+            fieldDiv.getStyle().set("box-shadow","none");
+            fieldDiv.getStyle().set("border-width",UIUtilities.borderSizeSmall);
+        }else{
+            fieldDiv.getStyle().set("box-shadow",UIUtilities.boxShadowStyle);
+            fieldDiv.getStyle().set("border-radius",UIUtilities.boxShadowStyleRadius);
             hasChangedValues = Boolean.TRUE;
         }
     }
@@ -490,126 +709,118 @@ public class DialogCommon {
         this.dialogMode = dialogMode;
     }
 
-    public FormLayout showItem(Stock stockEntity){
+    public FormLayout showItem(Stock stockEntity, DisplayMode currentDisplayMode){
+        return showItem(stockEntity, currentDisplayMode, false, true);
+    }
+
+    public FormLayout showItem(Stock currentStock, DisplayMode currentDisplayMode, Boolean forceReadOnly, Boolean showHeader){
         validationEnabled = Boolean.FALSE;
-        FormLayout taskFormLayout = new FormLayout();
-        taskFormLayout.setResponsiveSteps(new FormLayout.ResponsiveStep("0px", 1, FormLayout.ResponsiveStep.LabelsPosition.ASIDE));
-        /*
-        taskFormLayout.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1, FormLayout.ResponsiveStep.LabelsPosition.TOP),
-                new FormLayout.ResponsiveStep("100px", 1, FormLayout.ResponsiveStep.LabelsPosition.ASIDE));
-
-         */
-
-        this.stockEntity = stockEntity;
-
-        //determine display mode
-        /*
-        if(this.stockEntity.getCreatedBy().equals(43L)){
-            displayMode = DisplayMode.GLOBAL;
-            //determine if this restaurant uses pos payment like Smiley's
-            List<Restaurant> restaurants = restaurantRepository.findEffectiveByRestaurantId(this.stockEntity.getRestaurantId(),this.stockEntity.getCreationDate().toLocalDate());
-            if(restaurants!=null && restaurants.size()>0){
-                posGlobal = restaurants.get(0).getPosGlobal();
-            }
-        }else if(this.stockEntity.getRestaurantId().equals(0L)){ //custom
-            displayMode = DisplayMode.CUSTOM;
-        }else{
-            displayMode = DisplayMode.PHONEIN;
+        FormLayout stockFormLayout = new FormLayout();
+        stockFormLayout.setWidthFull();
+        stockFormLayout.setAutoResponsive(false);
+        //stockFormLayout.setColumnWidth("8em");
+        stockFormLayout.setExpandColumns(true);
+        stockFormLayout.setExpandFields(true);
+        stockFormLayout.setMaxColumns(3);
+        stockFormLayout.setMinColumns(1);
+        
+        if(forceReadOnly){
+            fieldFatherName.setReadOnly(true);
+            fieldMotherName.setReadOnly(true);
+            fieldCategory.setReadOnly(true);
+            fieldStatus.setReadOnly(true);
+            fieldStatusDate.setReadOnly(true);
+            fieldFoster.setReadOnly(true);
+            fieldAquiredDate.setReadOnly(true);
+            fieldBornDate.setReadOnly(true);
+            fieldChampNo.setReadOnly(true);
+            fieldGenotype.setReadOnly(true);
+            fieldLegs.setReadOnly(true);
+            fieldRegNo.setReadOnly(true);
         }
+        
+        stockFormLayout.setResponsiveSteps(
+        // Use one column by default
+        new ResponsiveStep("0", 1, FormLayout.ResponsiveStep.LabelsPosition.ASIDE),
+        // Use two columns, if the layout's width exceeds 320px
+        new ResponsiveStep("600px", 2,FormLayout.ResponsiveStep.LabelsPosition.TOP),
+        // Use three columns, if the layout's width exceeds 500px
+        new ResponsiveStep("900px", 3,FormLayout.ResponsiveStep.LabelsPosition.TOP));        
+        /*
+        stockFormLayout.setResponsiveSteps(new FormLayout.ResponsiveStep("0px", 1, FormLayout.ResponsiveStep.LabelsPosition.ASIDE));
+        stockFormLayout.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1, FormLayout.ResponsiveStep.LabelsPosition.TOP),
+                new FormLayout.ResponsiveStep("100px", 1, FormLayout.ResponsiveStep.LabelsPosition.ASIDE));
         */
+        //this.stockEntity = stockEntity;
+
         //configure the field layout
-        log.info("showTask: display mode set to:" + displayMode);
-        taskFormLayout.removeAll();
+        //log.info("showItem:" + currentStock.getName() + ", displayMode:" + currentDisplayMode);
+        stockFormLayout.removeAll();
 
         //add the header
-        taskFormLayout.add(getStockHeader(this.stockEntity, Boolean.FALSE));
+        if(showHeader){
+            stockFormLayout.add(getStockHeader(currentStock, Boolean.FALSE));
+        }
 
         //common fields
 
         //fields by displayMode type
-        if(this.displayMode.equals(DisplayMode.STOCK_DETAILS)){
-            taskFormLayout.addFormItem(fieldGlobalSubTotal,"Global Subtotal");
-            taskFormLayout.addFormItem(fieldGlobalTaxes,"Global Taxes");
-            taskFormLayout.addFormItem(fieldPaymentMethod,"Payment");
-            taskFormLayout.addFormItem(fieldDeliveryFee,"Delivery Fee");
-            taskFormLayout.addFormItem(fieldServiceFeePercent,"Service Fee(%)");
-            taskFormLayout.addFormItem(fieldServiceFee,"Service Fee($)");
-            taskFormLayout.addFormItem(fieldTotalSale,"Total sale");
-            taskFormLayout.addFormItem(fieldTip,"Tip");
-            taskFormLayout.addFormItem(fieldTotalWithTip,"Total with tip");
-            //TODO:: only add if superUser
-            taskFormLayout.addFormItem(fieldTipIssue,"Tip issue");
-            taskFormLayout.addFormItem(fieldNotes, "Notes");
-            dialogConvertCustom.setVisible(false);
-        }else if(this.displayMode.equals(DisplayMode.LITTER_LIST)){
-            taskFormLayout.addFormItem(fieldReceiptTotal,"Receipt total");
-            taskFormLayout.addFormItem(fieldFeesOnly,"Fees only");
-            taskFormLayout.addFormItem(fieldPaymentMethod,"Payment");
-            taskFormLayout.addFormItem(fieldDeliveryFee,"Delivery Fee");
-            taskFormLayout.addFormItem(fieldServiceFeePercent,"Service Fee(%)");
-            taskFormLayout.addFormItem(fieldServiceFee,"Service Fee($)");
-            taskFormLayout.addFormItem(fieldTotalSale,"Total sale");
-            taskFormLayout.addFormItem(fieldTip,"Tip");
-            taskFormLayout.addFormItem(fieldTotalWithTip,"Total with tip");
-            //TODO:: only add if superUser
-            taskFormLayout.addFormItem(fieldTipIssue,"Tip issue");
-            taskFormLayout.addFormItem(fieldNotes, "Notes");
-            dialogConvertCustom.setVisible(true);
-        }else if(this.displayMode.equals(DisplayMode.KIT_LIST)){
-            taskFormLayout.addFormItem(fieldReceiptTotal,"Receipt total");
-            taskFormLayout.addFormItem(fieldWebOrder,"Web order");
-            taskFormLayout.addFormItem(fieldPaymentMethod,"Payment");
-            taskFormLayout.addFormItem(fieldDeliveryFee,"Delivery Fee");
-            taskFormLayout.addFormItem(fieldServiceFeePercent,"Service Fee(%)");
-            taskFormLayout.addFormItem(fieldServiceFee,"Service Fee($)");
-            taskFormLayout.addFormItem(fieldTotalSale,"Total sale");
-            taskFormLayout.addFormItem(fieldTip,"Tip");
-            taskFormLayout.addFormItem(fieldTotalWithTip,"Total with tip");
-            //TODO:: only add if superUser
-            taskFormLayout.addFormItem(fieldTipIssue,"Tip issue");
-            taskFormLayout.addFormItem(fieldNotes, "Notes");
-            dialogConvertCustom.setVisible(false);
+        if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
+            stockFormLayout.addFormItem(fieldFatherName,"Father");
+            stockFormLayout.addFormItem(fieldMotherName,"Mother");
+            stockFormLayout.addFormItem(fieldGenotype,"Genotype");
+            stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
+            stockFormLayout.addFormItem(fieldLegs,"Legs");
+            stockFormLayout.addFormItem(fieldChampNo,"Championship Number");
+            stockFormLayout.addFormItem(fieldRegNo,"Registration Number");
+            stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
+            stockFormLayout.addFormItem(fieldStatus,"Status");
+            stockFormLayout.addFormItem(fieldStatusDate,"Status Date");
+            stockFormLayout.addFormItem(fieldCategory,"Category");
+            stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
+            stockFormLayout.addFormItem(fieldAquiredDate,"Aquired");
+            stockFormLayout.addFormItem(fieldBornDate,"Born");
+            stockFormLayout.addFormItem(fieldFoster,"Foster");
+        }else if(currentDisplayMode.equals(DisplayMode.LITTER_LIST)){
+            
+        }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
+            stockFormLayout.add(avatarDiv);
         }
 
         //set values
-        setValues();
-        return taskFormLayout;
+        setValues(currentStock, currentDisplayMode);
+        return stockFormLayout;
     }
 
-    private void setValues(){
+    private void setValues(Stock currentStock, DisplayMode currentDisplayMode){
         validationEnabled = Boolean.FALSE;
-        /*
-        if(Config.getInstance().getPaymentMethods().contains(this.stockEntity.getPaymentMethod())){
-            fieldPaymentMethod.setValue(this.stockEntity.getPaymentMethod());
-        }else{
-            fieldPaymentMethod.clear();
-        }
-        fieldDeliveryFee.setValue(this.stockEntity.getDeliveryFee());
-        fieldServiceFeePercent.setValue(getServiceFeePercent());
-        fieldServiceFee.setValue(this.stockEntity.getServiceFee());
-        fieldTotalSale.setValue(this.stockEntity.getTotalSale());
-        fieldTip.setValue(this.stockEntity.getTip());
-        fieldTotalWithTip.setValue(Utility.getInstance().round(this.stockEntity.getTip() + this.stockEntity.getTotalSale(),2));
-        fieldTipIssue.setValue(this.stockEntity.getTipInNotesIssue());
-        if(this.stockEntity.getNotes()!=null){
-            fieldNotes.setValue(this.stockEntity.getNotes());
-        }
 
-        if(this.displayMode.equals(DisplayMode.GLOBAL)){
-            fieldGlobalSubTotal.setValue(this.stockEntity.getGlobalSubtotal());
-            fieldGlobalTaxes.setValue(this.stockEntity.getGlobalTotalTaxes());
-            if(posGlobal){
-                fieldPaidToVendor.setValue(this.stockEntity.getPaidToVendor());
-            }
-        }else if(this.displayMode.equals(DisplayMode.CUSTOM)){
-            fieldFeesOnly.setValue(this.stockEntity.getFeesOnly());
-            fieldReceiptTotal.setValue(this.stockEntity.getReceiptTotal());
+        if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
+            fieldAquiredDate.setValue(currentStock.getAcquired());
+            //System.out.println("***Set Aquired::" + currentStock.getAcquired());
+            
+            fieldBornDate.setValue(currentStock.getDoB());
+            fieldLegs.setValue(currentStock.getLegs());
+            fieldChampNo.setValue(currentStock.getChampNo());
+            fieldRegNo.setValue(currentStock.getRegNo());
+            fieldFatherName.setValue(stockService.getStockNameById(currentStock.getFatherId()));
+            fieldMotherName.setValue(stockService.getStockNameById(currentStock.getMotherId()));
+            fieldGenotype.setValue(currentStock.getGenotype());
+            fieldCategory.setValue(currentStock.getCategory());
+            fieldStatus.setValue(currentStock.getStatus());
+            //System.out.println("***Set Status::" + currentStock.getStatus());
+            fieldStatusDate.setValue(currentStock.getStatusDate());
+            fieldFoster.setValue("TODO");
+        }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
+            fieldProfileAvatar.setImageHandler(DownloadHandler.forFile(currentStock.getProfileFile()));
+            fieldProfileAvatar.setName(currentStock.getProfileImage());
+            profileImageData = getByteArrayFromImageFile(currentStock.getProfileFile().getAbsolutePath());
+            profileImageMimeType = "image/*";
         }else{
             //Phonein
-            fieldWebOrder.setValue(this.stockEntity.getWebOrder());
-            fieldReceiptTotal.setValue(this.stockEntity.getReceiptTotal());
+            //fieldWebOrder.setValue(this.stockEntity.getWebOrder());
+            //fieldReceiptTotal.setValue(this.stockEntity.getReceiptTotal());
         }
-        */
         validationEnabled = Boolean.TRUE;
 
     }
@@ -623,7 +834,8 @@ public class DialogCommon {
         stockName.setName(item.getName());
         stockName.setColorIndex(5);
         stockName.addThemeVariants(AvatarVariant.LUMO_LARGE);
-        stockName.setImage(item.getDefaultImageSource());
+        
+        stockName.setImageHandler(DownloadHandler.forFile(item.getProfileFile()));
 
         VerticalLayout columnAvatars = new VerticalLayout(stockName);
 
@@ -745,161 +957,6 @@ public class DialogCommon {
         return "badge error";
     }
 
-    private void dialogAdvConfigure() {
-        dialogAdv.getElement().setAttribute("aria-label", "Convert Custom Task");
-
-        //configure the dialog internal layout for the form
-        dialogAdvLayout.setSpacing(false);
-        dialogAdvLayout.setPadding(false);
-        dialogAdvLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        dialogAdvLayout.getStyle().set("width", "400px").set("max-width", "100%");
-
-        dialogAdv.add(dialogAdvLayout);
-        dialogAdv.setHeaderTitle("Convert Custom Task");
-
-        dialogAdvCloseButton.addClickListener((e) -> dialogAdv.close());
-        dialogAdvCloseButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        dialogAdv.getHeader().add(dialogAdvCloseButton);
-        dialogAdv.setCloseOnEsc(true);
-        dialogAdvCancelButton.addClickListener((e) -> dialogAdv.close());
-
-        dialogAdvOkButton.addClickListener(
-                event -> {
-                    dialogAdvSave();
-                }
-        );
-        dialogAdvOkButton.addClickShortcut(Key.ENTER);
-        dialogAdvOkButton.setEnabled(false);
-        dialogAdvOkButton.setDisableOnClick(true);
-
-        HorizontalLayout footerLayoutAdv = new HorizontalLayout(dialogAdvOkButton,dialogAdvCancelButton);
-
-        // Prevent click shortcut of the OK button from also triggering when another button is focused
-        ShortcutRegistration shortcutRegistration = Shortcuts
-                .addShortcutListener(footerLayoutAdv, () -> {}, Key.ENTER)
-                .listenOn(footerLayoutAdv);
-        shortcutRegistration.setEventPropagationAllowed(false);
-        shortcutRegistration.setBrowserDefaultAllowed(true);
-
-        dialogAdv.getFooter().add(footerLayoutAdv);
-
-        //one time configuration for any fields
-        List<AdvDialogMode> convertTypeList = Stream.of(AdvDialogMode.values()).collect(Collectors.toList());
-        advFieldConvertType.setItems(convertTypeList);
-        advFieldConvertType.setPlaceholder("Select conversion type");
-        advFieldConvertType.addValueChangeListener(item -> {
-            dialogAdvValidate();
-        });
-
-        /*
-        advFieldRestaurant.setItems(restaurantRepository.findDistinctNonExpiredRestaurants());
-        advFieldRestaurant.setItemLabelGenerator(Restaurant::getName);
-        advFieldRestaurant.setReadOnly(false);
-        advFieldRestaurant.setPlaceholder("Select restaurant");
-        advFieldRestaurant.addValueChangeListener(item -> {
-            dialogAdvValidate();
-        });
-
-        advFieldOrderId.addValueChangeListener(item -> {
-            dialogAdvValidate();
-        });
-        */
-
-    }
-
-    private void dialogAdvValidate() {
-
-        if(advFieldConvertType.getValue()==null){
-            advFieldOrderId.setEnabled(false);
-        }else if(advFieldConvertType.getValue().equals(AdvDialogMode.Global)){
-            advFieldOrderId.setEnabled(true);
-        }else{
-            advFieldOrderId.setEnabled(false);
-        }
-
-        /*
-        if(advFieldRestaurant.getValue().getRestaurantId().equals(0L)){
-            dialogAdvOkButton.setEnabled(false);
-        }else if(advFieldConvertType.getValue().equals(AdvDialogMode.Global)){
-            //Global validation here which includes a valid orderid
-            if(advFieldOrderId.getValue()==null || advFieldOrderId.getValue().isEmpty() || advFieldOrderId.getValue().equals("0")){
-                dialogAdvOkButton.setEnabled(false);
-            }else{
-                OrderDetailRepository orderDetailRepository = Registry.getBean(OrderDetailRepository.class);
-                Long orderId = Long.valueOf(advFieldOrderId.getValue());
-                if(orderId==null){
-                    dialogAdvOkButton.setEnabled(false);
-                }else{
-                    OrderDetail orderDetail = orderDetailRepository.findOrderDetailByOrderId(orderId);
-                    if(orderDetail==null){
-                        dialogAdvOkButton.setEnabled(false);
-                    }else{
-                        dialogAdvOkButton.setEnabled(true);
-                    }
-                }
-            }
-        }else{  //form does not need order id
-            dialogAdvOkButton.setEnabled(true);
-        }
-        */
-    }
-
-    private void dialogAdvSave() {
-
-        /*
-        if(advFieldConvertType.getValue().equals(AdvDialogMode.Global)){
-            this.stockEntity.setTemplateId("Order_Details");
-            this.stockEntity.setCreatedBy(43L);
-            this.stockEntity.setOrderId(advFieldOrderId.getValue());
-            this.stockEntity.setLongOrderId(Long.valueOf(advFieldOrderId.getValue()));
-            OrderDetailRepository orderDetailRepository = Registry.getBean(OrderDetailRepository.class);
-            OrderDetail orderDetail = orderDetailRepository.findOrderDetailByOrderId(this.stockEntity.getLongOrderId());
-            this.stockEntity.updateGlobalData(orderDetail);
-
-        }else{
-            this.stockEntity.setCreatedBy(3L);
-            this.stockEntity.setOrderId(advFieldRestaurant.getValue().getFormId().toString());
-            this.stockEntity.setLongOrderId(advFieldRestaurant.getValue().getFormId());
-        }
-        this.stockEntity.setPosPayment(false);
-        this.stockEntity.setRestaurantId(advFieldRestaurant.getValue().getRestaurantId());
-        this.stockEntity.setRestaurantName(advFieldRestaurant.getValue().getName());
-        this.stockEntity.updateCalculatedFields();
-
-        //update fields needed for Global Tasks
-        customTaskConverted = Boolean.TRUE;
-        */
-        
-        //dialogOkButton.setEnabled(false);
-        dialogLayout.removeAll();
-        dialogLayout.add(showItem(this.stockEntity));
-        dialogValidate();
-        dialogAdv.close();
-
-    }
-
-    private void dialogAdvOpen(){
-        customTaskConverted = Boolean.FALSE;
-        dialogAdvLayout.removeAll();
-        /*
-        dialogAdvLayout.add(advFieldConvertType, advFieldRestaurant,advFieldOrderId);
-
-        //set values
-        List<Restaurant> restaurants = restaurantRepository.findEffectiveByRestaurantId(this.stockEntity.getRestaurantId(), LocalDate.now());
-        Restaurant restaurant = restaurants.get(0);
-        advFieldRestaurant.setValue(restaurant);
-
-        advFieldConvertType.setValue(AdvDialogMode.Global);
-
-        if(this.stockEntity.getOrderId()!=null){
-            advFieldOrderId.setValue(this.stockEntity.getOrderId());
-        }
-        */
-
-        dialogAdv.open();
-
-    }
-
     public void addListener(ListRefreshNeededListener listener){
         listRefreshNeededListeners.add(listener);
     }
@@ -910,13 +967,13 @@ public class DialogCommon {
         }
     }
 
-    public DisplayMode getDisplayMode() {
-        return displayMode;
-    }
-
-    public void setDisplayMode(DisplayMode displayMode) {
-        this.displayMode = displayMode;
-    }
+//    public DisplayMode getDisplayMode() {
+//        return displayMode;
+//    }
+//
+//    public void setDisplayMode(DisplayMode displayMode) {
+//        this.displayMode = displayMode;
+//    }
 
     public String getDialogTitle() {
         return dialogTitle;

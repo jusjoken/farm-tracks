@@ -14,6 +14,7 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.contextmenu.ContextMenu;
 import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
@@ -126,6 +127,9 @@ public class UIUtilities {
         return textField;
     }
 
+    public static TextField getTextField(){
+        return getTextField("");
+    }
     public static TextField getTextField(String label){
         TextField textField = new TextField();
         if(!label.isEmpty()){
@@ -233,6 +237,41 @@ public class UIUtilities {
         menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
 
         return menuButton;
+    }
+
+    public static ContextMenu createContextMenu(Stock stockEntity) {
+        String stockName = stockEntity.getDisplayName();
+        Div heading = new Div();
+        heading.setText(stockName);
+        heading.getStyle().set("text-align", "center");
+        heading.getStyle().set("font-weight", "bold");
+        heading.getStyle().set("padding", "8px");
+        ContextMenu menu = new ContextMenu();
+        menu.setOpenOnClick(true);
+        
+        //add a label at the top with the stock name
+        menu.addComponent(heading);
+        menu.addSeparator();
+
+        //this code will make sure the Details panel does not expand/colapse when the menu button is clicked
+        //menu.getElement().addEventListener("click", click -> {
+            //do nothing
+        //}).addEventData("event.stopPropagation()");
+        
+        menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
+        menu.addItem(new Item("Breed", Utility.ICONS.TYPE_BREEDER.getIconSource()));
+        menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
+        menu.addItem(new Item("Cage Card", Utility.ICONS.ACTION_CAGE_CARD.getIconSource()));
+        menu.addItem(new Item("Mark For Sale", Utility.ICONS.ACTION_MARK_FOR_SALE.getIconSource()));
+        menu.addItem(new Item("Sell", Utility.ICONS.STATUS_SOLD.getIconSource()));
+        menu.addItem(new Item("Deposit taken", Utility.ICONS.STATUS_SOLD_W_DEPOSIT.getIconSource()));
+        menu.addItem(new Item("Butcher", Utility.ICONS.STATUS_BUTHERED.getIconSource()));
+        menu.addItem(new Item("Died", Utility.ICONS.STATUS_DIED.getIconSource()));
+        menu.addItem(new Item("Archive", Utility.ICONS.STATUS_ARCHIVED.getIconSource()));
+        menu.addItem(new Item("Cull", Utility.ICONS.STATUS_CULLED.getIconSource()));
+        menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
+
+        return menu;
     }
     
 }

@@ -10,8 +10,8 @@ import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.service.LitterRepository;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockRepository;
+import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockTypeRepository;
-import ca.jusjoken.views.stock.BreedersViewOld;
 import com.opencsv.bean.CsvToBeanBuilder;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -26,6 +26,7 @@ import java.util.logging.Logger;
  */
 public class Import {
     StockRepository stockRepository;
+    StockService stockService;
     StockTypeRepository stockTypeRepository;
     LitterRepository litterRepository;
     private List<Stock> breederImportList = new ArrayList<>();
@@ -34,6 +35,7 @@ public class Import {
 
     public Import() {
         this.stockRepository = Registry.getBean(StockRepository.class);
+        this.stockService = Registry.getBean(StockService.class);
         this.stockTypeRepository = Registry.getBean(StockTypeRepository.class);
         this.litterRepository = Registry.getBean(LitterRepository.class);
     }
@@ -44,7 +46,7 @@ public class Import {
                     .withType(Stock.class).build().parse();
         } catch (FileNotFoundException ex) {
             clearBreederList();
-            Logger.getLogger(BreedersViewOld.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(Import.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
@@ -54,7 +56,7 @@ public class Import {
                     .withType(Stock.class).build().parse();
         } catch (FileNotFoundException ex) {
             clearKitList();
-            Logger.getLogger(BreedersViewOld.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(Import.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
@@ -64,13 +66,17 @@ public class Import {
                     .withType(Litter.class).build().parse();
         } catch (FileNotFoundException ex) {
             clearLitterList();
-            Logger.getLogger(BreedersViewOld.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(Import.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
     public Boolean processAllImportsFromEverbreed(){
-        System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed records");
+        System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed stock records");
         stockRepository.deleteAll();
+
+        System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed litter records");
+        litterRepository.deleteAllLittersNative();
+
         if(!kitImportList.isEmpty()){
             System.out.println("processAllImportsFromEverbreed: processing kits");
             processStockList(kitImportList, Boolean.FALSE);
@@ -89,8 +95,6 @@ public class Import {
             processStockParents(breederImportList);
         }
         //process Litters
-        System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed litter records");
-        litterRepository.deleteAll();
         if(!litterImportList.isEmpty()){
             processLitterList(litterImportList);
         }
@@ -151,7 +155,7 @@ public class Import {
                 }
             }
             if(item.getNeedsSaving()){
-                stockRepository.save(item);
+                stockRepository.saveAndFlush(item);
                 System.out.println("processStockList: item after save:" + item.toString());
             }
         }
@@ -161,8 +165,8 @@ public class Import {
         //run to update stock for fields that could be in the imported stock (mother/father)
         for(Stock item: importList){
             //process the import
-            Long fatherId = null;
-            Long motherId = null;
+            Integer fatherId = null;
+            Integer motherId = null;
             item.setNeedsSaving(Boolean.FALSE);
             if(!item.getFatherName().isEmpty()){
                 System.out.println("processStockParents: FatherText:" + item.getFatherName() + " nameWithoutTattoo:" + item.getFatherNameWithoutTattoo() + " tattoo:" + item.getFatherTattoo());
@@ -188,7 +192,7 @@ public class Import {
             }
             //if updated then save again
             if(item.getNeedsSaving()){
-                stockRepository.save(item);
+                stockRepository.saveAndFlush(item);
                 System.out.println("processStockParents: item after save:" + item.toString());
             }else{
                 System.out.println("processStockParents: item does not need saving:" + item.toString());
@@ -202,8 +206,8 @@ public class Import {
         for(Litter item: importList){
             System.out.println("processLitterList: processing item:" + item.toString());
             item.setNeedsSaving(Boolean.FALSE);
-            Long fatherId = null;
-            Long motherId = null;
+            Integer fatherId = null;
+            Integer motherId = null;
             if(!item.getFatherName().isEmpty()){
                 System.out.println("processLitterList: FatherText:" + item.getFatherName() + " nameWithoutTattoo:" + item.getFatherNameWithoutTattoo() + " tattoo:" + item.getFatherTattoo());
                 Stock fatherStock = stockRepository.findByNameAndTattoo(item.getFatherNameWithoutTattoo(),item.getFatherTattoo());
@@ -238,7 +242,7 @@ public class Import {
             
             //if updated then save again
             if(item.getNeedsSaving()){
-                litterRepository.save(item);
+                litterRepository.saveAndFlush(item);
                 System.out.println("processLitterList: item after save:" + item.toString());
             }else{
                 System.out.println("processLitterList: item does not need saving:" + item.toString());
@@ -247,14 +251,19 @@ public class Import {
             //TODO: find each kit in the stock and set the LitterId
             //loop to find matching kits and store when you do not find a match
             //List<Stock> kitsFromLitter = stockRepository.findAllKitsByLitterName(item.getName());
-            List<Stock> kitsFromLitter = stockRepository.findAllKitsByMotherFatherDoB(item.getMother().getId(), item.getFather().getId(), item.getDoB());
-            for(Stock kit: kitsFromLitter){
-                System.out.println("processLitterList: found kit:" + kit.toString());
-                kit.setLitter(item);
-                stockRepository.save(kit);
-            }
-            if(kitsFromLitter.size()<item.getKitsSurvivedCount()){
-                litterMissingKits.add(item);
+            //work around null mother and/or father
+            if(item.getMother()==null || item.getFather()==null){
+                System.out.println("processLitterList: " + item.toString() + ": has NULL Mother and/or Father - skipping kit processing");
+            }else{
+                List<Stock> kitsFromLitter = stockRepository.findAllKitsByMotherFatherDoB(item.getMother().getId(), item.getFather().getId(), item.getDoB());
+                for(Stock kit: kitsFromLitter){
+                    System.out.println("processLitterList: found kit:" + kit.toString());
+                    kit.setLitter(item);
+                    stockRepository.saveAndFlush(kit);
+                }
+                if(kitsFromLitter.size()<item.getKitsSurvivedCount()){
+                    litterMissingKits.add(item);
+                }
             }
             
         }

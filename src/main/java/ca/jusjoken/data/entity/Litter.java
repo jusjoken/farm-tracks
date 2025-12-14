@@ -30,7 +30,7 @@ public class Litter {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "id", nullable = false)    
-    private Long id;
+    private Integer id;
 
     @CsvBindByName(column = "Prefix")
     private String prefix;
@@ -55,11 +55,11 @@ public class Litter {
     //private Long motherId;  //id of the mother
     
     @ManyToOne
-    @JoinColumn(name = "father_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "father_id", referencedColumnName = "id", nullable = false,foreignKey = @jakarta.persistence.ForeignKey(name = "none"))
     private Stock father;
     
     @ManyToOne
-    @JoinColumn(name = "mother_id", referencedColumnName = "id", nullable = false)
+    @JoinColumn(name = "mother_id", referencedColumnName = "id", nullable = false,foreignKey = @jakarta.persistence.ForeignKey(name = "none"))
     private Stock mother;
 
     public Stock getFather() {
@@ -118,11 +118,11 @@ public class Litter {
     @Transient
     private Boolean needsSaving = Boolean.FALSE;
     
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 

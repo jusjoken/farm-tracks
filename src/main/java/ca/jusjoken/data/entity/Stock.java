@@ -14,6 +14,7 @@ import com.opencsv.bean.CsvCustomBindByName;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.SvgIcon;
 import com.vaadin.flow.theme.lumo.LumoUtility;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -22,6 +23,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Transient;
+import java.io.File;
 import java.time.LocalDate;
 import org.hibernate.annotations.Formula;
 
@@ -31,7 +33,7 @@ public class Stock {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "id", nullable = false)
-    private Long id;
+    private Integer id;
 
     private Boolean breeder = false;
     @ManyToOne
@@ -60,8 +62,8 @@ public class Stock {
     @CsvBindByName(column = "Mother")
     private String motherName;  //name of the mother for import
 
-    private Long fatherId;  //id of the father
-    private Long motherId;  //id of the mother
+    private Integer fatherId;  //id of the father
+    private Integer motherId;  //id of the mother
 
     @CsvBindByName(column = "Color")
     private String color;  //list of valid colors
@@ -106,12 +108,20 @@ public class Stock {
 
     //@Transient
     private Boolean active;
+
+    @CsvBindByName(column = "ProfileImage")
+    private String profileImage;
     
     @Transient
-    private String defaultImageSource = "images/rabbit_blank.jpg";
+    private String defaultImageSource = "rabbit_blank.jpg";
 
-    @ManyToOne
-    @JoinColumn(name = "litterId")
+    @Transient
+    private String profileImagePath = System.getenv("PROFILE_IMAGE_PATH");
+    
+    
+    
+    @ManyToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "litterId",foreignKey = @jakarta.persistence.ForeignKey(name = "none"))
     private Litter litter;
 
     public Litter getLitter() {
@@ -125,7 +135,7 @@ public class Stock {
     //private Long litterForsterId;
 
     @ManyToOne
-    @JoinColumn(name = "fosterLitterId")
+    @JoinColumn(name = "fosterLitterId",foreignKey = @jakarta.persistence.ForeignKey(name = "none"))
     private Litter fosterLitter;
 
     public Litter getFosterLitter() {
@@ -187,6 +197,23 @@ public class Stock {
             + " WHERE s.id = id)")
     private Long kitCount;
 
+    @Override
+    public boolean equals(Object obj) {
+       if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof Stock)) {
+            return false;
+        }
+        Stock other = (Stock) obj;
+        return id == other.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return id;
+    }
+
     public Long getKitCount() {
         return kitCount;
     }
@@ -228,11 +255,11 @@ public class Stock {
         this.stockType = stockType;
     }
 
-    public Long getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(Integer id) {
         this.id = id;
     }
 
@@ -245,6 +272,7 @@ public class Stock {
     }
 
     public String getPrefix() {
+        if(prefix==null) return "";
         return prefix;
     }
 
@@ -253,6 +281,7 @@ public class Stock {
     }
 
     public String getName() {
+        if(name==null) return "";
         return name;
     }
 
@@ -261,6 +290,7 @@ public class Stock {
     }
 
     public String getTattoo() {
+        if(tattoo==null) return "";
         return tattoo;
     }
 
@@ -269,6 +299,7 @@ public class Stock {
     }
 
     public String getCage() {
+        if(cage==null) return "";
         return cage;
     }
 
@@ -277,6 +308,7 @@ public class Stock {
     }
 
     public String getColor() {
+        if(color==null) return "";
         return color;
     }
 
@@ -285,6 +317,7 @@ public class Stock {
     }
 
     public String getBreed() {
+        if(breed==null) return "";
         return breed;
     }
 
@@ -293,6 +326,7 @@ public class Stock {
     }
 
     public Integer getWeight() {
+        if(weight==null) return 0;
         return weight;
     }
 
@@ -325,6 +359,7 @@ public class Stock {
     }
 
     public String getRegNo() {
+        if(regNo==null) return "";
         return regNo;
     }
 
@@ -333,6 +368,7 @@ public class Stock {
     }
 
     public String getChampNo() {
+        if(champNo==null) return "";
         return champNo;
     }
 
@@ -341,6 +377,7 @@ public class Stock {
     }
 
     public String getLegs() {
+        if(legs==null) return "";
         return legs;
     }
 
@@ -349,6 +386,7 @@ public class Stock {
     }
 
     public String getGenotype() {
+        if(genotype==null) return "";
         return genotype;
     }
 
@@ -365,6 +403,7 @@ public class Stock {
     }
 
     public String getCategory() {
+        if(category==null) return "";
         return category;
     }
 
@@ -374,7 +413,7 @@ public class Stock {
 
     public String getNotes() {
         if(this.notes==null) return "";
-        return notes.replace("[", "").replace("]", "").replace("\"", "");
+        return notes.replaceAll("\\[", "").replaceAll("]", "").replaceAll("\"", "");
     }
     
     public Boolean hasNotes(){
@@ -386,6 +425,7 @@ public class Stock {
     }
 
     public String getStatus() {
+        if(status==null) return "";
         return status;
     }
 
@@ -422,6 +462,7 @@ public class Stock {
     }
 
     public String getSexText() {
+        if(sexText==null) return "";
         return sexText;
     }
 
@@ -430,6 +471,7 @@ public class Stock {
     }
 
     public String getFatherName() {
+        if(fatherName==null) return "";
         return fatherName;
     }
 
@@ -446,6 +488,7 @@ public class Stock {
     }
 
     public String getMotherName() {
+        if(motherName==null) return "";
         return motherName;
     }
 
@@ -464,7 +507,7 @@ public class Stock {
     private String getNameWithoutTattoo(String inVal) {
         String retVal = "";
         if (inVal.contains("(")) {
-            retVal = inVal.substring(0, inVal.indexOf("("));
+            retVal = inVal.substring(0, inVal.lastIndexOf("("));
         } else {
             retVal = inVal;
         }
@@ -476,28 +519,29 @@ public class Stock {
         if (inVal.contains("()")) {
             retVal = "";
         } else {
-            retVal = inVal.substring(inVal.indexOf("(") + 1, inVal.indexOf(")"));
+            retVal = inVal.substring(inVal.lastIndexOf("(") + 1, inVal.lastIndexOf(")"));
         }
         return retVal;
     }
 
-    public Long getFatherId() {
+    public Integer getFatherId() {
         return fatherId;
     }
 
-    public void setFatherId(Long fatherId) {
+    public void setFatherId(Integer fatherId) {
         this.fatherId = fatherId;
     }
 
-    public Long getMotherId() {
+    public Integer getMotherId() {
         return motherId;
     }
 
-    public void setMotherId(Long motherId) {
+    public void setMotherId(Integer motherId) {
         this.motherId = motherId;
     }
 
     public String getWeightText() {
+        if(weightText==null) return "";
         return weightText;
     }
 
@@ -525,6 +569,38 @@ public class Stock {
             return getTattoo();
         }
         return getName();
+    }
+    
+    public File getProfileFile(){
+        File profileFile = new File(profileImagePath, getProfileFileName());
+        if(profileFile.exists()){
+            return profileFile;
+        }else{
+            profileFile = new File(profileImagePath, getDefaultImageSource());
+            if (profileFile.exists()){
+                return profileFile;
+            }else{
+                return null;
+            }
+        }
+    }
+    
+    public File getProfileFileToBeSaved(){
+        return new File(profileImagePath, getProfileFileName());
+    }
+
+    private String getProfileFileName() {
+        return "stock-profile-" + getProfileFileBaseName() + ".jpg";
+    }
+
+    private String getProfileFileBaseName() {
+        if (getTattoo().isEmpty()) {
+            if(getName().isEmpty()){
+                return getId().toString();
+            }
+            return getName();
+        }
+        return getTattoo();
     }
 
     public final Boolean isActive() {
@@ -558,6 +634,17 @@ public class Stock {
         }else{
             return null;
         }
+    }
+
+    public String getProfileImage() {
+        if(profileImage==null || profileImage.isEmpty()){
+            return defaultImageSource;
+        }
+        return profileImage;
+    }
+
+    public void setProfileImage(String profileImage) {
+        this.profileImage = profileImage;
     }
 
     public Layout getHeader(){
@@ -603,7 +690,7 @@ public class Stock {
         return layout;
     }
     
-    public void updateFromImported(Boolean importBreeder, Long importId, StockType importStockType) {
+    public void updateFromImported(Boolean importBreeder, Integer importId, StockType importStockType) {
         //only allow this update if the id is null as imported records do not have an id
         needsSaving = Boolean.FALSE;
         if (id != null) {
@@ -640,7 +727,7 @@ public class Stock {
 
     @Override
     public String toString() {
-        return "Stock{" + "id=" + id + ", breeder=" + breeder + ", stockType=" + stockType + ", sexText=" + sexText + ", sex=" + sex + ", prefix=" + prefix + ", name=" + name + ", tattoo=" + tattoo + ", cage=" + cage + ", fatherName=" + fatherName + ", motherName=" + motherName + ", fatherId=" + fatherId + ", motherId=" + motherId + ", color=" + color + ", breed=" + breed + ", weightText=" + weightText + ", weight=" + weight + ", doB=" + doB + ", acquired=" + acquired + ", regNo=" + regNo + ", champNo=" + champNo + ", legs=" + legs + ", genotype=" + genotype + ", kitsCount=" + kitsCount + ", category=" + category + ", notes=" + notes + ", status=" + status + ", statusDate=" + statusDate + ", active=" + active + ", litter=" + litter + ", fosterLitter=" + fosterLitter + ", needsSaving=" + needsSaving + ", ageInDays=" + ageInDays + ", litterCount=" + litterCount + ", kitCount=" + kitCount + '}';
+        return "Stock{" + "id=" + id + ", breeder=" + breeder + ", stockType=" + stockType + ", sexText=" + sexText + ", sex=" + sex + ", prefix=" + prefix + ", name=" + name + ", tattoo=" + tattoo + ", cage=" + cage + ", fatherName=" + fatherName + ", motherName=" + motherName + ", fatherId=" + fatherId + ", motherId=" + motherId + ", color=" + color + ", breed=" + breed + ", weightText=" + weightText + ", weight=" + weight + ", doB=" + doB + ", acquired=" + acquired + ", regNo=" + regNo + ", champNo=" + champNo + ", legs=" + legs + ", genotype=" + genotype + ", kitsCount=" + kitsCount + ", category=" + category + ", notes=" + notes + ", status=" + status + ", statusDate=" + statusDate + ", active=" + active + ", profileImage=" + profileImage + ", defaultImageSource=" + defaultImageSource + ", litter=" + litter + ", fosterLitter=" + fosterLitter + ", needsSaving=" + needsSaving + ", ageInDays=" + ageInDays + ", litterCount=" + litterCount + ", kitCount=" + kitCount + '}';
     }
 
     
