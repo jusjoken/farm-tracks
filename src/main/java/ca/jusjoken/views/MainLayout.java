@@ -91,6 +91,7 @@ public class MainLayout extends AppLayout{
     }
 
     private void createNavigation() {
+        System.out.println("MainLayout: createNavigation");
         nav.removeAll();
 
         List<MenuEntry> menuEntries = MenuConfiguration.getMenuEntries();
@@ -124,18 +125,28 @@ public class MainLayout extends AppLayout{
     @Override
     protected void afterNavigation() {
         super.afterNavigation();
+        System.out.println("MainLayout: afterNavigation");
         viewTitle.setText(getCurrentPageTitle());
     }
 
     private String getCurrentPageTitle() {
+        System.out.println("MainLayout: getCurrentPageTitle: " + MenuConfiguration.getPageHeader(getContent()).orElse(""));
         return MenuConfiguration.getPageHeader(getContent()).orElse("");
     }
 
     @Override
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent); 
+        System.out.println("MainLayout: onAttach");
         registration = ComponentUtil.addListener(attachEvent.getUI(), ComponentConfirmEvent.class, event ->{
             createNavigation();
+            if(event.getSource().getId().isPresent()){
+                String currentId = event.getSource().getId().get();
+                System.out.println("MainLayout: onAttach: listener: dialog id:" + currentId);
+                UI.getCurrent().navigate(StockView.class,currentId);
+                viewTitle.setText(queryService.getSavedQueryById(currentId).getSavedQueryName());
+            }
+            
         });
     }
 

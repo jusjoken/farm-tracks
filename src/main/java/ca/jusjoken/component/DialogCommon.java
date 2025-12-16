@@ -9,6 +9,7 @@ package ca.jusjoken.component;
  * @author birch
  */
 import ca.jusjoken.UIUtilities;
+import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.service.LitterService;
@@ -41,13 +42,14 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.JustifyContentMode;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.upload.Upload;
-import com.vaadin.flow.component.virtuallist.VirtualList;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
+import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.dom.ElementFactory;
 import com.vaadin.flow.server.streams.DownloadHandler;
 import com.vaadin.flow.server.streams.InMemoryUploadHandler;
@@ -73,7 +75,7 @@ import org.imgscalr.Scalr;
 public class DialogCommon {
 
     public enum DialogMode{
-        EDIT, DELETE
+        EDIT, DELETE, VIEW
     }
 
     //default is EDIT - must be superUser to allow DELETE
@@ -116,6 +118,15 @@ public class DialogCommon {
     private Checkbox fieldProfileUseCamera = new Checkbox("Use camera if available");
     private Button dialogProfileImageRotateButton = new Button("Rotate");
 
+    private Checkbox fieldBreeder = new Checkbox();
+    private RadioButtonGroupEx<Gender> fieldGender = new RadioButtonGroupEx<>();
+    private TextField fieldPrefix = new TextField();
+    private TextField fieldName = new TextField();
+    private TextField fieldTattoo = new TextField();
+    private TextField fieldColor = new TextField();
+    private TextField fieldBreed = new TextField();
+    private NumberField fieldWeight = new NumberField();
+    
     private DatePicker fieldAquiredDate = new DatePicker();
     private DatePicker fieldBornDate = new DatePicker();
     private TextField fieldLegs = UIUtilities.getTextField();
@@ -224,8 +235,17 @@ public class DialogCommon {
         dialog.getFooter().add(footerLayout);
 
         //one time configuration for any fields
-
+        fieldGender.setItems(Gender.MALE, Gender.FEMALE);
+        
         //form fields need width full to fill the column they are in
+        fieldBreeder.setWidthFull();
+        fieldGender.setWidthFull();
+        fieldPrefix.setWidthFull();
+        fieldName.setWidthFull();
+        fieldTattoo.setWidthFull();
+        fieldColor.setWidthFull();
+        fieldBreed.setWidthFull();
+        fieldWeight.setWidthFull();
         fieldFatherName.setWidthFull();
         fieldMotherName.setWidthFull();
         fieldCategory.setWidthFull();
@@ -238,23 +258,16 @@ public class DialogCommon {
         fieldGenotype.setWidthFull();
         fieldLegs.setWidthFull();
         fieldRegNo.setWidthFull();
-        
-        //fieldStatus.setWidth("150px");
-        //fieldStatusDate.setWidth("150px");
-        
-        //fieldPaymentMethod.setItems(Config.getInstance().getPaymentMethods());
-
-//        fieldPaymentMethod.setEmptySelectionAllowed(false);
-//        fieldPaymentMethod.setRequiredIndicatorVisible(true);
-//        fieldPaymentMethod.setWidth("150px");
-//        fieldPaymentMethod.setPlaceholder("Select payment method");
-//        fieldNotes.setReadOnly(true);
-//        fieldNotes.addThemeVariants(TextAreaVariant.LUMO_SMALL);
-//
-//        fieldGlobalTaxes.setButtonIcon(new Icon("vaadin", "cogs"));
-//        fieldTotalSale.setButtonIcon(new Icon("vaadin","calc"));
 
         //add change listeners for each editable field
+        fieldBreeder.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldGender.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldPrefix.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldName.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldTattoo.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldColor.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldBreed.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldWeight.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
         fieldAquiredDate.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
         fieldBornDate.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
         fieldLegs.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
@@ -322,14 +335,8 @@ public class DialogCommon {
         //set values and visibility for fields
         clearLists();
         dialogLayout.removeAll();
-        if(currentDisplayMode.equals(DisplayMode.LITTER_LIST)){
-            litterList = litterService.getLitters(this.stockEntity);
-            //show list of litter items
-            VirtualList<Litter> list = new VirtualList<>();
-            list.setItems(litterList);
-            list.setRenderer(litterCardRenderer);
-            list.setWidthFull();
-            dialogLayout.add(list);
+        if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
+            dialogLayout.add(showItem(this.stockEntity, currentDisplayMode, false, false));
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
             //load stored image or if none load default image
             fieldProfileAvatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
@@ -343,8 +350,7 @@ public class DialogCommon {
             //dialogLayout.add(getStockHeader(stockEntity, false), avatarDiv, createImageUploadLayout());
             dialogLayout.add(showItem(this.stockEntity,currentDisplayMode), createImageUploadLayout(currentDisplayMode));
         }else{
-            //viewer for stock fields - READONLY
-            dialogLayout.add(showItem(this.stockEntity, currentDisplayMode));
+            //nothing
         }
 
         customTaskConverted = Boolean.FALSE;
@@ -766,6 +772,17 @@ public class DialogCommon {
 
         //fields by displayMode type
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
+            if(dialogMode.equals(DialogMode.EDIT)){
+                stockFormLayout.addFormItem(fieldName,"Name");
+                stockFormLayout.addFormItem(fieldPrefix,"Prefix");
+                stockFormLayout.addFormItem(fieldTattoo,"Tattoo");
+                stockFormLayout.addFormItem(fieldBreed,"Breed");
+                stockFormLayout.addFormItem(fieldGender,"Gender");
+                stockFormLayout.addFormItem(fieldBreeder,"Breeder");
+                stockFormLayout.addFormItem(fieldColor,"Color");
+                stockFormLayout.addFormItem(fieldWeight,"Weight");
+            }
+            
             stockFormLayout.addFormItem(fieldFatherName,"Father");
             stockFormLayout.addFormItem(fieldMotherName,"Mother");
             stockFormLayout.addFormItem(fieldGenotype,"Genotype");
@@ -796,6 +813,22 @@ public class DialogCommon {
         validationEnabled = Boolean.FALSE;
 
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
+            if(dialogMode.equals(DialogMode.EDIT)){
+                fieldName.setValue(currentStock.getName());
+                fieldPrefix.setValue(currentStock.getPrefix());
+                fieldTattoo.setValue(currentStock.getTattoo());
+                fieldBreed.setValue(currentStock.getBreed());
+
+                fieldGender.setRenderer(new TextRenderer<Gender>(gender -> {
+                    if(gender.equals(Gender.MALE)) return currentStock.getStockType().getMaleName();
+                    return currentStock.getStockType().getFemaleName();
+                }));        
+                
+                fieldGender.setValue(currentStock.getSex());
+                fieldBreeder.setValue(currentStock.isBreeder());
+                fieldColor.setValue(currentStock.getColor());
+                fieldWeight.setValue(currentStock.getWeight().doubleValue());
+            }
             fieldAquiredDate.setValue(currentStock.getAcquired());
             //System.out.println("***Set Aquired::" + currentStock.getAcquired());
             

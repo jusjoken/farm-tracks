@@ -40,7 +40,8 @@ public class StockSavedQueryService {
     public StockSavedQuery getSavedQueryById(String id){
         Optional<StockSavedQuery> query = queryRepository.findById(Long.valueOf(id));
         if(query.isEmpty()){
-            return getDefaultSaveQuery();
+            List<StockSavedQuery> list = getSavedQueryList();
+            return list.get(0);
         }
         return query.get();
     }
@@ -77,6 +78,10 @@ public class StockSavedQueryService {
             queryRepository.save(query);
             return query.getId();
         }
+    }
+    
+    public void deleteQuery(String queryId){
+        queryRepository.deleteById(Long.parseLong(queryId));
     }
     
 }

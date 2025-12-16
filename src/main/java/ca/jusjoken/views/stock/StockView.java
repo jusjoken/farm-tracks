@@ -7,8 +7,10 @@ import ca.jusjoken.component.Item;
 import ca.jusjoken.component.Layout;
 import ca.jusjoken.component.LazyComponent;
 import ca.jusjoken.component.ListRefreshNeededListener;
+import ca.jusjoken.component.RadioButtonGroupEx;
 import ca.jusjoken.data.ColumnName;
 import ca.jusjoken.data.Utility;
+import ca.jusjoken.data.Utility.BreederFilter;
 import ca.jusjoken.data.Utility.TabType;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
@@ -20,7 +22,6 @@ import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockTypeRepository;
-import ca.jusjoken.theme.RadioButtonTheme;
 import ca.jusjoken.views.MainLayout;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentUtil;
@@ -33,11 +34,11 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.contextmenu.ContextMenu;
+import com.vaadin.flow.component.contextmenu.MenuItem;
 import com.vaadin.flow.component.details.Details;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.SvgIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
-import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.TabSheet;
@@ -49,6 +50,7 @@ import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
+import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.BeforeEvent;
 import com.vaadin.flow.router.HasDynamicTitle;
@@ -85,16 +87,20 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private NativeLabel countLabel = new NativeLabel();
     private Button saveOptionsButton = new Button(LineAwesomeIcon.SAVE_SOLID.create());
     private Button applyOptionsButton = new Button(LineAwesomeIcon.CHECK_SQUARE_SOLID.create());
+    private Button deleteOptionsButton = new Button(LineAwesomeIcon.TRASH_ALT_SOLID.create());
+    private Button resetOptionsButton = new Button(LineAwesomeIcon.UNDO_ALT_SOLID.create());
     private DialogCommon dialogCommon;
     private ConfirmDialog saveQueryDialog = new ConfirmDialog();
+    private ConfirmDialog deleteQueryDialog = new ConfirmDialog();
+    private ConfirmDialog resetQueryDialog = new ConfirmDialog();
     private TextField saveQueryName = new TextField("Stock query name");
     private Select<StockType> stockTypeChoice = new Select<>();
-    private RadioButtonGroup<String> breederFilter = new RadioButtonGroup<>();
+    private RadioButtonGroupEx<BreederFilter> breederFilter = new RadioButtonGroupEx<>();
     private Select<StockStatus> stockStatusFilter = new Select<>();
     private Select<ColumnName> stockSort1Column = new Select<>();
-    private RadioButtonGroup<String> sort1Direction = new RadioButtonGroup<>();
+    private RadioButtonGroupEx<String> sort1Direction = new RadioButtonGroupEx<>();
     private Select<ColumnName> stockSort2Column = new Select<>();
-    private RadioButtonGroup<String> sort2Direction = new RadioButtonGroup<>();
+    private RadioButtonGroupEx<String> sort2Direction = new RadioButtonGroupEx<>();
     private Boolean skipSidebarUpdates = Boolean.FALSE;
 
     public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockService stockService, StockSavedQueryService queryService) {
@@ -131,6 +137,12 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         applyOptionsButton.addClickListener(click -> {
             applyFilters();
         });
+        deleteOptionsButton.addClickListener(click -> {
+            deleteOptions();
+        });
+        resetOptionsButton.addClickListener(click -> {
+            resetOptions();
+        });
         
         saveOptionsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         saveOptionsButton.setAriaLabel("Save current options");
@@ -140,13 +152,21 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         applyOptionsButton.setAriaLabel("Apply current options");
         applyOptionsButton.setTooltipText("Apply current options");
 
+        deleteOptionsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        deleteOptionsButton.setAriaLabel("Delete current saved options");
+        deleteOptionsButton.setTooltipText("Delete current saved options");
+
+        resetOptionsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        resetOptionsButton.setAriaLabel("Reset current saved options");
+        resetOptionsButton.setTooltipText("Reset current saved options");
+
         Button close = new Button(LineAwesomeIcon.TIMES_SOLID.create(), e -> closeSidebar());
         close.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         close.setAriaLabel("Close options");
         close.setTooltipText("Close options");
 
         HorizontalLayout buttonLayout = UIUtilities.getHorizontalLayoutNoWidthCentered();
-        buttonLayout.add(applyOptionsButton,saveOptionsButton,close);
+        buttonLayout.add(resetOptionsButton,deleteOptionsButton ,applyOptionsButton,saveOptionsButton,close);
         
         Layout header = new Layout(title, buttonLayout);
         header.addClassNames(Padding.End.MEDIUM, Padding.Start.LARGE, Padding.Vertical.SMALL);
@@ -167,28 +187,22 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             stockTypeChoice.setValue(currentStockSavedQuery.getStockType());
         }
         
-        breederFilter.setAriaLabel("Breeder Filter");
-        breederFilter.addClassNames(BoxSizing.BORDER, Padding.XSMALL, Padding.Top.MEDIUM);
-        breederFilter.addThemeNames(RadioButtonTheme.EQUAL_WIDTH, RadioButtonTheme.PRIMARY, RadioButtonTheme.TOGGLE);
-        breederFilter.getChildren().forEach(component -> {
-            component.getElement().getThemeList().add(RadioButtonTheme.PRIMARY);
-            component.getElement().getThemeList().add(RadioButtonTheme.TOGGLE);
-        });
+        breederFilter.setItems(BreederFilter.filterList());
+        breederFilter.setValue(BreederFilter.BREEDER);
         breederFilter.setLabel("Breeder Filter");
         breederFilter.setTooltipText("Breeder Filter");
-        if(stockTypeChoice.getValue()!=null){
-            breederFilter.setItems("All", stockTypeChoice.getValue().getBreederName(), stockTypeChoice.getValue().getNonBreederName());
-            breederFilter.setValue(stockTypeChoice.getValue().getBreederName());
-        }
+
         breederFilter.addValueChangeListener(event -> {
-            if(event.getValue().equals("All")) {
-                currentStockSavedQuery.setBreeder(null);
-            }else if(event.getValue().equals(stockTypeChoice.getValue().getNonBreederName())) {
-                currentStockSavedQuery.setBreeder(Boolean.FALSE);
-            }else{
-                currentStockSavedQuery.setBreeder(Boolean.TRUE);
+            if(event.getValue()!=null){
+                if(event.getValue().equals(BreederFilter.ALL)) {
+                    currentStockSavedQuery.setBreeder(null);
+                }else if(event.getValue().equals(BreederFilter.NONBREEDER)) {
+                    currentStockSavedQuery.setBreeder(Boolean.FALSE);
+                }else{
+                    currentStockSavedQuery.setBreeder(Boolean.TRUE);
+                }
+                sidebarChanged(Boolean.TRUE);
             }
-            sidebarChanged(Boolean.TRUE);
         });
 
         stockStatusFilter.setAriaLabel("Status Filter");
@@ -221,18 +235,11 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             sidebarChanged(Boolean.TRUE);
         });
         
-        sort1Direction.setAriaLabel("Sort Direction");
         sort1Direction.setItems(Sort.Direction.ASC.name(), Sort.Direction.DESC.name());
-        sort1Direction.addClassNames(BoxSizing.BORDER, Padding.XSMALL, Padding.Top.MEDIUM);
-        sort1Direction.addThemeNames(RadioButtonTheme.EQUAL_WIDTH, RadioButtonTheme.PRIMARY, RadioButtonTheme.TOGGLE);
-        sort1Direction.getChildren().forEach(component -> {
-            component.getElement().getThemeList().add(RadioButtonTheme.PRIMARY);
-            component.getElement().getThemeList().add(RadioButtonTheme.TOGGLE);
-        });
         sort1Direction.setLabel("Sort Direction");
         sort1Direction.setTooltipText("Sort Direction");
         sort1Direction.addValueChangeListener(event -> {
-            currentStockSavedQuery.setSort1Direction(event.getValue());
+            currentStockSavedQuery.setSort1Direction(event.getValue().toString());
             sidebarChanged(Boolean.TRUE);
         });
 
@@ -258,18 +265,11 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             sidebarChanged(Boolean.TRUE);
         });
         
-        sort2Direction.setAriaLabel("Sort Direction");
         sort2Direction.setItems(Sort.Direction.ASC.name(), Sort.Direction.DESC.name());
-        sort2Direction.addClassNames(BoxSizing.BORDER, Padding.XSMALL, Padding.Top.MEDIUM);
-        sort2Direction.addThemeNames(RadioButtonTheme.EQUAL_WIDTH, RadioButtonTheme.PRIMARY, RadioButtonTheme.TOGGLE);
-        sort2Direction.getChildren().forEach(component -> {
-            component.getElement().getThemeList().add(RadioButtonTheme.PRIMARY);
-            component.getElement().getThemeList().add(RadioButtonTheme.TOGGLE);
-        });
         sort2Direction.setLabel("Sort Direction");
         sort2Direction.setTooltipText("Sort Direction");
         sort2Direction.addValueChangeListener(event -> {
-            currentStockSavedQuery.setSort2Direction(event.getValue());
+            currentStockSavedQuery.setSort2Direction(event.getValue().toString());
             sidebarChanged(Boolean.TRUE);
         });
 
@@ -289,7 +289,17 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private void sidebarSetValues(){
         skipSidebarUpdates = Boolean.TRUE;
         stockTypeChoice.setValue(currentStockSavedQuery.getStockType());
-        breederFilter.setValue(stockTypeChoice.getValue().getBreederName());
+        breederFilter.setRenderer(new TextRenderer<BreederFilter>(filter -> {
+            if(filter.equals(BreederFilter.BREEDER)) {
+                return currentStockSavedQuery.getStockType().getBreederName();
+            }else if(filter.equals(BreederFilter.NONBREEDER)) {
+                return currentStockSavedQuery.getStockType().getNonBreederName();
+            }else{
+                return "All";
+            }
+        }));        
+        breederFilter.setValue(BreederFilter.fromIsBreeder(currentStockSavedQuery.getBreeder()));
+
         stockStatusFilter.setValue(currentStockSavedQuery.getStockStatus());
         stockSort1Column.setValue(Utility.getInstance().getColumnName(currentStockSavedQuery.getSort1().getColumnName()));
         sort1Direction.setValue(currentStockSavedQuery.getSort1Direction());
@@ -311,6 +321,12 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             currentStockSavedQuery.setNeedsSaving(changed);
             applyOptionsButton.setEnabled(changed);
             saveOptionsButton.setEnabled(changed);
+            resetOptionsButton.setEnabled(changed);
+            if(currentSavedQueryId.equals(0)){
+                deleteOptionsButton.setEnabled(false);
+            }else{
+                deleteOptionsButton.setEnabled(true);
+            }
         }
     }
     
@@ -338,15 +354,16 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
                 UIUtilities.showNotification("Saving current query overwritting:id:" + currentStockSavedQuery.getId() + " :" + currentStockSavedQuery.getSavedQueryName());
                 //save the currentStockSavedQuery to the database
                 currentSavedQueryId = queryService.saveQuery(currentStockSavedQuery).toString();
+                //setting the dialog id the Empty String will ensure the fireEvent will NOT navigate as we are already there
+                saveQueryDialog.setId("");
                 loadFilters();
                 applyFilters();
                 sidebarChanged(Boolean.FALSE);
             }else{
                 UIUtilities.showNotification("Saving current query as NEW :" + saveQueryName.getValue());
                 currentSavedQueryId = queryService.saveAsQuery(currentStockSavedQuery, saveQueryName.getValue()).toString();
-                loadFilters();
-                applyFilters();
-                sidebarChanged(Boolean.FALSE);
+                //setting the dialog id will ensure the fireEvent will navigate to the id specified
+                saveQueryDialog.setId(currentSavedQueryId);
             }
             ComponentUtil.fireEvent(UI.getCurrent(), new ComponentConfirmEvent(saveQueryDialog, false));
         });
@@ -354,7 +371,55 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     
     private void saveOptions() {
         saveQueryName.setValue(currentStockSavedQuery.getSavedQueryName());
+
         saveQueryDialog.open();
+    }
+    
+    private void deleteOptions(){
+        deleteQueryDialog.setHeader("Delete current saved options?");
+        deleteQueryDialog.setText("Are you sure you want to delete '" + currentStockSavedQuery.getSavedQueryName() + "'?");
+                
+        deleteQueryDialog.setCancelable(true);
+        deleteQueryDialog.addCancelListener(event -> {
+            //do nothing
+        });
+
+        deleteQueryDialog.setConfirmText("Delete");
+        deleteQueryDialog.setConfirmButtonTheme("error primary");
+        deleteQueryDialog.addConfirmListener(event -> {
+            //delete the item
+            UIUtilities.showNotification("Deleting current saved query:id:" + currentStockSavedQuery.getId() + " :" + currentStockSavedQuery.getSavedQueryName());
+            //delete the currentStockSavedQuery from the database
+            queryService.deleteQuery(currentSavedQueryId);
+            //load the first query from the database and make it the current one
+            currentSavedQueryId = queryService.getSavedQueryList().get(0).getId().toString();
+            //setting the dialog id will ensure the fireEvent will navigate to the id specified
+            deleteQueryDialog.setId(currentSavedQueryId);
+            ComponentUtil.fireEvent(UI.getCurrent(), new ComponentConfirmEvent(deleteQueryDialog, false));
+        });
+        deleteQueryDialog.open();
+    }
+
+    private void resetOptions(){
+        resetQueryDialog.setHeader("Reset/Undo current saved options?");
+        resetQueryDialog.setText("Are you sure you want to reset/undo options for '" + currentStockSavedQuery.getSavedQueryName() + "'?");
+                
+        resetQueryDialog.setCancelable(true);
+        resetQueryDialog.addCancelListener(event -> {
+            //do nothing
+        });
+
+        resetQueryDialog.setConfirmText("Reset");
+        resetQueryDialog.setConfirmButtonTheme("error primary");
+        resetQueryDialog.addConfirmListener(event -> {
+            //reset/reload the item
+            //UIUtilities.showNotification("Reseting/reloading current saved query:id:" + currentStockSavedQuery.getId() + " :" + currentStockSavedQuery.getSavedQueryName());
+            //reload the currentStockSavedQuery from the database
+            loadFilters();
+            applyFilters();
+            sidebarChanged(Boolean.FALSE);
+        });
+        resetQueryDialog.open();
     }
     
     private Layout createSectionHeader(String title, Boolean topPadding){
@@ -424,12 +489,14 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     }
     
     private void loadFilters(){
+        System.out.println("loadFilters: currentSavedQueryId:" + currentSavedQueryId + " saveQuery:" + currentStockSavedQuery );
         if(currentSavedQueryId==null){
             currentStockSavedQuery = queryService.getSavedQueryList().get(0);
         }else{
             currentStockSavedQuery = queryService.getSavedQueryById(currentSavedQueryId);
         }
         sidebarChanged(Boolean.FALSE);
+        updateStockTypeCount();
     }
     
     private void applyFilters(){
@@ -541,11 +608,47 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         UIUtilities.setBorders(detailsPanel, stock, false);
         detailsPanel.addClassNames(Border.ALL,BorderRadius.LARGE, BoxShadow.SMALL);
         
-        ContextMenu menu = UIUtilities.createContextMenu(stock);
+        ContextMenu menu = createContextMenu(stock);
         menu.setTarget(detailsPanel);
         menu.setOpenOnClick(false);
         
         return detailsPanel;
+    }
+
+    private ContextMenu createContextMenu(Stock stockEntity) {
+        String stockName = stockEntity.getDisplayName();
+        Div heading = new Div();
+        heading.setText(stockName);
+        heading.getStyle().set("text-align", "center");
+        heading.getStyle().set("font-weight", "bold");
+        heading.getStyle().set("padding", "8px");
+        ContextMenu menu = new ContextMenu();
+        menu.setOpenOnClick(true);
+        
+        //add a label at the top with the stock name
+        menu.addComponent(heading);
+        menu.addSeparator();
+
+        MenuItem editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
+        editMenu.addClickListener(click -> {
+            //open stock edit dialog
+            dialogCommon.setDialogMode(DialogCommon.DialogMode.EDIT);
+            dialogCommon.setDialogTitle("Edit Stock");
+            dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.STOCK_DETAILS);
+        });
+        menu.addItem(new Item("Breed", Utility.ICONS.TYPE_BREEDER.getIconSource()));
+        menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
+        menu.addItem(new Item("Cage Card", Utility.ICONS.ACTION_CAGE_CARD.getIconSource()));
+        menu.addItem(new Item("Mark For Sale", Utility.ICONS.ACTION_MARK_FOR_SALE.getIconSource()));
+        menu.addItem(new Item("Sell", Utility.ICONS.STATUS_SOLD.getIconSource()));
+        menu.addItem(new Item("Deposit taken", Utility.ICONS.STATUS_SOLD_W_DEPOSIT.getIconSource()));
+        menu.addItem(new Item("Butcher", Utility.ICONS.STATUS_BUTHERED.getIconSource()));
+        menu.addItem(new Item("Died", Utility.ICONS.STATUS_DIED.getIconSource()));
+        menu.addItem(new Item("Archive", Utility.ICONS.STATUS_ARCHIVED.getIconSource()));
+        menu.addItem(new Item("Cull", Utility.ICONS.STATUS_CULLED.getIconSource()));
+        menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
+
+        return menu;
     }
     
     private Layout createTabbedContentArea(Stock stock){
@@ -585,6 +688,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private LazyComponent createTabOverview(Stock stock) {
         Layout layout = new Layout();
         DialogCommon overviewDialog = new DialogCommon(DialogCommon.DisplayMode.STOCK_DETAILS);
+        overviewDialog.setDialogMode(DialogCommon.DialogMode.VIEW);
         layout.add(overviewDialog.showItem(stock, DialogCommon.DisplayMode.STOCK_DETAILS,true,false));
         return new LazyComponent(() -> layout);
     }

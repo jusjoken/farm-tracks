@@ -63,6 +63,37 @@ public class Utility {
         }
     }
 
+    public static enum BreederFilter{
+        BREEDER(Boolean.TRUE), NONBREEDER(Boolean.FALSE), ALL(null);
+
+        private final Boolean isBreeder;
+        
+        private BreederFilter(Boolean isBreeder) {
+            this.isBreeder = isBreeder;
+        }
+        public Boolean getIsBreeder(){
+            return isBreeder;
+        }
+        
+        public static BreederFilter fromIsBreeder(Boolean isBreeder){
+            if(isBreeder==null){
+                return BreederFilter.ALL;
+            }else if(isBreeder){
+                return BreederFilter.BREEDER;
+            }else{
+                return BreederFilter.NONBREEDER;
+            }
+        }
+        
+        public static List<BreederFilter> filterList(){
+            List<BreederFilter> list = new ArrayList<>();
+            list.add(ALL);
+            list.add(BREEDER);
+            list.add(NONBREEDER);
+            return list;
+        }
+    }
+        
     public static enum ImportType{
         BREEDERS("Breeders"), KITS("Kits"), LITTERS("Litters");
 
