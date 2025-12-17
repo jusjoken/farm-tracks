@@ -107,8 +107,8 @@ public class StockService {
         }
     }
 
-    public List<Stock> findById(Integer id) {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+    public Stock findById(Integer id) {
+        return stockRepository.findAllById(id);
     }
 
     public List<Stock> findAll() {
@@ -118,6 +118,13 @@ public class StockService {
 
     public void save(Stock entity){
         this.stockRepository.save(entity);
+    }
+    
+    public List<Stock> getMothers(){
+        return stockRepository.findAllMothers();
+    }
+    public List<Stock> getFathers(){
+        return stockRepository.findAllFathers();
     }
 
 }

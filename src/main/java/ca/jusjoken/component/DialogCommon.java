@@ -29,6 +29,7 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.card.Card;
 import com.vaadin.flow.component.card.CardVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
+import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
@@ -42,7 +43,6 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.JustifyContentMode;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextArea;
@@ -79,7 +79,7 @@ public class DialogCommon {
     }
 
     //default is EDIT - must be superUser to allow DELETE
-    private DialogMode dialogMode = DialogMode.EDIT;
+    private DialogMode dialogMode = DialogMode.VIEW;
 
     public enum DisplayMode{
         LITTER_LIST, KIT_LIST, STOCK_DETAILS, PROFILE_IMAGE
@@ -125,15 +125,17 @@ public class DialogCommon {
     private TextField fieldTattoo = new TextField();
     private TextField fieldColor = new TextField();
     private TextField fieldBreed = new TextField();
-    private NumberField fieldWeight = new NumberField();
+    private WeightInput fieldWeight = new WeightInput();
     
     private DatePicker fieldAquiredDate = new DatePicker();
     private DatePicker fieldBornDate = new DatePicker();
     private TextField fieldLegs = UIUtilities.getTextField();
     private TextField fieldChampNo = UIUtilities.getTextField();
     private TextField fieldRegNo = UIUtilities.getTextField();
-    private TextField fieldFatherName = UIUtilities.getTextField();
-    private TextField fieldMotherName = UIUtilities.getTextField();
+    private TextField fieldFatherName = new TextField();
+    private TextField fieldMotherName = new TextField();
+    private ComboBox<Stock> fieldFather = new ComboBox();
+    private ComboBox<Stock> fieldMother = new ComboBox();
     private TextField fieldGenotype = UIUtilities.getTextField();
     private TextField fieldCategory = UIUtilities.getTextField(); //TODO - needs to be a pickbox
     private TextField fieldStatus = UIUtilities.getTextField(); //TODO - needs to be a pickbox
@@ -236,6 +238,10 @@ public class DialogCommon {
 
         //one time configuration for any fields
         fieldGender.setItems(Gender.MALE, Gender.FEMALE);
+        if(dialogMode.equals(DialogMode.EDIT)){
+            fieldMother.setAllowCustomValue(true);
+            fieldFather.setAllowCustomValue(true);
+        }
         
         //form fields need width full to fill the column they are in
         fieldBreeder.setWidthFull();
@@ -246,6 +252,8 @@ public class DialogCommon {
         fieldColor.setWidthFull();
         fieldBreed.setWidthFull();
         fieldWeight.setWidthFull();
+        fieldFather.setWidthFull();
+        fieldMother.setWidthFull();
         fieldFatherName.setWidthFull();
         fieldMotherName.setWidthFull();
         fieldCategory.setWidthFull();
@@ -273,8 +281,19 @@ public class DialogCommon {
         fieldLegs.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
         fieldChampNo.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
         fieldRegNo.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldFatherName.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldMotherName.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldFather.addValueChangeListener(item -> {
+            System.out.println("**Father value changed to:" + item.getValue());
+            dialogValidate(currentDisplayMode);
+        });
+        fieldFather.addCustomValueSetListener(item -> {
+            System.out.println("**Father custom changed to:" + item.getDetail());
+            //TODO:: set the NEW field in Stock for FatherExternal and null FatherId
+        });
+        fieldMother.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
+        fieldMother.addCustomValueSetListener(item -> {
+            System.out.println("**Mother custom changed to:" + item.getDetail());
+            //TODO:: set the NEW field in Stock for MotherExternal and null MotherId
+        });
         fieldGenotype.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
         fieldCategory.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
         fieldStatus.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
@@ -284,15 +303,15 @@ public class DialogCommon {
     }
 
     private void dialogClose(){
-        if(customTaskConverted){
-            log.info("dialogClose: reloading stockEntity");
-            List<Stock> stockEntityList = stockService.findById(this.stockEntity.getId());
-            log.info("dialogClose: reloading stockEntity:" + stockEntityList);
-            if(stockEntityList!=null && stockEntityList.size()>0){
-                log.info("dialogClose: reseting to stockEntity:" + stockEntityList.get(0));
-                this.stockEntity = stockEntityList.get(0);
-            }
-        }
+//        if(customTaskConverted){
+//            log.info("dialogClose: reloading stockEntity");
+//            List<Stock> stockEntityList = stockService.findById(this.stockEntity.getId());
+//            log.info("dialogClose: reloading stockEntity:" + stockEntityList);
+//            if(stockEntityList!=null && stockEntityList.size()>0){
+//                log.info("dialogClose: reseting to stockEntity:" + stockEntityList.get(0));
+//                this.stockEntity = stockEntityList.get(0);
+//            }
+//        }
         dialog.close();
     }
 
@@ -323,15 +342,16 @@ public class DialogCommon {
     }
 
     public void dialogOpen(Integer stockID, DisplayMode currentDisplayMode){
-        List<Stock> stockEntityList = stockService.findById(stockID);
-        if(stockEntityList!=null && !stockEntityList.isEmpty()){
-            dialogOpen(stockEntityList.get(0), currentDisplayMode);
+        Stock stockEntityItem = stockService.findById(stockID);
+        if(stockEntityItem!=null){
+            dialogOpen(stockEntityItem, currentDisplayMode);
         }else{
             log.info("StockEditDialog: dialogOpen: failed to find stock with Id:" + stockID);
         }
     }
     public void dialogOpen(Stock stockEntity, DisplayMode currentDisplayMode){
         this.stockEntity = stockEntity;
+        System.out.println("dialogOpen: dialogMode:" + dialogMode);
         //set values and visibility for fields
         clearLists();
         dialogLayout.removeAll();
@@ -630,6 +650,7 @@ public class DialogCommon {
             if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
                 validateAvatar(fieldProfileAvatar,avatarDiv,this.stockEntity.getProfileImage().toString());
             }else if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
+                
                 //validateField(fieldReceiptTotal,this.stockEntity.getReceiptTotal());
                 //validateCheckbox(fieldFeesOnly,this.stockEntity.getFeesOnly());
             }else{
@@ -731,6 +752,8 @@ public class DialogCommon {
         stockFormLayout.setMinColumns(1);
         
         if(forceReadOnly){
+            fieldFather.setReadOnly(true);
+            fieldMother.setReadOnly(true);
             fieldFatherName.setReadOnly(true);
             fieldMotherName.setReadOnly(true);
             fieldCategory.setReadOnly(true);
@@ -781,10 +804,14 @@ public class DialogCommon {
                 stockFormLayout.addFormItem(fieldBreeder,"Breeder");
                 stockFormLayout.addFormItem(fieldColor,"Color");
                 stockFormLayout.addFormItem(fieldWeight,"Weight");
+                stockFormLayout.addFormItem(fieldFather,"Father");
+                stockFormLayout.addFormItem(fieldMother,"Mother");
+            }
+            if(dialogMode.equals(DialogMode.VIEW)){
+                stockFormLayout.addFormItem(fieldFatherName,"Father");
+                stockFormLayout.addFormItem(fieldMotherName,"Mother");
             }
             
-            stockFormLayout.addFormItem(fieldFatherName,"Father");
-            stockFormLayout.addFormItem(fieldMotherName,"Mother");
             stockFormLayout.addFormItem(fieldGenotype,"Genotype");
             stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
             stockFormLayout.addFormItem(fieldLegs,"Legs");
@@ -827,8 +854,24 @@ public class DialogCommon {
                 fieldGender.setValue(currentStock.getSex());
                 fieldBreeder.setValue(currentStock.isBreeder());
                 fieldColor.setValue(currentStock.getColor());
-                fieldWeight.setValue(currentStock.getWeight().doubleValue());
+                System.out.println("setValues: weight:" + currentStock.getWeight());
+                fieldWeight.setValue(currentStock.getWeight());
+                
+                fieldFather.setItems(stockService.getFathers());
+                fieldFather.setItemLabelGenerator(Stock::getDisplayName);
+                fieldFather.setValue(stockService.findById(currentStock.getFatherId()));
+                fieldMother.setItems(stockService.getMothers());
+                fieldMother.setItemLabelGenerator(Stock::getDisplayName);
+                fieldMother.setValue(stockService.findById(currentStock.getMotherId()));
             }
+            if(dialogMode.equals(DialogMode.VIEW)){
+                if(currentStock.getFatherId()!=null){
+                    fieldFatherName.setValue(stockService.findById(currentStock.getFatherId()).getDisplayName());
+                }
+                if(currentStock.getMotherId()!=null){
+                    fieldMotherName.setValue(stockService.findById(currentStock.getMotherId()).getDisplayName());
+                }
+}
             fieldAquiredDate.setValue(currentStock.getAcquired());
             //System.out.println("***Set Aquired::" + currentStock.getAcquired());
             
@@ -836,8 +879,7 @@ public class DialogCommon {
             fieldLegs.setValue(currentStock.getLegs());
             fieldChampNo.setValue(currentStock.getChampNo());
             fieldRegNo.setValue(currentStock.getRegNo());
-            fieldFatherName.setValue(stockService.getStockNameById(currentStock.getFatherId()));
-            fieldMotherName.setValue(stockService.getStockNameById(currentStock.getMotherId()));
+            
             fieldGenotype.setValue(currentStock.getGenotype());
             fieldCategory.setValue(currentStock.getCategory());
             fieldStatus.setValue(currentStock.getStatus());

@@ -234,6 +234,25 @@ public class Utility {
         return bd.doubleValue();
     }
     
+    public Integer WeightConverterPoundsOuncesToOz(Integer pounds, Integer ounces){
+        Integer totalOunces = pounds * 16 + ounces;
+        //System.out.println("Total ounces: " + totalOunces);        
+        return totalOunces;
+    }
+    
+    public Integer WeightConverterOzToPounds(Integer ounces){
+        Integer pounds = (int) (ounces / 16);
+        //System.out.println("Ounces: " + ounces + " = " + retVal);        
+        return pounds;        
+    }
+    
+    public Integer WeightConverterOzToRemainingOunces(Integer ounces){
+        System.out.println("WeightConverterOzToRemainingOunces: ounces in:" + ounces);
+        Integer remainingOunces = (int) (ounces % 16);
+        System.out.println("WeightConverterOzToRemainingOunces: remainingOunces:" + remainingOunces);
+        return remainingOunces;        
+    }
+    
     public Integer WeightConverterStringToOz(String weight){
         //String weight = "2 lbs 6 oz"; // Example input
         String[] parts = weight.split(" ");

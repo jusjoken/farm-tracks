@@ -48,6 +48,13 @@ public interface StockRepository extends JpaRepository<Stock, Long>, QueryByExam
 
     public List<Stock> findAllByFatherId(Integer id);
 
+    @Query("select s from Stock s where s.breeder = true and s.sex = 'F' order by s.name")
+    List<Stock> findAllMothers();
+    
+    @Query("select s from Stock s where s.breeder = true and s.sex = 'M' order by s.name")
+    List<Stock> findAllFathers();
+    
+    public Stock findAllById(Integer id);
     
     
 }
