@@ -6,13 +6,11 @@ package ca.jusjoken.views;
 
 import ca.jusjoken.component.Layout;
 import com.vaadin.flow.component.Text;
-import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 import com.vaadin.flow.theme.lumo.LumoUtility;
-import org.vaadin.lineawesome.LineAwesomeIconUrl;
 
 /**
  *
@@ -22,7 +20,6 @@ import org.vaadin.lineawesome.LineAwesomeIconUrl;
 @Route(value = "home", layout = MainLayout.class)
 @RouteAlias(value = "", layout = MainLayout.class)
 @RouteAlias(value = "welcome", layout = MainLayout.class)
-@Menu(order = 0, icon = LineAwesomeIconUrl.TH_LIST_SOLID)
 @AnonymousAllowed
 public class WelcomeView extends Layout {
     

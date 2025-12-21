@@ -23,6 +23,7 @@ import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockTypeRepository;
 import ca.jusjoken.views.MainLayout;
+import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentUtil;
 import com.vaadin.flow.component.Html;
@@ -37,7 +38,6 @@ import com.vaadin.flow.component.contextmenu.ContextMenu;
 import com.vaadin.flow.component.contextmenu.MenuItem;
 import com.vaadin.flow.component.details.Details;
 import com.vaadin.flow.component.html.*;
-import com.vaadin.flow.component.icon.SvgIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.tabs.Tab;
@@ -47,6 +47,7 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.virtuallist.VirtualList;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
+import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
@@ -63,7 +64,6 @@ import com.vaadin.flow.theme.lumo.LumoUtility.*;
 import jakarta.annotation.security.PermitAll;
 import java.util.ArrayList;
 import java.util.Collection;
-import org.vaadin.lineawesome.LineAwesomeIcon;
 
 import java.util.List;
 import org.springframework.data.domain.Sort;
@@ -85,10 +85,10 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private VirtualList<Stock> list = new VirtualList<>();
     private Section sidebar;
     private NativeLabel countLabel = new NativeLabel();
-    private Button saveOptionsButton = new Button(LineAwesomeIcon.SAVE_SOLID.create());
-    private Button applyOptionsButton = new Button(LineAwesomeIcon.CHECK_SQUARE_SOLID.create());
-    private Button deleteOptionsButton = new Button(LineAwesomeIcon.TRASH_ALT_SOLID.create());
-    private Button resetOptionsButton = new Button(LineAwesomeIcon.UNDO_ALT_SOLID.create());
+    private Button saveOptionsButton = new Button(FontAwesome.Regular.SAVE.create());
+    private Button applyOptionsButton = new Button(FontAwesome.Regular.CHECK_SQUARE.create());
+    private Button deleteOptionsButton = new Button(FontAwesome.Regular.TRASH_CAN.create());
+    private Button resetOptionsButton = new Button(FontAwesome.Solid.UNDO.create());
     private DialogCommon dialogCommon;
     private ConfirmDialog saveQueryDialog = new ConfirmDialog();
     private ConfirmDialog deleteQueryDialog = new ConfirmDialog();
@@ -160,7 +160,8 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         resetOptionsButton.setAriaLabel("Reset current saved options");
         resetOptionsButton.setTooltipText("Reset current saved options");
 
-        Button close = new Button(LineAwesomeIcon.TIMES_SOLID.create(), e -> closeSidebar());
+        //Button close = new Button(LineAwesomeIcon.TIMES_SOLID.create(), e -> closeSidebar());
+        Button close = new Button(FontAwesome.Solid.CLOSE.create(), e -> closeSidebar());
         close.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         close.setAriaLabel("Close options");
         close.setTooltipText("Close options");
@@ -445,16 +446,16 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             applyFilters();
         });
         
-        Button options = new Button("Options", LineAwesomeIcon.COGS_SOLID.create());
+        Button options = new Button("Options", FontAwesome.Solid.COG.create());
         options.setTooltipText("Open the options panel for filter and sort options.");
         options.addClickListener(e -> toggleSidebar());
         
-        Button gotoStart = new Button(LineAwesomeIcon.ANGLE_DOUBLE_UP_SOLID.create());
+        Button gotoStart = new Button(FontAwesome.Solid.ANGLE_DOUBLE_UP.create());
         gotoStart.setTooltipText("Go to the start of the list");
         gotoStart.addClickListener(e -> {
             list.scrollToStart();
         });
-        Button gotoEnd = new Button(LineAwesomeIcon.ANGLE_DOUBLE_DOWN_SOLID.create());
+        Button gotoEnd = new Button(FontAwesome.Solid.ANGLE_DOUBLE_DOWN.create());
         gotoEnd.setTooltipText("Go to the end of the list");
         gotoEnd.addClickListener(e -> {
             list.scrollToEnd();
@@ -642,7 +643,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         menu.addItem(new Item("Mark For Sale", Utility.ICONS.ACTION_MARK_FOR_SALE.getIconSource()));
         menu.addItem(new Item("Sell", Utility.ICONS.STATUS_SOLD.getIconSource()));
         menu.addItem(new Item("Deposit taken", Utility.ICONS.STATUS_SOLD_W_DEPOSIT.getIconSource()));
-        menu.addItem(new Item("Butcher", Utility.ICONS.STATUS_BUTHERED.getIconSource()));
+        menu.addItem(new Item("Butcher", Utility.ICONS.STATUS_BUTCHERED.getIconSource()));
         menu.addItem(new Item("Died", Utility.ICONS.STATUS_DIED.getIconSource()));
         menu.addItem(new Item("Archive", Utility.ICONS.STATUS_ARCHIVED.getIconSource()));
         menu.addItem(new Item("Cull", Utility.ICONS.STATUS_CULLED.getIconSource()));
@@ -676,7 +677,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             counter.getElement().setAttribute("title", counterLabel);
             return new Tab(label, counter);        
         }else if(tabType.equals(TabType.HASDATA) && !itemData.isEmpty()){
-            SvgIcon paperClip = LineAwesomeIcon.PAPERCLIP_SOLID.create();
+            Icon paperClip = FontAwesome.Solid.PAPERCLIP.create();
             paperClip.getStyle().set("padding", "var(--lumo-space-xs)");
             paperClip.setColor("var(--lumo-primary-color)");
             return new Tab(label, paperClip);        

@@ -12,6 +12,7 @@ import ca.jusjoken.utility.BadgeVariant;
 import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.SvgIcon;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 import jakarta.persistence.CascadeType;
@@ -683,7 +684,7 @@ public class Stock {
         layout.setAlignItems(Layout.AlignItems.CENTER);
         layout.setGap(Layout.Gap.SMALL);
 
-        SvgIcon svgIcon = new SvgIcon(icon);
+        Icon svgIcon = new Icon(icon);
         svgIcon.setTooltipText(text);
         svgIcon.addClassNames(LumoUtility.IconSize.SMALL);
         layout.add(svgIcon);

@@ -18,7 +18,6 @@ import ca.jusjoken.data.service.StockService;
 import com.flowingcode.vaadin.addons.imagecrop.Crop;
 import com.flowingcode.vaadin.addons.imagecrop.ImageCrop;
 import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.ShortcutRegistration;
 import com.vaadin.flow.component.Shortcuts;
@@ -26,8 +25,6 @@ import com.vaadin.flow.component.avatar.Avatar;
 import com.vaadin.flow.component.avatar.AvatarVariant;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.card.Card;
-import com.vaadin.flow.component.card.CardVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
@@ -176,6 +173,7 @@ public class DialogCommon {
     private Boolean hasChangedValues = Boolean.FALSE;
     private StockService stockService;
     private LitterService litterService;
+    private DisplayMode openedDisplayMode = DisplayMode.STOCK_DETAILS;
 
     private List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
 
@@ -209,7 +207,7 @@ public class DialogCommon {
 
         dialogOkButton.addClickListener(
                 event -> {
-                    dialogSave(currentDisplayMode);
+                    dialogSave();
                 }
         );
         dialogOkButton.addClickShortcut(Key.ENTER);
@@ -282,7 +280,6 @@ public class DialogCommon {
         fieldChampNo.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
         fieldRegNo.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
         fieldFather.addValueChangeListener(item -> {
-            System.out.println("**Father value changed to:" + item.getValue());
             dialogValidate(currentDisplayMode);
         });
         fieldFather.addCustomValueSetListener(item -> {
@@ -315,7 +312,8 @@ public class DialogCommon {
         dialog.close();
     }
 
-    private void dialogSave(DisplayMode currentDisplayMode) {
+    private void dialogSave() {
+        DisplayMode currentDisplayMode = openedDisplayMode;
         //save here
         //update stockEntity from fields
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
@@ -351,7 +349,7 @@ public class DialogCommon {
     }
     public void dialogOpen(Stock stockEntity, DisplayMode currentDisplayMode){
         this.stockEntity = stockEntity;
-        System.out.println("dialogOpen: dialogMode:" + dialogMode);
+        openedDisplayMode = currentDisplayMode;
         //set values and visibility for fields
         clearLists();
         dialogLayout.removeAll();
@@ -370,6 +368,7 @@ public class DialogCommon {
             //dialogLayout.add(getStockHeader(stockEntity, false), avatarDiv, createImageUploadLayout());
             dialogLayout.add(showItem(this.stockEntity,currentDisplayMode), createImageUploadLayout(currentDisplayMode));
         }else{
+            System.out.println("dialogOpen: dialogMode:" + dialogMode + " NOTHING");
             //nothing
         }
 
@@ -380,7 +379,7 @@ public class DialogCommon {
         dialog.getHeader().add(dialogCloseButton);
 
         dialogValidate(currentDisplayMode);
-        dialog.setModal(true);
+        //dialog.setModal(true);
         dialog.setDraggable(true);
         dialog.setResizable(true);
         //dialog.addClassNames("backdrop-blur-none");
@@ -473,10 +472,10 @@ public class DialogCommon {
         InputStream is = new ByteArrayInputStream(imageBytes);
         BufferedImage newBi = ImageIO.read(is);
         
-        System.out.println("Scale: BEFORE" + newBi.getWidth() + "x" + newBi.getHeight());
+        //System.out.println("Scale: BEFORE" + newBi.getWidth() + "x" + newBi.getHeight());
         
         BufferedImage resizedBi = Scalr.resize(newBi, Scalr.Method.QUALITY, Scalr.Mode.FIT_TO_WIDTH, targetWidth, Scalr.OP_ANTIALIAS);   
-        System.out.println("Scale: AFTER" + resizedBi.getWidth() + "x" + resizedBi.getHeight());
+        //System.out.println("Scale: AFTER" + resizedBi.getWidth() + "x" + resizedBi.getHeight());
         
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ImageIO.write(resizedBi, "jpg", baos);
@@ -489,9 +488,9 @@ public class DialogCommon {
         InputStream is = new ByteArrayInputStream(imageBytes);
         BufferedImage newBi = ImageIO.read(is);
         
-        System.out.println("Rotate: BEFORE:" + newBi.getWidth() + "x" + newBi.getHeight());
+        //System.out.println("Rotate: BEFORE:" + newBi.getWidth() + "x" + newBi.getHeight());
         newBi = Scalr.rotate(newBi, Scalr.Rotation.CW_90, Scalr.OP_ANTIALIAS);
-        System.out.println("Rotate: AFTER:" + newBi.getWidth() + "x" + newBi.getHeight());
+        //System.out.println("Rotate: AFTER:" + newBi.getWidth() + "x" + newBi.getHeight());
         
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ImageIO.write(newBi, "jpg", baos);
@@ -580,11 +579,6 @@ public class DialogCommon {
                 return createMiniLitterPanel(litter);
             });    
 
-    private ComponentRenderer<Component, Stock> kitCardRenderer = new ComponentRenderer<>(
-            stock -> {
-                return createMiniKitCard(stock);
-            });    
-
     private Layout createMiniLitterPanel(Litter litter){
         Layout box = new Layout();
         box.setFlexDirection(Layout.FlexDirection.COLUMN);
@@ -596,51 +590,6 @@ public class DialogCommon {
         Layout headerRow = new Layout(new Span(litter.getName()));
         headerRow.setAlignItems(Layout.AlignItems.BASELINE);
         return box;
-    }
-    
-    private Layout createMiniKitPanel(Stock kit){
-        Layout box = new Layout();
-        box.setFlexDirection(Layout.FlexDirection.COLUMN);
-        box.addClassNames(FontSize.XSMALL);
-        box.addClassNames(FontWeight.LIGHT);
-        box.setWidth("134px");
-        box.setHeight("62px");
-        box.addClassNames(Margin.XSMALL, Padding.XSMALL);
-        Layout headerRow = new Layout(new Span(kit.getDisplayName()));
-        headerRow.setAlignItems(Layout.AlignItems.BASELINE);
-        /*
-        Component actionMenu = createDefaultActions();
-        actionMenu.getStyle().set("margin-left", "auto");
-        actionMenu.addClassNames(LumoUtility.Padding.NONE, LumoUtility.Margin.Top.NONE,LumoUtility.Margin.Bottom.NONE);
-        headerRow.add(actionMenu);
-        */
-        box.add(headerRow);
-        box.add(new Span(kit.getColor()));
-        box.add(new Html(kit.getWeightInLbsOz()));
-
-        UIUtilities.setBorders(box, null, false);
-        box.addClassNames(Border.ALL,BorderRadius.MEDIUM, BoxShadow.SMALL);
-        return box;
-    }
-
-    private Card createMiniKitCard(Stock kit){
-        Card card = new Card();
-        //card.setTitle(new Span(kit.getDisplayName()));
-        //card.setSubtitle(new Span(kit.getColor()));
-        Layout headerRow = new Layout(new Span(kit.getDisplayName()));
-        headerRow.setAlignItems(Layout.AlignItems.BASELINE);
-        card.setHeader(headerRow);
-        Component actionMenu = UIUtilities.createDefaultActions();
-        actionMenu.getStyle().set("margin-left", "auto");
-        actionMenu.addClassNames(Padding.NONE, Margin.Top.NONE,Margin.Bottom.NONE);
-        card.setHeaderSuffix(actionMenu);
-        
-        card.add(new Html(kit.getWeightInLbsOz()));
-        card.addThemeVariants(CardVariant.LUMO_ELEVATED,CardVariant.LUMO_HORIZONTAL,CardVariant.LUMO_OUTLINED);
-        card.addClassNames(Margin.SMALL);
-        //card.setWidth("134px");
-        //card.setHeight("62px");
-        return card;
     }
     
     private void dialogValidate(DisplayMode currentDisplayMode) {
@@ -854,7 +803,6 @@ public class DialogCommon {
                 fieldGender.setValue(currentStock.getSex());
                 fieldBreeder.setValue(currentStock.isBreeder());
                 fieldColor.setValue(currentStock.getColor());
-                System.out.println("setValues: weight:" + currentStock.getWeight());
                 fieldWeight.setValue(currentStock.getWeight());
                 
                 fieldFather.setItems(stockService.getFathers());
@@ -873,7 +821,6 @@ public class DialogCommon {
                 }
 }
             fieldAquiredDate.setValue(currentStock.getAcquired());
-            //System.out.println("***Set Aquired::" + currentStock.getAcquired());
             
             fieldBornDate.setValue(currentStock.getDoB());
             fieldLegs.setValue(currentStock.getLegs());
@@ -883,7 +830,6 @@ public class DialogCommon {
             fieldGenotype.setValue(currentStock.getGenotype());
             fieldCategory.setValue(currentStock.getCategory());
             fieldStatus.setValue(currentStock.getStatus());
-            //System.out.println("***Set Status::" + currentStock.getStatus());
             fieldStatusDate.setValue(currentStock.getStatusDate());
             fieldFoster.setValue("TODO");
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){

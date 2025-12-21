@@ -1,30 +1,40 @@
 package ca.jusjoken.views;
 
+import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.ComponentConfirmEvent;
-import ca.jusjoken.component.UserDialog;
 import ca.jusjoken.data.entity.StockSavedQuery;
+import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockSavedQueryService;
+import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.views.stock.StockView;
+import ca.jusjoken.views.utility.MaintenanceView;
+import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.ComponentUtil;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.avatar.Avatar;
+import com.vaadin.flow.component.contextmenu.ContextMenu;
+import com.vaadin.flow.component.contextmenu.MenuItem;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Footer;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.Header;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.icon.SvgIcon;
-import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.Scroller;
+import com.vaadin.flow.component.page.ColorScheme;
+import com.vaadin.flow.component.page.ColorScheme.Value;
 import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
+import com.vaadin.flow.router.AfterNavigationEvent;
+import com.vaadin.flow.router.AfterNavigationObserver;
 import com.vaadin.flow.router.Layout;
+import com.vaadin.flow.server.auth.AccessAnnotationChecker;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 import com.vaadin.flow.server.menu.MenuConfiguration;
-import com.vaadin.flow.server.menu.MenuEntry;
 import com.vaadin.flow.shared.Registration;
 import com.vaadin.flow.spring.security.AuthenticationContext;
 import com.vaadin.flow.theme.lumo.LumoUtility;
@@ -36,20 +46,23 @@ import org.springframework.security.core.userdetails.UserDetails;
  */
 @Layout
 @AnonymousAllowed
-public class MainLayout extends AppLayout{
+public class MainLayout extends AppLayout implements AfterNavigationObserver {
     
     private final transient AuthenticationContext authContext;
     private final StockSavedQueryService queryService;
-    //private StockView stockView = new StockView();
+    private final StockTypeService typeService;
     
     private Registration registration;
     private SideNav nav = new SideNav();
+    private AccessAnnotationChecker accessChecker;
 
     private H1 viewTitle;
 
-    public MainLayout(AuthenticationContext authContext) {
+    public MainLayout(AuthenticationContext authContext, AccessAnnotationChecker accessChecker) {
         this.queryService = Registry.getBean(StockSavedQueryService.class);
+        this.typeService = Registry.getBean(StockTypeService.class);
         this.authContext = authContext;
+        this.accessChecker = accessChecker;
         
         //StockView.class.addListener(this);
         setPrimarySection(Section.DRAWER);
@@ -62,8 +75,14 @@ public class MainLayout extends AppLayout{
         toggle.setAriaLabel("Menu toggle");
 
         viewTitle = new H1();
-        viewTitle.addClassNames(LumoUtility.FontSize.LARGE, LumoUtility.Margin.NONE);
-
+        viewTitle.addClassNames(LumoUtility.FontSize.LARGE, LumoUtility.Margin.NONE, LumoUtility.Width.FULL);
+        
+        addToNavbar(true, toggle, viewTitle, getUserMenu());
+    }
+    
+    private HorizontalLayout getUserMenu(){
+        HorizontalLayout userMenu = UIUtilities.getHorizontalLayout(false,false,false);
+        
         String userName = "None";
         if(authContext.isAuthenticated()){
             userName = authContext.getAuthenticatedUser(UserDetails.class).get().getUsername();
@@ -73,11 +92,54 @@ public class MainLayout extends AppLayout{
         avatar.addClassNames(LumoUtility.Margin.Horizontal.SMALL);
         avatar.setTooltipEnabled(true);
         avatar.addClassNames(LumoUtility.Position.ABSOLUTE, LumoUtility.Position.End.XSMALL, LumoUtility.Position.Top.XSMALL);
-
-        UserDialog userDialog = new UserDialog(authContext);
-        userDialog.setTarget(avatar);
+        avatar.getStyle().set("display","block");
+        avatar.getStyle().set("cursor","pointer");
+        avatar.getElement().setAttribute("tabindex", "-1");
         
-        addToNavbar(true, toggle, viewTitle, avatar);
+        ContextMenu menu = new ContextMenu(avatar);
+        menu.setOpenOnClick(true);
+
+        Div heading = new Div();
+        heading.setText(userName);
+        heading.getStyle().set("text-align", "center");
+        heading.getStyle().set("font-weight", "bold");
+        heading.getStyle().set("padding", "8px");
+        
+        if(authContext.isAuthenticated()){
+            menu.addComponent(heading);
+            menu.addSeparator();
+            MenuItem mode = menu.addItem("Switch mode", event -> {
+                if(ColorScheme.Value.DARK==UI.getCurrentOrThrow().getPage().getColorScheme()){
+                    UI.getCurrentOrThrow().getPage().setColorScheme(Value.LIGHT);
+                }else{
+                    UI.getCurrentOrThrow().getPage().setColorScheme(Value.DARK);
+                }
+            });
+            setModeText(mode);
+            mode.addClickListener(listener -> {
+                setModeText(mode);
+            });
+
+            menu.addItem("Sign out", event -> {
+                authContext.logout();
+            });
+        }else{
+            menu.addItem("Sign in", event -> {
+                menu.getUI().ifPresent(ui -> ui.navigate("/login"));
+            });
+        }
+
+        //userMenu.add(button, popover);  
+        userMenu.add(avatar);  
+        return userMenu;
+    }
+    
+    private void setModeText(MenuItem mode){
+        if(ColorScheme.Value.DARK==UI.getCurrentOrThrow().getPage().getColorScheme()){
+            mode.setText("Switch to Light Mode");
+        }else{
+            mode.setText("Switch to Dark Mode");
+        }
     }
 
     private void addDrawerContent() {
@@ -94,24 +156,33 @@ public class MainLayout extends AppLayout{
         System.out.println("MainLayout: createNavigation");
         nav.removeAll();
 
-        List<MenuEntry> menuEntries = MenuConfiguration.getMenuEntries();
-        menuEntries.forEach(entry -> {
-            if (entry.icon() != null) {
-                nav.addItem(new SideNavItem(entry.title(), entry.path(), new SvgIcon(entry.icon())));
-            } else {
-                nav.addItem(new SideNavItem(entry.title(), entry.path()));
-            }
-        });
+        nav.addItem(new SideNavItem("Welcome", WelcomeView.class, FontAwesome.Solid.HOME.create()));
 
-        //TODO build nav items for each stock query from database
-        List<StockSavedQuery> stockQueryList = queryService.getSavedQueryList();
-        for(StockSavedQuery query: stockQueryList){
-            SideNavItem sn = new SideNavItem(query.getSavedQueryName(), StockView.class, query.getId().toString());
-            sn.setPrefixComponent(VaadinIcon.LIST.create());
-            sn.getElement().addEventListener("click", click -> {
-                viewTitle.setText(query.getSavedQueryName());
-            });
-            nav.addItem(sn);
+        //build nav items for each stock query from database
+        if(accessChecker.hasAccess(StockView.class)){
+            List<StockType> stockTypes = typeService.findAllStockTypes();
+            for(StockType type: stockTypes){
+                SideNavItem stockGroupItem = new SideNavItem(type.getName());
+                stockGroupItem.setExpanded(true);
+                List<StockSavedQuery> stockQueryList = queryService.getSavedQueryListByType(type.getName());
+                if(stockQueryList.size()>0){
+                    nav.addItem(stockGroupItem);
+                }
+                for(StockSavedQuery query: stockQueryList){
+                    SideNavItem sn = new SideNavItem(query.getSavedQueryName(), StockView.class, query.getId().toString());
+                    stockGroupItem.addItem(sn);
+                    sn.setPrefixComponent(FontAwesome.Solid.PAW.create());
+                    sn.getElement().addEventListener("click", click -> {
+                        viewTitle.setText(query.getSavedQueryName());
+                    });
+                }
+            }
+
+        }
+        
+
+        if(accessChecker.hasAccess(MaintenanceView.class)){
+            nav.addItem(new SideNavItem("Maintenance", MaintenanceView.class, FontAwesome.Solid.COGS.create()));
         }
         
     }
@@ -120,13 +191,6 @@ public class MainLayout extends AppLayout{
         Footer layout = new Footer();
 
         return layout;
-    }
-
-    @Override
-    protected void afterNavigation() {
-        super.afterNavigation();
-        System.out.println("MainLayout: afterNavigation");
-        viewTitle.setText(getCurrentPageTitle());
     }
 
     private String getCurrentPageTitle() {
@@ -148,6 +212,12 @@ public class MainLayout extends AppLayout{
             }
             
         });
+    }
+
+    @Override
+    public void afterNavigation(AfterNavigationEvent ane) {
+        System.out.println("MainLayout: afterNavigation");
+        viewTitle.setText(getCurrentPageTitle());
     }
 
     

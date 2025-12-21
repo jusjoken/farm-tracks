@@ -4,7 +4,6 @@
  */
 package ca.jusjoken.views.utility;
 
-import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Import;
 import ca.jusjoken.data.Utility;
 import com.vaadin.flow.component.button.Button;
@@ -17,11 +16,9 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.FileBuffer;
 import com.vaadin.flow.component.upload.receivers.FileData;
-import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
-import org.vaadin.lineawesome.LineAwesomeIconUrl;
 
 /**
  *
@@ -29,7 +26,6 @@ import org.vaadin.lineawesome.LineAwesomeIconUrl;
  */
 @PageTitle("Maintenance")
 @Route("maintenance")
-@Menu(order = 0, icon = LineAwesomeIconUrl.COGS_SOLID)
 @PermitAll
 @Uses(Icon.class)
 public class MaintenanceView extends Div{
@@ -102,8 +98,7 @@ public class MaintenanceView extends Div{
         // Re-enable the upload button after the file is cleared
         upload.getElement()
                 .addEventListener("max-files-reached-changed", event -> {
-                    boolean maxFilesReached = event.getEventData()
-                            .getBoolean("event.detail.value");
+                    boolean maxFilesReached = event.getEventData().get("event.detail.value").asBoolean();
                     uploadButton.setEnabled(!maxFilesReached);
                 }).addEventData("event.detail.value");            
 

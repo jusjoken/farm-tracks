@@ -37,6 +37,11 @@ public class StockSavedQueryService {
         return list;
     }
     
+    public List<StockSavedQuery> getSavedQueryListByType (String type){
+        List<StockSavedQuery> list = queryRepository.findAllByType(type);
+        return list;
+    }
+    
     public StockSavedQuery getSavedQueryById(String id){
         Optional<StockSavedQuery> query = queryRepository.findById(Long.valueOf(id));
         if(query.isEmpty()){

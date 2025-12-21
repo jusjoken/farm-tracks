@@ -7,6 +7,7 @@ package ca.jusjoken.data;
 import ca.jusjoken.data.service.ColumnNameComparator;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockStatusComparator;
+import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -15,7 +16,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.vaadin.lineawesome.LineAwesomeIcon;
 
 /**
  *
@@ -122,23 +122,23 @@ public class Utility {
     }
     
     public enum ICONS {
-        STATUS_ACTIVE(LineAwesomeIcon.CHECK_CIRCLE_SOLID.getSource()),
-        STATUS_INACTIVE(LineAwesomeIcon.TIMES_CIRCLE_SOLID.getSource()),
-        STATUS_ALL(LineAwesomeIcon.GLOBE_SOLID.getSource()),
-        STATUS_CULLED(LineAwesomeIcon.CUT_SOLID.getSource()),
-        STATUS_BUTHERED(LineAwesomeIcon.UTENSILS_SOLID.getSource()),
-        STATUS_DIED(LineAwesomeIcon.HEART_BROKEN_SOLID.getSource()),
-        STATUS_SOLD(LineAwesomeIcon.DOLLAR_SIGN_SOLID.getSource()),
-        STATUS_SOLD_W_DEPOSIT(LineAwesomeIcon.HAND_HOLDING_USD_SOLID.getSource()),
-        STATUS_ARCHIVED(LineAwesomeIcon.ARCHIVE_SOLID.getSource()),
-        ACTION_DELETE(LineAwesomeIcon.TRASH_SOLID.getSource()),
-        ACTION_MARK_FOR_SALE(LineAwesomeIcon.MONEY_BILL_SOLID.getSource()),
-        ACTION_CAGE_CARD(LineAwesomeIcon.LIST_SOLID.getSource()),
-        ACTION_BIRTH(LineAwesomeIcon.BIRTHDAY_CAKE_SOLID.getSource()),
-        ACTION_EDIT(LineAwesomeIcon.PENCIL_ALT_SOLID.getSource()),
-        GENDER_FEMALE(LineAwesomeIcon.VENUS_SOLID.getSource()),
-        GENDER_MALE(LineAwesomeIcon.MARS_SOLID.getSource()),
-        TYPE_BREEDER(LineAwesomeIcon.VENUS_MARS_SOLID.getSource());
+        STATUS_ACTIVE(FontAwesome.Solid.CIRCLE_CHECK.create().getIcon()),
+        STATUS_INACTIVE(FontAwesome.Solid.TIMES_CIRCLE.create().getIcon()),
+        STATUS_ALL(FontAwesome.Solid.GLOBE.create().getIcon()),
+        STATUS_CULLED(FontAwesome.Solid.CUT.create().getIcon()),
+        STATUS_BUTCHERED(FontAwesome.Solid.UTENSILS.create().getIcon()),
+        STATUS_DIED(FontAwesome.Solid.HEART_BROKEN.create().getIcon()),
+        STATUS_SOLD(FontAwesome.Solid.DOLLAR_SIGN.create().getIcon()),
+        STATUS_SOLD_W_DEPOSIT(FontAwesome.Solid.HAND_HOLDING_USD.create().getIcon()),
+        STATUS_ARCHIVED(FontAwesome.Solid.ARCHIVE.create().getIcon()),
+        ACTION_DELETE(FontAwesome.Solid.TRASH.create().getIcon()),
+        ACTION_MARK_FOR_SALE(FontAwesome.Solid.MONEY_BILL.create().getIcon()),
+        ACTION_CAGE_CARD(FontAwesome.Solid.LIST.create().getIcon()),
+        ACTION_BIRTH(FontAwesome.Solid.BIRTHDAY_CAKE.create().getIcon()),
+        ACTION_EDIT(FontAwesome.Solid.PENCIL_ALT.create().getIcon()),
+        GENDER_FEMALE(FontAwesome.Solid.VENUS.create().getIcon()),
+        GENDER_MALE(FontAwesome.Solid.MARS.create().getIcon()),
+        TYPE_BREEDER(FontAwesome.Solid.VENUS_MARS.create().getIcon());
 
         private final String iconSource;
 
@@ -196,7 +196,7 @@ public class Utility {
         stockStatusList.put("inactive", new StockStatus("inactive", ICONS.STATUS_INACTIVE, "Inactive",Boolean.FALSE,2));
         stockStatusList.put("all", new StockStatus("all", ICONS.STATUS_ALL, "All",Boolean.FALSE,3));
         stockStatusList.put("archived", new StockStatus("archived", ICONS.STATUS_ARCHIVED, "Archived",Boolean.TRUE,5));
-        stockStatusList.put("butchered", new StockStatus("butchered", ICONS.STATUS_BUTHERED, "Butchered",Boolean.TRUE,6));
+        stockStatusList.put("butchered", new StockStatus("butchered", ICONS.STATUS_BUTCHERED, "Butchered",Boolean.TRUE,6));
         stockStatusList.put("culled", new StockStatus("culled", ICONS.STATUS_CULLED, "Culled",Boolean.TRUE,7));
         stockStatusList.put("died", new StockStatus("died", ICONS.STATUS_DIED, "Died",Boolean.TRUE,8));
         stockStatusList.put("forsale", new StockStatus("forsale", ICONS.ACTION_MARK_FOR_SALE, "For sale",Boolean.FALSE,9));

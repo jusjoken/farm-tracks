@@ -6,6 +6,8 @@ package ca.jusjoken.views.login;
 
 import com.vaadin.flow.component.html.Main;
 import com.vaadin.flow.component.login.LoginForm;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
@@ -25,12 +27,17 @@ public class LoginView extends Main implements BeforeEnterObserver {
     private final LoginForm login;
 
     public LoginView() {
-        addClassNames(LumoUtility.Display.FLEX, LumoUtility.JustifyContent.CENTER,
-            LumoUtility.AlignItems.CENTER);
-        setSizeFull();
+        //addClassNames(LumoUtility.Display.FLEX, LumoUtility.JustifyContent.CENTER,LumoUtility.AlignItems.CENTER);
         login = new LoginForm();
         login.setAction("login"); 
-        add(login);
+        
+        VerticalLayout layout = new VerticalLayout();
+        layout.setAlignItems(FlexComponent.Alignment.CENTER);
+        layout.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
+        layout.add(login);
+        layout.setSizeFull();
+        add(layout);
+        setSizeFull();
        
     }
 
