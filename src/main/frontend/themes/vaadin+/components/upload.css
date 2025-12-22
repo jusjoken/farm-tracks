@@ -1,7 +1,0 @@
-vaadin-upload[theme~="alt"]::part(primary-buttons) {
-    text-align: center;
-}
-
-vaadin-upload[theme~="alt"] vaadin-upload-file-list li {
-    border-top: 1px solid var(--lumo-contrast-10pct);
-}

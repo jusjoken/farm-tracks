@@ -7,7 +7,6 @@ import ca.jusjoken.component.Item;
 import ca.jusjoken.component.Layout;
 import ca.jusjoken.component.LazyComponent;
 import ca.jusjoken.component.ListRefreshNeededListener;
-import ca.jusjoken.component.RadioButtonGroupEx;
 import ca.jusjoken.data.ColumnName;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.BreederFilter;
@@ -27,6 +26,7 @@ import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentUtil;
 import com.vaadin.flow.component.Html;
+import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
 import com.vaadin.flow.component.avatar.Avatar;
@@ -48,7 +48,9 @@ import com.vaadin.flow.component.virtuallist.VirtualList;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.menubar.MenuBar;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
@@ -95,12 +97,12 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private ConfirmDialog resetQueryDialog = new ConfirmDialog();
     private TextField saveQueryName = new TextField("Stock query name");
     private Select<StockType> stockTypeChoice = new Select<>();
-    private RadioButtonGroupEx<BreederFilter> breederFilter = new RadioButtonGroupEx<>();
+    private RadioButtonGroup<BreederFilter> breederFilter = new RadioButtonGroup<>();
     private Select<StockStatus> stockStatusFilter = new Select<>();
     private Select<ColumnName> stockSort1Column = new Select<>();
-    private RadioButtonGroupEx<String> sort1Direction = new RadioButtonGroupEx<>();
+    private RadioButtonGroup<String> sort1Direction = new RadioButtonGroup<>();
     private Select<ColumnName> stockSort2Column = new Select<>();
-    private RadioButtonGroupEx<String> sort2Direction = new RadioButtonGroupEx<>();
+    private RadioButtonGroup<String> sort2Direction = new RadioButtonGroup<>();
     private Boolean skipSidebarUpdates = Boolean.FALSE;
 
     public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockService stockService, StockSavedQueryService queryService) {
@@ -446,30 +448,44 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             applyFilters();
         });
         
-        Button options = new Button("Options", FontAwesome.Solid.COG.create());
-        options.setTooltipText("Open the options panel for filter and sort options.");
-        options.addClickListener(e -> toggleSidebar());
-        
-        Button gotoStart = new Button(FontAwesome.Solid.ANGLE_DOUBLE_UP.create());
-        gotoStart.setTooltipText("Go to the start of the list");
-        gotoStart.addClickListener(e -> {
-            list.scrollToStart();
-        });
-        Button gotoEnd = new Button(FontAwesome.Solid.ANGLE_DOUBLE_DOWN.create());
-        gotoEnd.setTooltipText("Go to the end of the list");
-        gotoEnd.addClickListener(e -> {
-            list.scrollToEnd();
-        });
-        
-        Layout gotoLayout = new Layout(gotoStart,gotoEnd);
-        
+        //try a menubar
+        MenuBar menuBar = new MenuBar();
+        menuBar.setWidthFull();
 
-        // Remove paddings
-        for (Component component : new Component[]{search, options, gotoEnd, gotoStart}) {
-            component.addClassNames(Padding.Vertical.NONE);
-        }
+        //adding a textfield to a menubar is not recommended but seems to work well and on mobile does a good job of bringing up the overflow menu
+        menuBar.addItem(search);
         
-        Layout toolbar = new Layout(search, options, gotoLayout, countLabel);
+        //Options button
+        Icon optionsItemIcon = new Icon(FontAwesome.Solid.COG.create().getIcon());
+        optionsItemIcon.getStyle().setWidth("var(--lumo-icon-size-s)");
+        optionsItemIcon.getStyle().setHeight("var(--lumo-icon-size-s)");
+        optionsItemIcon.getStyle().setMarginRight("var(--lumo-space-s)");
+        optionsItemIcon.getStyle().setMarginLeft("var(--lumo-space-s)");
+        MenuItem optionsItem = menuBar.addItem(optionsItemIcon);
+        optionsItem.add(new Text("Options"));
+        optionsItem.addClickListener(e -> toggleSidebar());
+
+        Icon gotoStartIcon = new Icon(FontAwesome.Solid.ANGLE_DOUBLE_UP.create().getIcon());
+        gotoStartIcon.getStyle().setWidth("var(--lumo-icon-size-s)");
+        gotoStartIcon.getStyle().setHeight("var(--lumo-icon-size-s)");
+        gotoStartIcon.getStyle().setMarginRight("var(--lumo-space-s)");
+        gotoStartIcon.getStyle().setMarginLeft("var(--lumo-space-s)");
+        
+        MenuItem gotoStartItem = menuBar.addItem(gotoStartIcon);
+        gotoStartItem.addClickListener(e -> list.scrollToStart());
+
+        Icon gotoEndIcon = new Icon(FontAwesome.Solid.ANGLE_DOUBLE_DOWN.create().getIcon());
+        gotoEndIcon.getStyle().setWidth("var(--lumo-icon-size-s)");
+        gotoEndIcon.getStyle().setHeight("var(--lumo-icon-size-s)");
+        gotoEndIcon.getStyle().setMarginRight("var(--lumo-space-s)");
+        gotoEndIcon.getStyle().setMarginLeft("var(--lumo-space-s)");
+        MenuItem gotoEndItem = menuBar.addItem(gotoEndIcon);
+        gotoEndItem.addClickListener(e -> list.scrollToEnd());
+        
+        MenuItem countLabelItem = menuBar.addItem(countLabel);
+        countLabelItem.setClassName(FontSize.SMALL);
+        
+        Layout toolbar = new Layout(menuBar);
         toolbar.setAlignItems(Layout.AlignItems.BASELINE);
         toolbar.addClassNames(Border.BOTTOM, Padding.Horizontal.LARGE, Padding.Vertical.SMALL);
         toolbar.setGap(Layout.Gap.MEDIUM);

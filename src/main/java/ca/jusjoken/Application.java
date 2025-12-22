@@ -1,14 +1,11 @@
 package ca.jusjoken;
 
+import com.vaadin.flow.component.dependency.StyleSheet;
 import com.vaadin.flow.component.page.AppShellConfigurator;
 import com.vaadin.flow.server.PWA;
-import com.vaadin.flow.theme.Theme;
-import javax.sql.DataSource;
+import com.vaadin.flow.theme.lumo.Lumo;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-//import org.springframework.boot.autoconfigure.sql.init.SqlDataSourceScriptDatabaseInitializer;
-//import org.springframework.boot.autoconfigure.sql.init.SqlInitializationProperties;
-import org.springframework.context.annotation.Bean;
 
 /**
  * The entry point of the Spring Boot application.
@@ -18,25 +15,12 @@ import org.springframework.context.annotation.Bean;
  *
  */
 @SpringBootApplication
-@Theme(value = "vaadin+")
+@StyleSheet(Lumo.STYLESHEET)
+@StyleSheet(Lumo.UTILITY_STYLESHEET)
 @PWA(name = "Farm Tracks", shortName = "FT")
 public class Application implements AppShellConfigurator {
 
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
     }
-//    @Bean
-//    SqlDataSourceScriptDatabaseInitializer dataSourceScriptDatabaseInitializer(DataSource dataSource,
-//            SqlInitializationProperties properties) {
-//        // This bean ensures the database is only initialized when empty
-//        return new SqlDataSourceScriptDatabaseInitializer(dataSource, properties) {
-//            @Override
-//            public boolean initializeDatabase() {
-////                if (repository.count() == 0L) {
-////                    return super.initializeDatabase();
-////                }
-//                return false;
-//            }
-//        };
-//    }
 }

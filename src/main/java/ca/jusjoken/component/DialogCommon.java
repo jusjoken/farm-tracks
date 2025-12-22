@@ -40,6 +40,7 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.JustifyContentMode;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextArea;
@@ -116,7 +117,7 @@ public class DialogCommon {
     private Button dialogProfileImageRotateButton = new Button("Rotate");
 
     private Checkbox fieldBreeder = new Checkbox();
-    private RadioButtonGroupEx<Gender> fieldGender = new RadioButtonGroupEx<>();
+    private RadioButtonGroup<Gender> fieldGender = new RadioButtonGroup<>();
     private TextField fieldPrefix = new TextField();
     private TextField fieldName = new TextField();
     private TextField fieldTattoo = new TextField();
@@ -572,24 +573,6 @@ public class DialogCommon {
     private void clearLists(){
         stockList.clear();
         litterList.clear();
-    }
-    
-    private ComponentRenderer<Component, Litter> litterCardRenderer = new ComponentRenderer<>(
-            litter -> {
-                return createMiniLitterPanel(litter);
-            });    
-
-    private Layout createMiniLitterPanel(Litter litter){
-        Layout box = new Layout();
-        box.setFlexDirection(Layout.FlexDirection.COLUMN);
-        box.addClassNames(FontSize.XSMALL);
-        box.addClassNames(FontWeight.LIGHT);
-        box.setWidth("134px");
-        box.setHeight("62px");
-        box.addClassNames(Margin.XSMALL, Padding.XSMALL);
-        Layout headerRow = new Layout(new Span(litter.getName()));
-        headerRow.setAlignItems(Layout.AlignItems.BASELINE);
-        return box;
     }
     
     private void dialogValidate(DisplayMode currentDisplayMode) {
