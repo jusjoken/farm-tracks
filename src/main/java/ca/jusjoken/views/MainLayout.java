@@ -144,7 +144,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
     private void addDrawerContent() {
         Span appName = new Span("Farm Tracks");
-        appName.addClassNames(LumoUtility.FontWeight.SEMIBOLD, LumoUtility.FontSize.LARGE);
+        appName.addClassNames(LumoUtility.FontWeight.SEMIBOLD, LumoUtility.FontSize.LARGE, LumoUtility.Margin.SMALL);
         Header header = new Header(appName);
 
         Scroller scroller = new Scroller(nav);

@@ -73,6 +73,7 @@ public class WeightInput extends AbstractCompositeField<HorizontalLayout,WeightI
         }else{
             setTotalOunces(tOunces);
         }
+        getElement().setProperty("value", tOunces);
     }
     
     @Override
@@ -88,6 +89,25 @@ public class WeightInput extends AbstractCompositeField<HorizontalLayout,WeightI
     
     public void setWidthFull(){
         getContent().setWidthFull();
+    }
+
+    @Override
+    public void setRequiredIndicatorVisible(boolean requiredIndicatorVisible) {
+        //System.out.println("setRequiredIndicatorVisible:" + requiredIndicatorVisible);
+        pounds.setRequiredIndicatorVisible(requiredIndicatorVisible);
+    }
+
+    @Override
+    public boolean isRequiredIndicatorVisible() {
+        return pounds.isRequiredIndicatorVisible();
+    }
+    
+    public String getLabel(){
+        return pounds.getLabel();
+    }
+    
+    public void setLabel(String label){
+        pounds.setLabel(label);
     }
     
 }   

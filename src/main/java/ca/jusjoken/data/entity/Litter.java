@@ -20,6 +20,8 @@ import jakarta.persistence.Transient;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 
 /**
  *
@@ -76,6 +78,10 @@ public class Litter {
 
     public void setMother(Stock mother) {
         this.mother = mother;
+    }
+    
+    public String getDisplayName(){
+        return getDoB().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) + " (" + getParentsFormatted() + ") - " + getName();
     }
     
     public String getParentsFormatted(){
@@ -312,6 +318,34 @@ public class Litter {
     public void setNeedsSaving(Boolean needsSaving) {
         this.needsSaving = needsSaving;
     }
+
+    public Boolean getActive() {
+        return archived==null;
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 79 * hash + Objects.hashCode(this.id);
+        return hash;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final Litter other = (Litter) obj;
+        return Objects.equals(this.id, other.id);
+    }
+    
+    
 
     @Override
     public String toString() {

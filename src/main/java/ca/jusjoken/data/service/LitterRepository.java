@@ -27,6 +27,9 @@ public interface LitterRepository extends JpaRepository<Litter, UUID>  {
 
     public List<Litter> findByFatherId(Integer id);
     
+    @Query("select l from Litter l where l.archived IS NULL")
+    public List<Litter> findNotArchived();
+    
     @Modifying
     @Query(value = "DELETE FROM litter", nativeQuery = true)
     public void deleteAllLittersNative();   

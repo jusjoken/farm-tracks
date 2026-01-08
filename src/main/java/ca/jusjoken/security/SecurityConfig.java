@@ -3,7 +3,7 @@ package ca.jusjoken.security;
 
 import ca.jusjoken.views.login.LoginView;
 import com.vaadin.flow.spring.security.VaadinSecurityConfigurer;
-import static com.vaadin.flow.spring.security.VaadinSecurityConfigurer.vaadin;
+import org.springframework.boot.security.autoconfigure.web.servlet.PathRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -42,6 +42,9 @@ class SecurityConfig {
     public SecurityFilterChain vaadinSecurityFilterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests(registry -> {
             registry.requestMatchers("/assets/**").permitAll();
+            
+            
+            registry.requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll();
         });
         //http.with(vaadin(), vaadin -> vaadin.loginView("/login", "/"));
         

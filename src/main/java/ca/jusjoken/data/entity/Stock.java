@@ -11,13 +11,21 @@ import ca.jusjoken.utility.AgeBetween;
 import ca.jusjoken.utility.BadgeVariant;
 import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
+import com.vaadin.flow.component.avatar.Avatar;
+import com.vaadin.flow.component.avatar.AvatarVariant;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.SvgIcon;
-import com.vaadin.flow.theme.lumo.LumoUtility;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.server.streams.DownloadHandler;
+import jakarta.persistence.Access;
+import jakarta.persistence.AccessType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -26,9 +34,14 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Transient;
 import java.io.File;
 import java.time.LocalDate;
-import org.hibernate.annotations.Formula;
+import java.time.LocalDateTime;
+import java.util.Objects;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
+@EntityListeners(AuditingEntityListener.class)
 public class Stock {
 
     @Id
@@ -65,9 +78,12 @@ public class Stock {
 
     private Integer fatherId;  //id of the father
     private Integer motherId;  //id of the mother
+    
+    private String fatherExtName = null; //only used when the parent is not in the database
+    private String motherExtName = null; //only used when the parent is not in the database
 
     @CsvBindByName(column = "Color")
-    private String color;  //list of valid colors
+    private String color; 
     @CsvBindByName(column = "Breed")
     private String breed;
 
@@ -75,6 +91,7 @@ public class Stock {
     @CsvBindByName(column = "Weight")
     private String weightText;  //weight used for import only - needs converting
 
+    //TODO:: needs to be a table with weight and dateWeighed
     private Integer weight;  //weight in Oz (convert to lbs/oz for display)
 
     @CsvCustomBindByName(column = "DoB", converter = LocalDateCsvConverter.class)
@@ -92,22 +109,22 @@ public class Stock {
     @CsvBindByName(column = "Genotype")
     private String genotype;  //TODO: needs a string builder for genotypes
 
+    //TODO:: removed as the service now retreives these counts
     //private Integer littersCount;   // make a getter and return a count
-    private Integer kitsCount;   // make a getter and return a count
+    //private Integer kitsCount;   // make a getter and return a count
 
     @CsvBindByName(column = "Category")
     private String category;
     @CsvBindByName(column = "Notes")
     private String notes;
 
-    //TODO: status likely needs to be a child table so a history can be kept
-    //change to an enumeration
+    //TODO: needs to be a table of status and statusDate
     @CsvBindByName(column = "Status")
-    private String status;  //need to be a list of valid status'
+    private String status; 
     @CsvCustomBindByName(column = "Status Date", converter = LocalDateCsvConverterDDMMYYYY.class)
-    private LocalDate statusDate;
+    private LocalDateTime statusDate;
 
-    //@Transient
+    @Transient
     private Boolean active;
 
     @CsvBindByName(column = "ProfileImage")
@@ -118,8 +135,6 @@ public class Stock {
 
     @Transient
     private String profileImagePath = System.getenv("PROFILE_IMAGE_PATH");
-    
-    
     
     @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "litterId",foreignKey = @jakarta.persistence.ForeignKey(name = "none"))
@@ -133,8 +148,6 @@ public class Stock {
         this.litter = litter;
     }
 
-    //private Long litterForsterId;
-
     @ManyToOne
     @JoinColumn(name = "fosterLitterId",foreignKey = @jakarta.persistence.ForeignKey(name = "none"))
     private Litter fosterLitter;
@@ -147,113 +160,109 @@ public class Stock {
         this.fosterLitter = litter;
     }
     
+    public String getFosterLitterName(){
+        if(fosterLitter==null) return "";
+        return fosterLitter.getParentsFormatted();
+    }
+    
+    public void setFosterLitterName(String name){
+        //do nothing - only here as binder needs a set
+    }
+    
     @Transient
     private Boolean needsSaving = Boolean.FALSE;
 
-    @Formula("(SELECT "
-            + "CASE "
-            + " WHEN s.status IN ('archived', 'butchered', 'culled', 'died','sold') AND s.status_date IS NOT NULL THEN "
-            + " (DATEDIFF(s.status_date, doB)) "
-            + " ELSE "
-            + " (DATEDIFF(CURRENT_DATE, doB)) "
-            + " END "
-            + " FROM stock s "
-            + " WHERE s.id = id)")
+    //the getter below is accessed by JPA to return the calculated age
     private Long ageInDays;
-
-    public Long getAgeInDays() {
-        return ageInDays;
-    }
-
-    public String getAgeInDaysStr() {
-        String ageStr = Utility.emptyValue;
-        if (this.ageInDays == null) {
-            return ageStr;
-        }
-        if (!this.ageInDays.equals(0L)) {
-            ageStr = String.valueOf(ageInDays);
-        }
-        return ageStr;
-    }
     
-    @Formula("(SELECT "
-            + "CASE "
-            + " WHEN s.sex = 'F' THEN "
-            + " (SELECT COUNT(*) FROM litter l WHERE s.id = l.mother_id ) "
-            + " WHEN s.sex = 'M' THEN "
-            + " (SELECT COUNT(*) FROM litter l WHERE s.id = l.father_id ) "
-            + " END "
-            + " FROM stock s "
-            + " WHERE s.id = id)")
-    private Long litterCount;
-
-    @Formula("(SELECT "
-            + "CASE "
-            + " WHEN s.sex = 'F' THEN "
-            + " (SELECT COUNT(*) FROM stock st WHERE s.id = st.mother_id ) "
-            + " WHEN s.sex = 'M' THEN "
-            + " (SELECT COUNT(*) FROM stock st WHERE s.id = st.father_id ) "
-            + " END "
-            + " FROM stock s "
-            + " WHERE s.id = id)")
-    private Long kitCount;
-
+    /*
     @Override
     public boolean equals(Object obj) {
        if (this == obj) {
+           //System.out.println("STOCK EQUALS: this = obj");
             return true;
         }
         if (!(obj instanceof Stock)) {
+           //System.out.println("STOCK EQUALS: obj not stock:" + obj);
             return false;
         }
         Stock other = (Stock) obj;
-        return id == other.id;
+        //System.out.println("STOCK EQUALS: other = obj value:" + getDisplayName() == other.getDisplayName());
+        return getDisplayName() == other.getDisplayName();
     }
 
     @Override
     public int hashCode() {
         return id;
     }
+    */
 
-    public Long getKitCount() {
-        return kitCount;
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 29 * hash + Objects.hashCode(this.id);
+        return hash;
     }
 
-    public String getKitCountStr() {
-        String kitCountStr = Utility.emptyValue;
-        if (this.kitCount == null) {
-            return kitCountStr;
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
         }
-        if (!this.kitCount.equals(0L)) {
-            kitCountStr = String.valueOf(kitCount);
+        if (obj == null) {
+            return false;
         }
-        return kitCountStr;
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final Stock other = (Stock) obj;
+        return Objects.equals(this.id, other.id);
     }
     
-    public Long getLitterCount() {
-        return litterCount;
-    }
     
-    public String getLitterCountStr() {
-        String litterCountStr = Utility.emptyValue;
-        if (this.litterCount == null) {
-            return litterCountStr;
-        }
-        if (!this.litterCount.equals(0L)) {
-            litterCountStr = String.valueOf(litterCount);
-        }
-        return litterCountStr;
+
+    @Transient
+    private Boolean temp = Boolean.FALSE;
+
+    //START Common Audit fields for any entity
+    //need to add the below for any entity using these audit fields
+    //@EntityListeners(AuditingEntityListener.class)
+    @CreatedDate
+    private LocalDateTime createdDate;
+    
+    @LastModifiedDate
+    private LocalDateTime lastModifiedDate;
+
+    public LocalDateTime getCreatedDate() {
+        return createdDate;
     }
 
+    public void setCreatedDate(LocalDateTime createdDate) {
+        this.createdDate = createdDate;
+    }
+
+    public LocalDateTime getLastModifiedDate() {
+        return lastModifiedDate;
+    }
+
+    public void setLastModifiedDate(LocalDateTime lastModifiedDate) {
+        this.lastModifiedDate = lastModifiedDate;
+    }
+    //END Common time stamps for records
+    
     public Stock() {
-        this.active = isActive();
+        //this.active = getActive();
+        
     }
 
-    public Stock(String name, Boolean active, Boolean breeder, StockType stockType) {
+    public Stock(String name, Boolean breeder, StockType stockType) {
         this.name = name;
-        this.active = active;
+        //this.active = active;
         this.breeder = breeder;
         this.stockType = stockType;
+        //as only used when creating a temp Stock item set id to -1
+        this.id = -1;
+        this.temp = Boolean.TRUE;
     }
 
     public Integer getId() {
@@ -346,11 +355,22 @@ public class Stock {
     public AgeBetween getAge() {
         LocalDate endDate = LocalDate.now();
         if (getStockStatus().stopsAgeCalculation() && getStatusDate() != null) {
-            endDate = getStatusDate();
+            endDate = getStatusDate().toLocalDate();
         }
         return new AgeBetween(this.doB, endDate);
     }
+    
+    @Access(AccessType.PROPERTY)
+    public Long getAgeInDays() {
+        //System.out.println("getAgeInDays: returning:" + getAge().getAgeInDays());
+        return getAge().getAgeInDays();
+    }
 
+    @Access(AccessType.PROPERTY)
+    public void setAgeInDays(Long ageInDays) {
+        this.ageInDays = ageInDays;
+    }
+    
     public LocalDate getAcquired() {
         return acquired;
     }
@@ -395,14 +415,6 @@ public class Stock {
         this.genotype = genotype;
     }
 
-    public Integer getKitsCount() {
-        return kitsCount;
-    }
-
-    public void setKitsCount(Integer kitsCount) {
-        this.kitsCount = kitsCount;
-    }
-
     public String getCategory() {
         if(category==null) return "";
         return category;
@@ -425,12 +437,23 @@ public class Stock {
         this.notes = notes;
     }
 
+    @Access(AccessType.PROPERTY)
     public String getStatus() {
-        if(status==null) return "";
+        /*
+        if(status==null || status.isEmpty()){
+            System.out.println("Stock.getStatus: status blank converted to active" + " for:" + getDisplayName());
+            return "active";
+        }
+        System.out.println("Stock.getStatus: status:" + status + " for:" + getDisplayName());
+        */
         return status;
     }
 
+    @Access(AccessType.PROPERTY)
     public void setStatus(String status) {
+        if(status==null || status.isEmpty()){
+            this.status = "active";
+        }
         this.status = status;
     }
 
@@ -438,15 +461,31 @@ public class Stock {
         return Utility.getInstance().getStockStatus(getStatus());
     }
 
-    public LocalDate getStatusDate() {
+    public LocalDateTime getStatusDate() {
         return statusDate;
     }
 
-    public void setStatusDate(LocalDate statusDate) {
+    public void setStatusDate(LocalDateTime statusDate) {
         this.statusDate = statusDate;
     }
+    
+    @Access(AccessType.PROPERTY)
+    public Boolean getActive(){
+        if(getStatus()==null) return Boolean.FALSE;
+        if(getStatus().equals("active")){
+            //System.out.println("Stock.getActive: returning TRUE for Status:" + status + " for:" + getDisplayName());
+            return Boolean.TRUE;
+        }
+        //System.out.println("Stock.getActive: returning FALSE for Status:" + status + " for:" + getDisplayName());
+        return Boolean.FALSE;
+    }
 
-    public Boolean isBreeder() {
+    @Access(AccessType.PROPERTY)
+    public void setActive(Boolean active) {
+        this.active = active;
+    }
+
+    public Boolean getBreeder() {
         return breeder;
     }
 
@@ -525,6 +564,24 @@ public class Stock {
         return retVal;
     }
 
+    public String getMotherExtName() {
+        //if(motherExtName==null) return "";
+        return motherExtName;
+    }
+
+    public void setMotherExtName(String motherExtName) {
+        this.motherExtName = motherExtName;
+    }
+
+    public String getFatherExtName() {
+        //if(fatherExtName==null) return "";
+        return fatherExtName;
+    }
+
+    public void setFatherExtName(String fatherExtName) {
+        this.fatherExtName = fatherExtName;
+    }
+    
     public Integer getFatherId() {
         return fatherId;
     }
@@ -604,20 +661,20 @@ public class Stock {
         return getTattoo();
     }
 
-    public final Boolean isActive() {
-        if (getStatus() == null || getStatus().isEmpty()) {
+    /*
+    public Boolean getActive() {
+        if (getStatus() == null || getStatus().isEmpty() || getStatus().equals("active")) {
+            //System.out.println("Stock.getActive: returning TRUE for getStatus:" + getStatus() + " for:" + getDisplayName());
             return Boolean.TRUE;
         }
+        //System.out.println("Stock.getActive: returning FALSE for getStatus:" + getStatus() + " for:" + getDisplayName());
         return Boolean.FALSE;
-    }
-
-    public Boolean getActive() {
-        return active;
     }
 
     public void setActive(Boolean active) {
         this.active = active;
     }
+    */
 
     public String getDefaultImageSource() {
         return defaultImageSource;
@@ -647,6 +704,61 @@ public class Stock {
     public void setProfileImage(String profileImage) {
         this.profileImage = profileImage;
     }
+    
+    public HorizontalLayout getStockHeader(Boolean fullHeader){
+        HorizontalLayout row = new HorizontalLayout();
+        row.setAlignItems(FlexComponent.Alignment.CENTER);
+
+        Avatar stockName = new Avatar();
+        stockName.setName(getName());
+        stockName.setColorIndex(5);
+        stockName.addThemeVariants(AvatarVariant.LUMO_LARGE);
+        
+        stockName.setImageHandler(DownloadHandler.forFile(getProfileFile()));
+
+        VerticalLayout columnAvatars = new VerticalLayout(stockName);
+
+        columnAvatars.setPadding(false);
+        columnAvatars.setSpacing(true);
+        columnAvatars.setWidth("75px");
+        columnAvatars.setAlignItems(FlexComponent.Alignment.CENTER);
+        columnAvatars.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+
+        VerticalLayout columnInfo = new VerticalLayout();
+        columnInfo.setPadding(false);
+        columnInfo.setSpacing(false);
+
+        columnInfo.add(getHeader());
+
+        if(fullHeader){
+            Span stockWeight = new Span(getWeightInLbsOz());
+            stockWeight.getStyle()
+                    .set("color", "var(--lumo-secondary-text-color)")
+                    .set("font-size", "var(--lumo-font-size-s)");
+            columnInfo.add(stockWeight);
+        }
+        String extraInfo = "";
+        if(!getTattoo().isEmpty()){
+            extraInfo = "(" + getTattoo() + ")";
+        }
+        if(!getBreed().isEmpty()){
+            extraInfo += "(" + getBreed() + ")";
+        }
+        if(!getColor().isEmpty()){
+            extraInfo += "(" + getColor() + ")";
+        }
+        
+        Span xInfo = new Span(extraInfo);
+        xInfo.getStyle()
+                .set("color", "var(--lumo-tertiary-text-color)")
+                .set("font-size", "var(--lumo-font-size-s)");
+        columnInfo.add(xInfo);
+
+        row.add(columnAvatars, columnInfo);
+        row.getStyle().set("line-height", "var(--lumo-line-height-m)");
+        return row;
+    }
+    
 
     public Layout getHeader(){
         // Header
@@ -661,7 +773,9 @@ public class Stock {
             header.add(badge);
         }
         Span stockName = new Span(getDisplayName());
-        stockName.addClassNames(LumoUtility.FontSize.LARGE, LumoUtility.FontWeight.MEDIUM);
+        //stockName.addClassNames(LumoUtility.FontSize.LARGE, LumoUtility.FontWeight.MEDIUM);
+        stockName.addClassNames("stock-name-responsive");
+        
         header.add(stockName);
         //add icons
         if(getSex().equals(Gender.FEMALE)){
@@ -669,9 +783,10 @@ public class Stock {
         }else if(getSex().equals(Gender.MALE)){
             header.add(showIcon(getStockType().getMaleName(),Utility.ICONS.GENDER_MALE.getIconSource()));
         }
-        if(isBreeder()){
+        if(getBreeder()){
             header.add(showIcon(getStockType().getBreederName(),Utility.ICONS.TYPE_BREEDER.getIconSource()));
         }
+        //System.out.println("getHeader: StockStatus:" + getStatus());
         if(Utility.getInstance().hasStockStatus(getStatus())){
             StockStatus stockStatus = Utility.getInstance().getStockStatus(getStatus());
             header.add(showIcon(stockStatus.getLongName(),stockStatus.getIcon().getIconSource()));
@@ -686,7 +801,10 @@ public class Stock {
 
         Icon svgIcon = new Icon(icon);
         svgIcon.setTooltipText(text);
-        svgIcon.addClassNames(LumoUtility.IconSize.SMALL);
+        svgIcon.addClassName("vaadin-icon-responsive");  //set in styles.css
+        //svgIcon.addClassNames(LumoUtility.IconSize.SMALL);
+        //svgIcon.getStyle().set("--vaadin-icon-visual-size", "1.0rem");
+        //svgIcon.getStyle().set("--vaadin-icon-size", "1.0rem");
         layout.add(svgIcon);
         return layout;
     }
@@ -722,14 +840,22 @@ public class Stock {
         }
 
         //set active based on status
-        active = isActive();
+        if(status==null || status.isEmpty()){
+            status = "active";
+        }
+        //create a new status record from status
+        active = getActive();
         needsSaving = Boolean.TRUE;
+    }
+
+    public Boolean isTemp() {
+        return temp;
     }
 
     @Override
     public String toString() {
-        return "Stock{" + "id=" + id + ", breeder=" + breeder + ", stockType=" + stockType + ", sexText=" + sexText + ", sex=" + sex + ", prefix=" + prefix + ", name=" + name + ", tattoo=" + tattoo + ", cage=" + cage + ", fatherName=" + fatherName + ", motherName=" + motherName + ", fatherId=" + fatherId + ", motherId=" + motherId + ", color=" + color + ", breed=" + breed + ", weightText=" + weightText + ", weight=" + weight + ", doB=" + doB + ", acquired=" + acquired + ", regNo=" + regNo + ", champNo=" + champNo + ", legs=" + legs + ", genotype=" + genotype + ", kitsCount=" + kitsCount + ", category=" + category + ", notes=" + notes + ", status=" + status + ", statusDate=" + statusDate + ", active=" + active + ", profileImage=" + profileImage + ", defaultImageSource=" + defaultImageSource + ", litter=" + litter + ", fosterLitter=" + fosterLitter + ", needsSaving=" + needsSaving + ", ageInDays=" + ageInDays + ", litterCount=" + litterCount + ", kitCount=" + kitCount + '}';
+        return "Stock{" + "id=" + id + ", breeder=" + breeder + ", stockType=" + stockType + ", sexText=" + sexText + ", sex=" + sex + ", prefix=" + prefix + ", name=" + name + ", tattoo=" + tattoo + ", cage=" + cage + ", fatherName=" + fatherName + ", motherName=" + motherName + ", fatherId=" + fatherId + ", motherId=" + motherId + ", fatherExtName=" + fatherExtName + ", motherExtName=" + motherExtName + ", color=" + color + ", breed=" + breed + ", weightText=" + weightText + ", weight=" + weight + ", doB=" + doB + ", acquired=" + acquired + ", regNo=" + regNo + ", champNo=" + champNo + ", legs=" + legs + ", genotype=" + genotype + ", category=" + category + ", notes=" + notes + ", status=" + status + ", statusDate=" + statusDate + ", active=" + active + ", profileImage=" + profileImage + ", defaultImageSource=" + defaultImageSource + ", profileImagePath=" + profileImagePath + ", litter=" + litter + ", fosterLitter=" + fosterLitter + ", needsSaving=" + needsSaving + ", ageInDays=" + ageInDays + ", temp=" + temp + ", createdDate=" + createdDate + ", lastModifiedDate=" + lastModifiedDate + '}';
     }
 
-    
+
 }

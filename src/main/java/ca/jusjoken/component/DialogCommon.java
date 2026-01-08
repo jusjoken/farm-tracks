@@ -13,11 +13,12 @@ import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.service.LitterService;
+import ca.jusjoken.data.service.ParentIntegerToStockConverter;
 import ca.jusjoken.data.service.Registry;
+import ca.jusjoken.data.service.StatusHistoryConverter;
 import ca.jusjoken.data.service.StockService;
 import com.flowingcode.vaadin.addons.imagecrop.Crop;
 import com.flowingcode.vaadin.addons.imagecrop.ImageCrop;
-import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.ShortcutRegistration;
 import com.vaadin.flow.component.Shortcuts;
@@ -42,17 +43,17 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.select.Select;
-import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.upload.Upload;
-import com.vaadin.flow.data.renderer.ComponentRenderer;
+import com.vaadin.flow.data.binder.Binder;
+import com.vaadin.flow.data.binder.PropertyId;
+import com.vaadin.flow.data.binder.ValidationException;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.dom.ElementFactory;
 import com.vaadin.flow.server.streams.DownloadHandler;
 import com.vaadin.flow.server.streams.InMemoryUploadHandler;
 import com.vaadin.flow.server.streams.UploadHandler;
-import com.vaadin.flow.theme.lumo.LumoUtility.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -76,6 +77,9 @@ public class DialogCommon {
         EDIT, DELETE, VIEW
     }
 
+    private Binder<Stock> binder;
+    private static final String notFostered = "Not fostered";
+
     //default is EDIT - must be superUser to allow DELETE
     private DialogMode dialogMode = DialogMode.VIEW;
 
@@ -84,8 +88,6 @@ public class DialogCommon {
     }
     //private DisplayMode displayMode = DisplayMode.PROFILE_IMAGE;
 
-    private Boolean superUser = Boolean.FALSE;
-    private Boolean validationEnabled = Boolean.FALSE;
     private Logger log = LoggerFactory.getLogger(DialogCommon.class);
     private Dialog dialog = new Dialog();
     private Long taskID = 0L;
@@ -95,7 +97,6 @@ public class DialogCommon {
     private List<Stock> stockList = new ArrayList<>();
     private List<Litter> litterList = new ArrayList<>();
     
-    private Boolean customTaskConverted = Boolean.FALSE;
     private Button dialogResetButton = new Button("Reset");
     private Button dialogOkButton = new Button("OK");
     private Button dialogCancelButton = new Button("Cancel");
@@ -115,61 +116,58 @@ public class DialogCommon {
     private ImageCrop fieldProfileImageCrop = new ImageCrop(fieldProfileAvatar.getImage());
     private Checkbox fieldProfileUseCamera = new Checkbox("Use camera if available");
     private Button dialogProfileImageRotateButton = new Button("Rotate");
+    private Boolean profileAvatarHasChanges = Boolean.FALSE;
 
+
+    @PropertyId("breeder")
     private Checkbox fieldBreeder = new Checkbox();
+    @PropertyId("sex")
     private RadioButtonGroup<Gender> fieldGender = new RadioButtonGroup<>();
+    @PropertyId("prefix")
     private TextField fieldPrefix = new TextField();
+    @PropertyId("name")
     private TextField fieldName = new TextField();
+    @PropertyId("tattoo")
     private TextField fieldTattoo = new TextField();
+    @PropertyId("color")
     private TextField fieldColor = new TextField();
+    @PropertyId("breed")
     private TextField fieldBreed = new TextField();
+    @PropertyId("weight")
     private WeightInput fieldWeight = new WeightInput();
     
+    @PropertyId("acquired")
     private DatePicker fieldAquiredDate = new DatePicker();
+    @PropertyId("doB")
     private DatePicker fieldBornDate = new DatePicker();
+    @PropertyId("legs")
     private TextField fieldLegs = UIUtilities.getTextField();
+    @PropertyId("champNo")
     private TextField fieldChampNo = UIUtilities.getTextField();
+    @PropertyId("regNo")
     private TextField fieldRegNo = UIUtilities.getTextField();
-    private TextField fieldFatherName = new TextField();
-    private TextField fieldMotherName = new TextField();
+
+    @PropertyId("fatherId")
     private ComboBox<Stock> fieldFather = new ComboBox();
+    @PropertyId("motherId")
     private ComboBox<Stock> fieldMother = new ComboBox();
+
+
+    @PropertyId("genotype")
     private TextField fieldGenotype = UIUtilities.getTextField();
+    @PropertyId("category")
     private TextField fieldCategory = UIUtilities.getTextField(); //TODO - needs to be a pickbox
-    private TextField fieldStatus = UIUtilities.getTextField(); //TODO - needs to be a pickbox
-    private DatePicker fieldStatusDate = new DatePicker();
-    private TextField fieldFoster = UIUtilities.getTextField(); //TODO - needs to figure this out
     
-    private NumberField fieldGlobalSubTotal = UIUtilities.getNumberField(Boolean.FALSE);
-    private ButtonNumberField fieldGlobalTaxes = UIUtilities.getButtonNumberField("",Boolean.FALSE,"$");
+    @PropertyId("status")
+    private TextField fieldStatus = new TextField();
 
-    private Checkbox fieldWebOrder = new Checkbox();
-    private Checkbox fieldFeesOnly = new Checkbox();
+    @PropertyId("fosterLitter")
+    private Select<Litter> fieldFoster = new Select();
 
-    private NumberField fieldPaidToVendor = UIUtilities.getNumberField(Boolean.FALSE);
-    private NumberField fieldReceiptTotal = UIUtilities.getNumberField(Boolean.FALSE);
-    private Select<String> fieldPaymentMethod = new Select<>();
-    private NumberField fieldDeliveryFee = UIUtilities.getNumberField(Boolean.FALSE);
-    private NumberField fieldServiceFeePercent = UIUtilities.getNumberField("",Boolean.FALSE,"%");
-    private NumberField fieldServiceFee = UIUtilities.getNumberField(Boolean.FALSE);
-    private ButtonNumberField fieldTotalSale = UIUtilities.getButtonNumberField("",Boolean.FALSE,"$");
-    private NumberField fieldTip = UIUtilities.getNumberField(Boolean.FALSE);
-    private NumberField fieldTotalWithTip = UIUtilities.getNumberField("",true,"$");
-    private Checkbox fieldTipIssue = new Checkbox();
+
     private TextArea fieldNotes = new TextArea();
 
     private VerticalLayout dialogLayout = new VerticalLayout();
-    private VerticalLayout dialogAdvLayout = new VerticalLayout();
-
-    //adv dialog fields
-    private enum AdvDialogMode {
-        Global, Form
-    }
-    private AdvDialogMode advDialogMode = AdvDialogMode.Global;
-    private Select<AdvDialogMode> advFieldConvertType = new Select<>();
-
-    //private ComboBox<Restaurant> advFieldRestaurant = new ComboBox<>("Restaurant");
-    private TextField advFieldOrderId = UIUtilities.getTextField("Order Id");
 
     private Boolean hasChangedValues = Boolean.FALSE;
     private StockService stockService;
@@ -179,7 +177,7 @@ public class DialogCommon {
     private List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
 
     private String profileImagePath;
-
+    
     public DialogCommon() {
         this(DisplayMode.STOCK_DETAILS);
     }
@@ -194,6 +192,7 @@ public class DialogCommon {
 
     private void dialogConfigure(DisplayMode currentDisplayMode) {
 
+        binder = new Binder<Stock>(Stock.class);
         //configure the dialog internal layout for the form
         dialogLayout.setSpacing(false);
         dialogLayout.setPadding(false);
@@ -215,12 +214,10 @@ public class DialogCommon {
         dialogOkButton.setEnabled(false);
         dialogOkButton.setDisableOnClick(true);
 
+        dialogResetButton.setEnabled(false);
         dialogResetButton.addClickListener(
                 event -> {
-                    dialogOkButton.setEnabled(false);
-                    setValues(this.stockEntity, currentDisplayMode);
-                    dialogValidate(currentDisplayMode);
-                    dialogUploadComponent.clearFileList();
+                    dialogReset(openedDisplayMode);
                 }
         );
 
@@ -241,6 +238,8 @@ public class DialogCommon {
             fieldMother.setAllowCustomValue(true);
             fieldFather.setAllowCustomValue(true);
         }
+        fieldFoster.setEmptySelectionAllowed(true);
+        fieldFoster.setEmptySelectionCaption(notFostered);
         
         //form fields need width full to fill the column they are in
         fieldBreeder.setWidthFull();
@@ -253,11 +252,8 @@ public class DialogCommon {
         fieldWeight.setWidthFull();
         fieldFather.setWidthFull();
         fieldMother.setWidthFull();
-        fieldFatherName.setWidthFull();
-        fieldMotherName.setWidthFull();
         fieldCategory.setWidthFull();
         fieldStatus.setWidthFull();
-        fieldStatusDate.setWidthFull();
         fieldFoster.setWidthFull();
         fieldAquiredDate.setWidthFull();
         fieldBornDate.setWidthFull();
@@ -266,74 +262,82 @@ public class DialogCommon {
         fieldLegs.setWidthFull();
         fieldRegNo.setWidthFull();
 
-        //add change listeners for each editable field
-        fieldBreeder.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldGender.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldPrefix.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldName.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldTattoo.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldColor.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldBreed.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldWeight.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldAquiredDate.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldBornDate.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldLegs.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldChampNo.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldRegNo.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldFather.addValueChangeListener(item -> {
-            dialogValidate(currentDisplayMode);
-        });
         fieldFather.addCustomValueSetListener(item -> {
-            System.out.println("**Father custom changed to:" + item.getDetail());
-            //TODO:: set the NEW field in Stock for FatherExternal and null FatherId
+            //add the custom value to the list and set as value
+            fieldFather.setItems(stockService.getFathers(item.getDetail(), stockEntity.getStockType()));
+            fieldFather.setValue(stockService.getParentExt(item.getDetail(), stockEntity.getStockType()));
+            System.out.println("**Father custom changed to:" + item.getDetail() + " getValue =" + item.getSource().getValue());
         });
-        fieldMother.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
         fieldMother.addCustomValueSetListener(item -> {
-            System.out.println("**Mother custom changed to:" + item.getDetail());
-            //TODO:: set the NEW field in Stock for MotherExternal and null MotherId
+            //add the custom value to the list and set as value
+            fieldMother.setItems(stockService.getMothers(item.getDetail(), stockEntity.getStockType()));
+            fieldMother.setValue(stockService.getParentExt(item.getDetail(), stockEntity.getStockType()));
+            System.out.println("**Mother custom changed to:" + item.getDetail() + " getValue =" + item.getSource().getValue());
         });
-        fieldGenotype.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldCategory.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldStatus.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldStatusDate.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
-        fieldFoster.addValueChangeListener(item -> dialogValidate(currentDisplayMode));
 
+    }
+    
+    private void dialogReset(DisplayMode currentDisplayMode){
+        System.out.println("dialogReset: currentDisplayMode:" + currentDisplayMode);
+        dialogOkButton.setEnabled(false);
+        dialogResetButton.setEnabled(false);
+        setValues(this.stockEntity, currentDisplayMode);
+        if(dialogUploadComponent!=null) dialogUploadComponent.clearFileList();
     }
 
     private void dialogClose(){
-//        if(customTaskConverted){
-//            log.info("dialogClose: reloading stockEntity");
-//            List<Stock> stockEntityList = stockService.findById(this.stockEntity.getId());
-//            log.info("dialogClose: reloading stockEntity:" + stockEntityList);
-//            if(stockEntityList!=null && stockEntityList.size()>0){
-//                log.info("dialogClose: reseting to stockEntity:" + stockEntityList.get(0));
-//                this.stockEntity = stockEntityList.get(0);
-//            }
-//        }
         dialog.close();
     }
 
     private void dialogSave() {
         DisplayMode currentDisplayMode = openedDisplayMode;
+        System.out.println("dialogSave: stockEntity start save:" + stockEntity);
         //save here
+        
+        //retrieve the stock entity from the database before saving so it is the same entity
+        this.stockEntity = stockService.findById(stockEntity.getId());
+        
         //update stockEntity from fields
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
-            //this.stockEntity.setGlobalSubtotal(fieldGlobalSubTotal.getValue());
-            //this.stockEntity.setGlobalTotalTaxes(fieldGlobalTaxes.getNumberField().getValue());
+            //Handle user adding a parent manually
+            if(fieldFather!=null && fieldFather.getValue()!=null && fieldFather.getValue().isTemp()){
+                this.stockEntity.setFatherExtName(fieldFather.getValue().getDisplayName());
+                this.stockEntity.setFatherId(null);
+            }else{
+                if(fieldFather.getValue()!=null){
+                    this.stockEntity.setFatherId(fieldFather.getValue().getId());
+                }
+            }
+            if(fieldMother!=null && fieldMother.getValue()!=null && fieldMother.getValue().isTemp()){
+                this.stockEntity.setMotherExtName(fieldMother.getValue().getDisplayName());
+                this.stockEntity.setMotherId(null);
+            }else{
+                if(fieldMother.getValue()!=null){
+                    this.stockEntity.setMotherId(fieldMother.getValue().getId());
+                }
+            }
+            //write all bound fields back to the entity
+            try {
+                binder.writeBean(stockEntity);
+            } catch (ValidationException ex) {
+                System.out.println("dialogSave: Validation Error writing bean stockEntity:" + ex);
+            }
+
+            System.out.println("dialogSave: stockEntity before save:" + stockEntity);
+            stockService.save(this.stockEntity);
+            System.out.println("dialogSave: stockEntity after save:" + stockEntity);
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
             //write the profile image to file
             try (OutputStream outputStream = Files.newOutputStream(stockEntity.getProfileFileToBeSaved().toPath())) {
                 outputStream.write(profileImageData);
+                profileAvatarHasChanges = Boolean.FALSE;
+                validateProfileAvatar();
             } catch (IOException e) {
                 // Handle exception
                 e.printStackTrace();
             }            
-        }else{
-            //this.stockEntity.setWebOrder(fieldWebOrder.getValue());
-            //this.stockEntity.setReceiptTotal(fieldReceiptTotal.getValue());
         }
 
-        stockService.save(this.stockEntity);
         //refresh if needed
         log.info("dialogSave: notifying listeners");
         dialog.close();
@@ -350,13 +354,18 @@ public class DialogCommon {
     }
     public void dialogOpen(Stock stockEntity, DisplayMode currentDisplayMode){
         this.stockEntity = stockEntity;
+        
         openedDisplayMode = currentDisplayMode;
         //set values and visibility for fields
         clearLists();
         dialogLayout.removeAll();
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
-            dialogLayout.add(showItem(this.stockEntity, currentDisplayMode, false, false));
+            //binder.readBean(this.stockEntity);
+            dialogLayout.add(showItem(this.stockEntity, currentDisplayMode));
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
+            profileAvatarHasChanges = Boolean.FALSE;
+            validateProfileAvatar();
+            
             //load stored image or if none load default image
             fieldProfileAvatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
             fieldProfileAvatar.setHeight("12em");
@@ -373,19 +382,26 @@ public class DialogCommon {
             //nothing
         }
 
-        customTaskConverted = Boolean.FALSE;
-
         dialog.setHeaderTitle(dialogTitle);
         dialog.getElement().setAttribute("aria-label", dialogTitle);
         dialog.getHeader().add(dialogCloseButton);
 
-        dialogValidate(currentDisplayMode);
-        //dialog.setModal(true);
         dialog.setDraggable(true);
         dialog.setResizable(true);
         //dialog.addClassNames("backdrop-blur-none");
 
         dialog.open();
+    }
+    
+    private void validateProfileAvatar(){
+        if(profileAvatarHasChanges){
+            dialogResetButton.setEnabled(true);
+            dialogOkButton.setEnabled(true);
+        }else{
+            dialogResetButton.setEnabled(false);
+            dialogOkButton.setEnabled(false);
+        }
+        
     }
     
     private VerticalLayout createImageUploadLayout(DisplayMode currentDisplayMode) {
@@ -407,7 +423,8 @@ public class DialogCommon {
                 //System.out.println("***Upload file: Base64:" + src);
                 fieldProfileAvatar.setImage(src);
                 fieldProfileAvatar.setName(metadata.fileName());
-                dialogValidate(currentDisplayMode);
+                profileAvatarHasChanges = Boolean.TRUE;
+                validateProfileAvatar();
             });
 
         dialogUploadComponent = new Upload(inMemoryHandler);  
@@ -437,7 +454,8 @@ public class DialogCommon {
                 String src = getImageAsBase64(profileImageData, profileImageMimeType);
                 fieldProfileAvatar.setImage(src);
                 fieldProfileAvatar.setName(fieldProfileAvatar.getName() + "rcw-");
-                dialogValidate(currentDisplayMode);
+                profileAvatarHasChanges = Boolean.TRUE;
+                validateProfileAvatar();
             } catch (Exception ex) {
                 System.getLogger(DialogCommon.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
             }
@@ -449,7 +467,8 @@ public class DialogCommon {
           Notification notification =
               Notification.show(errorMessage, 5000, Notification.Position.MIDDLE);
           notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
-          dialogValidate(currentDisplayMode);
+          profileAvatarHasChanges = Boolean.FALSE;
+          validateProfileAvatar();
         });
 
         fieldProfileUseCamera.setValue(false);
@@ -458,7 +477,7 @@ public class DialogCommon {
 
         getCropButton.addClickListener(e -> {
             openCropDialog(profileImageData, profileImageMimeType, currentDisplayMode);
-            dialogValidate(currentDisplayMode);
+            //profileAvatarHasChanges = Boolean.TRUE;
         });
         
         HorizontalLayout cropAndRotate = UIUtilities.getHorizontalLayout(true,true,false);
@@ -486,16 +505,21 @@ public class DialogCommon {
     
     private byte[] getRotatedImage(byte[] imageBytes) throws Exception {
         // convert byte[] back to a BufferedImage
+        //System.out.println("Rotate: imageBytes size:" + imageBytes.length);
         InputStream is = new ByteArrayInputStream(imageBytes);
         BufferedImage newBi = ImageIO.read(is);
+        //System.out.println("Rotate: newBi BEFORE: width:" + newBi.getWidth() + " height:" + newBi.getHeight());
         
         //System.out.println("Rotate: BEFORE:" + newBi.getWidth() + "x" + newBi.getHeight());
         newBi = Scalr.rotate(newBi, Scalr.Rotation.CW_90, Scalr.OP_ANTIALIAS);
         //System.out.println("Rotate: AFTER:" + newBi.getWidth() + "x" + newBi.getHeight());
+        //System.out.println("Rotate: newBi AFTER: width:" + newBi.getWidth() + " height:" + newBi.getHeight());
         
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(newBi, "jpg", baos);
+        boolean result = ImageIO.write(newBi, "png", baos); //changed to png format as jpg was failing for images with same W as H
+        //System.out.println("Rotate: wrtie result:" + result);
         byte[] bytes = baos.toByteArray();
+        //System.out.println("Rotate: bytes size:" + bytes.length);
         return bytes;
     } 
     
@@ -533,7 +557,8 @@ public class DialogCommon {
           fieldProfileAvatar.setImage(fieldProfileImageCrop.getCroppedImageDataUri());
           fieldProfileAvatar.setName(fieldProfileImageCrop.getImageSrc());
           profileImageData = fieldProfileImageCrop.getCroppedImageBase64();
-          dialogValidate(currentDisplayMode);
+          profileAvatarHasChanges = Boolean.TRUE;
+          validateProfileAvatar();
           cropDialog.close();
       });
 
@@ -575,91 +600,6 @@ public class DialogCommon {
         litterList.clear();
     }
     
-    private void dialogValidate(DisplayMode currentDisplayMode) {
-        //validate fields and enable OK button if valid
-        if(validationEnabled && this.stockEntity!=null){
-            hasChangedValues = Boolean.FALSE;
-            if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
-                validateAvatar(fieldProfileAvatar,avatarDiv,this.stockEntity.getProfileImage().toString());
-            }else if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
-                
-                //validateField(fieldReceiptTotal,this.stockEntity.getReceiptTotal());
-                //validateCheckbox(fieldFeesOnly,this.stockEntity.getFeesOnly());
-            }else{
-                //validateField(fieldReceiptTotal,this.stockEntity.getReceiptTotal());
-                //validateCheckbox(fieldWebOrder,this.stockEntity.getWebOrder());
-            }
-            //do common fields here
-//            validateListbox(fieldPaymentMethod,this.stockEntity.getPaymentMethod());
-//            validateField(fieldDeliveryFee,this.stockEntity.getDeliveryFee());
-//            validateField(fieldServiceFee,this.stockEntity.getServiceFee());
-//            validateField(fieldServiceFeePercent,getServiceFeePercent());
-//            validateField(fieldTotalSale.getNumberField(),this.stockEntity.getTotalSale());
-//            validateField(fieldTip,this.stockEntity.getTip());
-//            validateCheckbox(fieldTipIssue,this.stockEntity.getTipInNotesIssue());
-//            if(customTaskConverted) hasChangedValues = Boolean.TRUE;
-        }
-        if(hasChangedValues){
-            dialogOkButton.setEnabled(true);
-            dialogResetButton.setEnabled(true);
-        }else{
-            dialogOkButton.setEnabled(false);
-            dialogResetButton.setEnabled(false);
-        }
-
-    }
-
-    private void validateField(NumberField field, Double value){
-        if(value==null && field.getValue()==null){
-            field.getStyle().set("box-shadow","none");
-        }else if(value==null && field.getValue()!=null){
-            field.getStyle().set("box-shadow",UIUtilities.boxShadowStyle);
-            field.getStyle().set("border-radius",UIUtilities.boxShadowStyleRadius);
-            hasChangedValues = Boolean.TRUE;
-        }else if(field.getValue().equals(value)){
-            field.getStyle().set("box-shadow","none");
-        }else{
-            field.getStyle().set("box-shadow",UIUtilities.boxShadowStyle);
-            field.getStyle().set("border-radius",UIUtilities.boxShadowStyleRadius);
-            hasChangedValues = Boolean.TRUE;
-        }
-    }
-
-    private void validateAvatar(Avatar field, Div fieldDiv, String value){
-        if(field.getName().equals(value)){
-            fieldDiv.getStyle().set("box-shadow","none");
-            fieldDiv.getStyle().set("border-width",UIUtilities.borderSizeSmall);
-        }else{
-            fieldDiv.getStyle().set("box-shadow",UIUtilities.boxShadowStyle);
-            fieldDiv.getStyle().set("border-radius",UIUtilities.boxShadowStyleRadius);
-            hasChangedValues = Boolean.TRUE;
-        }
-    }
-
-    private void validateCheckbox(Checkbox field, Boolean value){
-        if(field.getValue().equals(value)){
-            field.getStyle().set("box-shadow","none");
-        }else{
-            field.getStyle().set("box-shadow",UIUtilities.boxShadowStyle);
-            field.getStyle().set("border-radius",UIUtilities.boxShadowStyleRadius);
-            hasChangedValues = Boolean.TRUE;
-        }
-    }
-
-    private void validateListbox(Select field, String value){
-        log.info("validateListbox: fieldValue:" + field.getValue() + " value:" + value);
-        if(field.getValue()==null || field.getValue().equals(value)){
-            log.info("validateListbox: matched");
-            field.getStyle().set("box-shadow","none");
-        }else{
-            log.info("validateListbox: NOT matched");
-            field.getStyle().set("box-shadow",UIUtilities.boxShadowStyle);
-            field.getStyle().set("border-radius",UIUtilities.boxShadowStyleRadius);
-            hasChangedValues = Boolean.TRUE;
-        }
-    }
-
-
     public DialogMode getDialogMode() {
         return dialogMode;
     }
@@ -668,37 +608,17 @@ public class DialogCommon {
         this.dialogMode = dialogMode;
     }
 
-    public FormLayout showItem(Stock stockEntity, DisplayMode currentDisplayMode){
-        return showItem(stockEntity, currentDisplayMode, false, true);
-    }
-
-    public FormLayout showItem(Stock currentStock, DisplayMode currentDisplayMode, Boolean forceReadOnly, Boolean showHeader){
-        validationEnabled = Boolean.FALSE;
+    public FormLayout showItem(Stock currentStock, DisplayMode currentDisplayMode){
         FormLayout stockFormLayout = new FormLayout();
         stockFormLayout.setWidthFull();
         stockFormLayout.setAutoResponsive(false);
-        //stockFormLayout.setColumnWidth("8em");
         stockFormLayout.setExpandColumns(true);
         stockFormLayout.setExpandFields(true);
         stockFormLayout.setMaxColumns(3);
         stockFormLayout.setMinColumns(1);
-        
-        if(forceReadOnly){
-            fieldFather.setReadOnly(true);
-            fieldMother.setReadOnly(true);
-            fieldFatherName.setReadOnly(true);
-            fieldMotherName.setReadOnly(true);
-            fieldCategory.setReadOnly(true);
-            fieldStatus.setReadOnly(true);
-            fieldStatusDate.setReadOnly(true);
-            fieldFoster.setReadOnly(true);
-            fieldAquiredDate.setReadOnly(true);
-            fieldBornDate.setReadOnly(true);
-            fieldChampNo.setReadOnly(true);
-            fieldGenotype.setReadOnly(true);
-            fieldLegs.setReadOnly(true);
-            fieldRegNo.setReadOnly(true);
-        }
+
+        //fields that are always ReadOnly
+        fieldStatus.setReadOnly(true);
         
         stockFormLayout.setResponsiveSteps(
         // Use one column by default
@@ -707,43 +627,23 @@ public class DialogCommon {
         new ResponsiveStep("600px", 2,FormLayout.ResponsiveStep.LabelsPosition.TOP),
         // Use three columns, if the layout's width exceeds 500px
         new ResponsiveStep("900px", 3,FormLayout.ResponsiveStep.LabelsPosition.TOP));        
-        /*
-        stockFormLayout.setResponsiveSteps(new FormLayout.ResponsiveStep("0px", 1, FormLayout.ResponsiveStep.LabelsPosition.ASIDE));
-        stockFormLayout.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1, FormLayout.ResponsiveStep.LabelsPosition.TOP),
-                new FormLayout.ResponsiveStep("100px", 1, FormLayout.ResponsiveStep.LabelsPosition.ASIDE));
-        */
-        //this.stockEntity = stockEntity;
-
-        //configure the field layout
-        //log.info("showItem:" + currentStock.getName() + ", displayMode:" + currentDisplayMode);
         stockFormLayout.removeAll();
 
         //add the header
-        if(showHeader){
-            stockFormLayout.add(getStockHeader(currentStock, Boolean.FALSE));
-        }
-
-        //common fields
+        stockFormLayout.add(currentStock.getStockHeader(Boolean.FALSE));
 
         //fields by displayMode type
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
-            if(dialogMode.equals(DialogMode.EDIT)){
-                stockFormLayout.addFormItem(fieldName,"Name");
-                stockFormLayout.addFormItem(fieldPrefix,"Prefix");
-                stockFormLayout.addFormItem(fieldTattoo,"Tattoo");
-                stockFormLayout.addFormItem(fieldBreed,"Breed");
-                stockFormLayout.addFormItem(fieldGender,"Gender");
-                stockFormLayout.addFormItem(fieldBreeder,"Breeder");
-                stockFormLayout.addFormItem(fieldColor,"Color");
-                stockFormLayout.addFormItem(fieldWeight,"Weight");
-                stockFormLayout.addFormItem(fieldFather,"Father");
-                stockFormLayout.addFormItem(fieldMother,"Mother");
-            }
-            if(dialogMode.equals(DialogMode.VIEW)){
-                stockFormLayout.addFormItem(fieldFatherName,"Father");
-                stockFormLayout.addFormItem(fieldMotherName,"Mother");
-            }
-            
+            stockFormLayout.addFormItem(fieldName,"Name");
+            stockFormLayout.addFormItem(fieldPrefix,"Prefix");
+            stockFormLayout.addFormItem(fieldTattoo,"Tattoo");
+            stockFormLayout.addFormItem(fieldBreed,"Breed");
+            stockFormLayout.addFormItem(fieldGender,"Gender");
+            stockFormLayout.addFormItem(fieldBreeder,"Breeder");
+            stockFormLayout.addFormItem(fieldColor,"Color");
+            stockFormLayout.addFormItem(fieldWeight,"Weight");
+            stockFormLayout.addFormItem(fieldFather,"Father");
+            stockFormLayout.addFormItem(fieldMother,"Mother");
             stockFormLayout.addFormItem(fieldGenotype,"Genotype");
             stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
             stockFormLayout.addFormItem(fieldLegs,"Legs");
@@ -751,214 +651,78 @@ public class DialogCommon {
             stockFormLayout.addFormItem(fieldRegNo,"Registration Number");
             stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
             stockFormLayout.addFormItem(fieldStatus,"Status");
-            stockFormLayout.addFormItem(fieldStatusDate,"Status Date");
             stockFormLayout.addFormItem(fieldCategory,"Category");
             stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
             stockFormLayout.addFormItem(fieldAquiredDate,"Aquired");
             stockFormLayout.addFormItem(fieldBornDate,"Born");
-            stockFormLayout.addFormItem(fieldFoster,"Foster");
-        }else if(currentDisplayMode.equals(DisplayMode.LITTER_LIST)){
-            
+            if(dialogMode.equals(DialogMode.EDIT)){
+                stockFormLayout.addFormItem(fieldFoster,"Foster");
+            }
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
             stockFormLayout.add(avatarDiv);
         }
-
+        
         //set values
         setValues(currentStock, currentDisplayMode);
         return stockFormLayout;
     }
 
     private void setValues(Stock currentStock, DisplayMode currentDisplayMode){
-        validationEnabled = Boolean.FALSE;
 
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
             if(dialogMode.equals(DialogMode.EDIT)){
-                fieldName.setValue(currentStock.getName());
-                fieldPrefix.setValue(currentStock.getPrefix());
-                fieldTattoo.setValue(currentStock.getTattoo());
-                fieldBreed.setValue(currentStock.getBreed());
-
                 fieldGender.setRenderer(new TextRenderer<Gender>(gender -> {
                     if(gender.equals(Gender.MALE)) return currentStock.getStockType().getMaleName();
                     return currentStock.getStockType().getFemaleName();
                 }));        
                 
-                fieldGender.setValue(currentStock.getSex());
-                fieldBreeder.setValue(currentStock.isBreeder());
-                fieldColor.setValue(currentStock.getColor());
-                fieldWeight.setValue(currentStock.getWeight());
-                
-                fieldFather.setItems(stockService.getFathers());
                 fieldFather.setItemLabelGenerator(Stock::getDisplayName);
-                fieldFather.setValue(stockService.findById(currentStock.getFatherId()));
-                fieldMother.setItems(stockService.getMothers());
                 fieldMother.setItemLabelGenerator(Stock::getDisplayName);
-                fieldMother.setValue(stockService.findById(currentStock.getMotherId()));
+                fieldFoster.setItems(litterService.getActiveLitters());
+                fieldFoster.setItemLabelGenerator(litter -> {
+                    if(litter == null) return notFostered;
+                    return litter.getDisplayName();
+                });
+
+                //retrieve the stock entity from the database
+                this.stockEntity = stockService.findById(currentStock.getId());
+
+                fieldFather.setItems(stockService.getFathers(currentStock.getFatherExtName(),currentStock.getStockType()));
+                binder.forField(fieldFather)
+                        .withConverter(new ParentIntegerToStockConverter(stockEntity, Gender.MALE))
+                        .bind(Stock::getFatherId, Stock::setFatherId);
+                fieldMother.setItems(stockService.getMothers(currentStock.getMotherExtName(),currentStock.getStockType()));
+                binder.forField(fieldMother)
+                        .withConverter(new ParentIntegerToStockConverter(stockEntity, Gender.FEMALE))
+                        .bind(Stock::getMotherId, Stock::setMotherId);
+
+                binder.forField(fieldStatus)
+                        .withConverter(new StatusHistoryConverter(this.stockEntity))
+                        .bindReadOnly(Stock::getStatus);
+
+                binder.bindInstanceFields(this);
+                binder.readBean(this.stockEntity);
+
+                binder.addStatusChangeListener(listener -> {
+                    boolean isValid = listener.getBinder().isValid();
+                    boolean hasChanges = listener.getBinder().hasChanges();
+                    System.out.println("addStatusChangeListener: isValid:" + isValid + " hasChanges:" + hasChanges);
+
+                    dialogOkButton.setEnabled(hasChanges && isValid);
+                    dialogResetButton.setEnabled(hasChanges);
+                });
+
             }
-            if(dialogMode.equals(DialogMode.VIEW)){
-                if(currentStock.getFatherId()!=null){
-                    fieldFatherName.setValue(stockService.findById(currentStock.getFatherId()).getDisplayName());
-                }
-                if(currentStock.getMotherId()!=null){
-                    fieldMotherName.setValue(stockService.findById(currentStock.getMotherId()).getDisplayName());
-                }
-}
-            fieldAquiredDate.setValue(currentStock.getAcquired());
             
-            fieldBornDate.setValue(currentStock.getDoB());
-            fieldLegs.setValue(currentStock.getLegs());
-            fieldChampNo.setValue(currentStock.getChampNo());
-            fieldRegNo.setValue(currentStock.getRegNo());
-            
-            fieldGenotype.setValue(currentStock.getGenotype());
-            fieldCategory.setValue(currentStock.getCategory());
-            fieldStatus.setValue(currentStock.getStatus());
-            fieldStatusDate.setValue(currentStock.getStatusDate());
-            fieldFoster.setValue("TODO");
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
             fieldProfileAvatar.setImageHandler(DownloadHandler.forFile(currentStock.getProfileFile()));
             fieldProfileAvatar.setName(currentStock.getProfileImage());
             profileImageData = getByteArrayFromImageFile(currentStock.getProfileFile().getAbsolutePath());
             profileImageMimeType = "image/*";
-        }else{
-            //Phonein
-            //fieldWebOrder.setValue(this.stockEntity.getWebOrder());
-            //fieldReceiptTotal.setValue(this.stockEntity.getReceiptTotal());
-        }
-        validationEnabled = Boolean.TRUE;
-
-    }
-
-    public HorizontalLayout getStockHeader(Stock item, Boolean fullHeader){
-        HorizontalLayout row = new HorizontalLayout();
-        row.setAlignItems(FlexComponent.Alignment.CENTER);
-
-        //Image img = new Image(item.getDefaultImageSource(), item.getName());
-        Avatar stockName = new Avatar();
-        stockName.setName(item.getName());
-        stockName.setColorIndex(5);
-        stockName.addThemeVariants(AvatarVariant.LUMO_LARGE);
-        
-        stockName.setImageHandler(DownloadHandler.forFile(item.getProfileFile()));
-
-        VerticalLayout columnAvatars = new VerticalLayout(stockName);
-
-        /*
-        SvgIcon genderIcon = item.getGenderIcon();
-        if(genderIcon!=null){
-            columnAvatars.add(genderIcon);
-        }
-        */
-        //Avatar genderType = new Avatar();
-        //genderType.setName(item.getSex().getShortName());
-        //genderType.setColorIndex(Utility.getInstance().);
-        //genderType.addThemeVariants(AvatarVariant.LUMO_XSMALL);
-
-        columnAvatars.setPadding(false);
-        columnAvatars.setSpacing(true);
-        columnAvatars.setWidth("75px");
-        columnAvatars.setAlignItems(FlexComponent.Alignment.CENTER);
-        columnAvatars.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-
-        VerticalLayout columnInfo = new VerticalLayout();
-        columnInfo.setPadding(false);
-        columnInfo.setSpacing(false);
-
-        columnInfo.add(item.getHeader());
-        /*
-        String customerNameString = formatCustomerName(item);
-        if(customerNameString!=null){
-            Span customerName = new Span(customerNameString);
-            customerName.getStyle()
-                    .set("color", "var(--lumo-secondary-text-color)")
-                    .set("font-size", "var(--lumo-font-size-s)");
-            columnInfo.add(customerName);
-        }
-        */
-
-        if(fullHeader){
-            Span customerAddress = new Span(item.getWeightInLbsOz());
-            customerAddress.getStyle()
-                    .set("color", "var(--lumo-secondary-text-color)")
-                    .set("font-size", "var(--lumo-font-size-s)");
-            columnInfo.add(customerAddress);
-        }
-        String extraInfo = "";
-        if(!item.getTattoo().isEmpty()){
-            extraInfo = "(" + item.getTattoo() + ")";
-        }
-        if(!item.getBreed().isEmpty()){
-            extraInfo += "(" + item.getBreed() + ")";
-        }
-        if(!item.getColor().isEmpty()){
-            extraInfo += "(" + item.getColor() + ")";
-        }
-        
-        Span xInfo = new Span(extraInfo);
-        xInfo.getStyle()
-                .set("color", "var(--lumo-tertiary-text-color)")
-                .set("font-size", "var(--lumo-font-size-s)");
-        columnInfo.add(xInfo);
-
-        if(fullHeader){
-            /*
-            Span paymentInfo;
-            if(item.getPaymentMethod()==null){
-                paymentInfo = new Span("Total:" + item.getTotalSale() + " Tip:" + item.getTip());
-            }else{
-                paymentInfo = new Span("Total:" + item.getTotalSale() + " Tip:" + item.getTip() + " - " + item.getPaymentMethod());
-            }
-            paymentInfo.getStyle()
-                    .set("color", "var(--lumo-secondary-text-color)")
-                    .set("font-size", "var(--lumo-font-size-s)");
-            columnInfo.add(paymentInfo);
-            */
+            profileAvatarHasChanges = Boolean.FALSE;
+            validateProfileAvatar();
         }
 
-        row.add(columnAvatars, columnInfo);
-        row.getStyle().set("line-height", "var(--lumo-line-height-m)");
-        return row;
-    }
-
-    private Integer getColorIndex(String taskTypeName){
-        if(taskTypeName.equals("Global")) return 0;
-        if(taskTypeName.equals("Form")) return 1;
-        else return 2;
-    }
-
-    private String formatIds(String jobId, String orderId, String refNumber){
-        String idString = "Jobid:" + jobId ;
-        if(orderId!=null && !orderId.isEmpty()){
-            idString = idString + " Orderid:" + orderId.trim();
-        }
-        if(refNumber!=null && !refNumber.isEmpty()){
-            idString = idString + " Ref:" + refNumber.trim();
-        }
-        return idString;
-    }
-
-    private String formatCustomerName(Stock item){
-        if(item.getDisplayName()==null || item.getName().isEmpty()){
-            return null;
-        }else{
-            return item.getDisplayName();
-        }
-    }
-
-    private String getStatusStyle(Long jobStatus){
-        String statusString = "badge";
-        if(jobStatus.equals(0L)) return "badge";
-        if(jobStatus.equals(1L)) return "badge";
-        if(jobStatus.equals(2L)) return "badge success";
-        if(jobStatus.equals(3L)) return "badge error";
-        if(jobStatus.equals(4L)) return "badge";
-        //if(jobStatus.equals(5L)) return "";
-        if(jobStatus.equals(6L)) return "badge contrast";
-        if(jobStatus.equals(7L)) return "badge";
-        if(jobStatus.equals(8L)) return "badge error";
-        if(jobStatus.equals(9L)) return "badge error";
-        if(jobStatus.equals(10L)) return "badge error";
-        return "badge error";
     }
 
     public void addListener(ListRefreshNeededListener listener){
@@ -970,14 +734,6 @@ public class DialogCommon {
             listener.listRefreshNeeded();
         }
     }
-
-//    public DisplayMode getDisplayMode() {
-//        return displayMode;
-//    }
-//
-//    public void setDisplayMode(DisplayMode displayMode) {
-//        this.displayMode = displayMode;
-//    }
 
     public String getDialogTitle() {
         return dialogTitle;

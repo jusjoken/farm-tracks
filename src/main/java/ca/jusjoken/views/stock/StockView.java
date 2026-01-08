@@ -7,6 +7,8 @@ import ca.jusjoken.component.Item;
 import ca.jusjoken.component.Layout;
 import ca.jusjoken.component.LazyComponent;
 import ca.jusjoken.component.ListRefreshNeededListener;
+import ca.jusjoken.component.StatusEditor;
+import ca.jusjoken.component.StockDetailsFormLayout;
 import ca.jusjoken.data.ColumnName;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.BreederFilter;
@@ -14,12 +16,14 @@ import ca.jusjoken.data.Utility.TabType;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
+import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.StockRepository;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockStatus;
+import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeRepository;
 import ca.jusjoken.views.MainLayout;
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
@@ -37,6 +41,7 @@ import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.contextmenu.ContextMenu;
 import com.vaadin.flow.component.contextmenu.MenuItem;
 import com.vaadin.flow.component.details.Details;
+import com.vaadin.flow.component.details.DetailsVariant;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.select.Select;
@@ -44,7 +49,6 @@ import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.component.virtuallist.VirtualList;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.icon.Icon;
@@ -53,6 +57,8 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
+import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
+import com.vaadin.flow.data.renderer.NativeButtonRenderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.BeforeEvent;
@@ -79,12 +85,14 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private final LitterService litterService;
     private final StockService stockService;
     private final StockSavedQueryService queryService;
+    private final StockStatusHistoryService statusService;
     private String currentSearchName = "";
     private StockSavedQuery currentStockSavedQuery;
     private String currentSavedQueryId = null;
     private List<Stock> stockList = new ArrayList();
     private Long stockListCountAll = 0L;
-    private VirtualList<Stock> list = new VirtualList<>();
+    private Long stockListCount = 0L;
+    private Grid<Stock> list = new Grid<>();
     private Section sidebar;
     private NativeLabel countLabel = new NativeLabel();
     private Button saveOptionsButton = new Button(FontAwesome.Regular.SAVE.create());
@@ -92,6 +100,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Button deleteOptionsButton = new Button(FontAwesome.Regular.TRASH_CAN.create());
     private Button resetOptionsButton = new Button(FontAwesome.Solid.UNDO.create());
     private DialogCommon dialogCommon;
+    private StatusEditor statusEditor;
     private ConfirmDialog saveQueryDialog = new ConfirmDialog();
     private ConfirmDialog deleteQueryDialog = new ConfirmDialog();
     private ConfirmDialog resetQueryDialog = new ConfirmDialog();
@@ -105,15 +114,18 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private RadioButtonGroup<String> sort2Direction = new RadioButtonGroup<>();
     private Boolean skipSidebarUpdates = Boolean.FALSE;
 
-    public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockService stockService, StockSavedQueryService queryService) {
+    public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService) {
         this.stockRepository = stockRepository;
         this.stockTypeRepository = stockTypeRepository;
         this.litterService = litterService;
         this.stockService = stockService;
         this.queryService = queryService;
+        this.statusService = statusService;
         //this.defaultStockSort.addOrder(new SortOrder(currentSortDirection.name(), "tattoo"));
         this.dialogCommon = new DialogCommon();
         dialogCommon.addListener(this);
+        this.statusEditor = new StatusEditor();
+        statusEditor.addListener(this);
         
         addClassNames(Display.FLEX, Height.FULL, Overflow.HIDDEN);
         //loadFilters();
@@ -216,7 +228,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             return new Item(stockStatus.getLongName(), stockStatus.getIcon().getIconSource());
         }));        
         
-        Collection<StockStatus> stockStatusList = Utility.getInstance().getStockStatusList();
+        Collection<StockStatus> stockStatusList = Utility.getInstance().getStockStatusList(true);
         stockStatusFilter.setItems(stockStatusList);
         stockStatusFilter.addComponents(Utility.getInstance().getStockStatus("all"), new Hr());
         stockStatusFilter.addValueChangeListener(event -> {
@@ -283,7 +295,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         
         this.sidebar = new Section(header, createSectionHeader("Filter options", false), filterForm, createSectionHeader("Sort options", true), sortForm);
         this.sidebar.addClassNames("backdrop-blur-3xl", "var(--lumo-tint-90pct)", Border.RIGHT,
-                Display.FLEX, FlexDirection.COLUMN, Position.ABSOLUTE, "lg:static", "bottom-0", "top-0",
+                Display.FLEX, FlexDirection.COLUMN, Position.ABSOLUTE, "lg:static", "bottom-1", "top-0",
                 "transition-all", "z-10");
         this.sidebar.setWidth(20, Unit.REM);
         return this.sidebar;
@@ -494,7 +506,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     }
     
     private void updateCounts(){
-        countLabel.setText(stockList.size() + "/" + stockListCountAll + " " + currentStockSavedQuery.getStockType().getName());
+        countLabel.setText(stockListCount + "/" + stockListCountAll + " " + currentStockSavedQuery.getStockType().getName());
         countLabel.addClassNames(FontSize.SMALL);
     }
     
@@ -518,15 +530,19 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     
     private void applyFilters(){
         System.out.println("applyFilters: stock(start):" + currentStockSavedQuery.toString() );
-        stockList = stockService.findStockWithCustomMatcher(currentSearchName, currentStockSavedQuery);
-        list.setItems(stockList);
+        list.setPageSize(25);
+        list.setItemsPageable((pageable) -> {
+            return stockService.findStockWithCustomMatcherPageable(pageable, currentSearchName, currentStockSavedQuery);
+        }, countCallback -> {
+            stockListCount = stockService.findStockWithCustomMatcherCount(currentSearchName, currentStockSavedQuery);
+            updateCounts();
+            return stockListCount;
+        });
         list.scrollToIndex(0);
         applyOptionsButton.setEnabled(false);
         currentStockSavedQuery.setDirty(Boolean.FALSE);
         saveOptionsButton.setEnabled(currentStockSavedQuery.getNeedsSaving());
-        updateCounts();
         sidebarSetValues();
-        //System.out.println("applyFilters: stock(end):" + currentStockSavedQuery.toString() );
     }
     
     private Component createContent() {
@@ -539,11 +555,11 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     
     private Component createList(){
         list.setItems(stockList);
-        list.setRenderer(stockCardRenderer);
+        list.addColumn(stockCardRenderer);
         list.setWidthFull();
         return list;        
     }
-
+    
     private ComponentRenderer<Component, Stock> stockCardRenderer = new ComponentRenderer<>(
             stock -> {
                 return createListItemLayout(stock);
@@ -554,8 +570,8 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         Avatar avatar = new Avatar();
         Div avatarDiv = new Div(avatar);
         avatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
-        avatar.setHeight("8em");
-        avatar.setWidth("8em");
+        avatar.setHeight("6em");
+        avatar.setWidth("6em");
         avatar.setImageHandler(DownloadHandler.forFile(stock.getProfileFile()));
         
         UIUtilities.setBorders(avatar, stock, true);
@@ -571,10 +587,10 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         Layout outerHeader = new Layout();
         outerHeader.add(stock.getHeader());
         
-        // Extra Info
+        // Extra Info - Id, Breed, Color next to avatar
         Layout extraInfo = new Layout();
         extraInfo.addClassNames(FontSize.XSMALL);
-        extraInfo.addClassNames(FontWeight.THIN);
+        extraInfo.addClassNames(FontWeight.LIGHT);
         extraInfo.setFlexDirection(Layout.FlexDirection.COLUMN);
         extraInfo.setAlignItems(Layout.AlignItems.START);
         extraInfo.setGap(Layout.Gap.XSMALL);
@@ -624,6 +640,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         detailsPanel.addClassNames(Padding.NONE,Margin.Left.MEDIUM,Margin.Right.MEDIUM);
         UIUtilities.setBorders(detailsPanel, stock, false);
         detailsPanel.addClassNames(Border.ALL,BorderRadius.LARGE, BoxShadow.SMALL);
+        detailsPanel.addThemeVariants(DetailsVariant.LUMO_REVERSE);
         
         ContextMenu menu = createContextMenu(stock);
         menu.setTarget(detailsPanel);
@@ -656,17 +673,70 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         menu.addItem(new Item("Breed", Utility.ICONS.TYPE_BREEDER.getIconSource()));
         menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
         menu.addItem(new Item("Cage Card", Utility.ICONS.ACTION_CAGE_CARD.getIconSource()));
-        menu.addItem(new Item("Mark For Sale", Utility.ICONS.ACTION_MARK_FOR_SALE.getIconSource()));
-        menu.addItem(new Item("Sell", Utility.ICONS.STATUS_SOLD.getIconSource()));
-        menu.addItem(new Item("Deposit taken", Utility.ICONS.STATUS_SOLD_W_DEPOSIT.getIconSource()));
-        menu.addItem(new Item("Butcher", Utility.ICONS.STATUS_BUTCHERED.getIconSource()));
-        menu.addItem(new Item("Died", Utility.ICONS.STATUS_DIED.getIconSource()));
-        menu.addItem(new Item("Archive", Utility.ICONS.STATUS_ARCHIVED.getIconSource()));
-        menu.addItem(new Item("Cull", Utility.ICONS.STATUS_CULLED.getIconSource()));
-        menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
+        createStatusMenuItem(menu, stockEntity, "sold");
+        createStatusMenuItem(menu, stockEntity, "forsale");
+        createStatusMenuItem(menu, stockEntity, "deposit");
+        createStatusMenuItem(menu, stockEntity, "butchered");
+        createStatusMenuItem(menu, stockEntity, "died");
+        createStatusMenuItem(menu, stockEntity, "archived");
+        createStatusMenuItem(menu, stockEntity, "culled");
+        createStatusMenuItem(menu, stockEntity, "active");
+        //TODO:: add a confirm dialoge for delete or customize status editor for delete
+        MenuItem deleteMenu = menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
+        deleteMenu.addClickListener(click -> {
+            deleteStockEntityWithConfirm(stockEntity);
+        });
 
         return menu;
     }
+    
+    private void createStatusMenuItem(ContextMenu menu, Stock stockEntity, String statusToEdit){
+        if(!stockEntity.getStatus().equals(statusToEdit)){
+            StockStatus status = Utility.getInstance().getStockStatus(statusToEdit);
+            MenuItem item = menu.addItem(new Item(status.getActionName(), status.getIcon().getIconSource()));
+            item.addClickListener(click -> {
+                //open status editor
+                statusEditor.dialogOpen(stockEntity, statusToEdit);
+            });
+        }
+    }
+    
+    private void deleteStockEntityWithConfirm(Stock stockEntity){
+        ConfirmDialog dialog = new ConfirmDialog();
+        dialog.setHeader("Delete \"" + stockEntity.getDisplayName() + "\"?");
+        dialog.setText(
+                "Are you sure you want to permanently delete " + stockEntity.getDisplayName() + "?");
+
+        dialog.setCancelable(true);
+        //dialog.addCancelListener(event -> setStatus("Canceled"));
+
+        dialog.setConfirmText("Delete");
+        dialog.setConfirmButtonTheme("error primary");
+        dialog.addConfirmListener(event -> {
+            if(stockService.checkInUse(stockEntity)){ //if in use then do not delete and WARN
+                warnStockInUse(stockEntity);
+            }else{
+                stockService.delete(stockEntity.getId());
+                listRefreshNeeded();
+            }
+        });     
+        dialog.open();
+    }
+
+    private void warnStockInUse(Stock stockEntity){
+        ConfirmDialog dialog = new ConfirmDialog();
+        dialog.setHeader("\"" + stockEntity.getDisplayName() + "\" in use!");
+        dialog.setText(
+                "Cannot permanently delete " + stockEntity.getDisplayName() + " as is in use as a parent!");
+
+        //dialog.setCancelable(false);
+        //dialog.addCancelListener(event -> setStatus("Canceled"));
+
+        dialog.setConfirmText("Ok");
+        //dialog.setConfirmButtonTheme("error primary");
+        dialog.open();
+    }
+
     
     private Layout createTabbedContentArea(Stock stock){
         Layout content = new Layout();
@@ -674,9 +744,12 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         TabSheet tabs = new TabSheet();
         tabs.setWidthFull();
         tabs.add("Overview", createTabOverview(stock));
-        tabs.add(createTab("Litters", TabType.COUNT, stock.getLitterCountStr()), createTabLitters(stock));
-        tabs.add(createTab("Kits", TabType.COUNT, stock.getKitCountStr()),createTabKits(stock));
+        tabs.add(createTab("Litters", TabType.COUNT, litterService.getLitterCountForParent(stock).toString()), createTabLitters(stock));
+        tabs.add(createTab("Kits", TabType.COUNT, stockService.getKitCountForParent(stock).toString()),createTabKits(stock));
         tabs.add(createTab("Notes", TabType.HASDATA, stock.getNotes()),createTabNotes(stock));
+        tabs.add(createTab("Status'", TabType.NONE, Utility.emptyValue),createTabStatuses(stock));
+        //TODO:: add list of weights
+        
         content.add(tabs);
         return content;
     }
@@ -704,9 +777,10 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
     private LazyComponent createTabOverview(Stock stock) {
         Layout layout = new Layout();
-        DialogCommon overviewDialog = new DialogCommon(DialogCommon.DisplayMode.STOCK_DETAILS);
-        overviewDialog.setDialogMode(DialogCommon.DialogMode.VIEW);
-        layout.add(overviewDialog.showItem(stock, DialogCommon.DisplayMode.STOCK_DETAILS,true,false));
+        //DialogCommon overviewDialog = new DialogCommon(DialogCommon.DisplayMode.STOCK_DETAILS);
+        //overviewDialog.setDialogMode(DialogCommon.DialogMode.VIEW);
+        //layout.add(overviewDialog.showItem(stock, DialogCommon.DisplayMode.STOCK_DETAILS,true,false));
+        layout.add(new StockDetailsFormLayout(stock));
         return new LazyComponent(() -> layout);
     }
     
@@ -773,10 +847,54 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         return layout;
     }
     
+    private LazyComponent createTabStatuses(Stock stock) {
+        Layout layout = new Layout();
+        List<StockStatusHistory> statuses = statusService.findByStockId(stock.getId());
+        Grid<StockStatusHistory> grid = new Grid<StockStatusHistory>(StockStatusHistory.class,false);
+        grid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
+        grid.setHeight("200px");
+
+        //only add the DELETE action column if there are more than 1 status so as to not remove the last one
+        if(statuses.size()>1){
+            grid.addColumn(
+                    new NativeButtonRenderer<>("Delete", clickedItem -> {
+                        System.out.println("createTabStatuses: delete:" + clickedItem);
+                        deleteStockStatusWithConfirm(clickedItem, stock);
+                    })
+            ).setAutoWidth(true).setFlexGrow(0);
+        }
+        grid.addColumn(StockStatusHistory::getStatusName).setHeader("Status");
+        grid.addColumn(new LocalDateTimeRenderer<>(StockStatusHistory::getCreatedDate,"MM-dd-YYYY HHmm")).setHeader("Created");
+        grid.addColumn(new LocalDateTimeRenderer<>(StockStatusHistory::getLastModifiedDate,"MM-dd-YYYY HHmm")).setHeader("Modified");
+        grid.addColumn(new LocalDateTimeRenderer<>(StockStatusHistory::getOriginalStatusDate,"MM-dd-YYYY HHmm")).setHeader("Everbreed");
+        grid.addColumn(StockStatusHistory::getStatusNote).setHeader("Note");
+
+        grid.setItems(statuses);
+        layout.add(grid);
+        return new LazyComponent(() -> layout);
+    }
+    
+    private void deleteStockStatusWithConfirm(StockStatusHistory status, Stock stock){
+        ConfirmDialog dialog = new ConfirmDialog();
+        dialog.setHeader("Delete \"" + status.getFormattedStatus() + "\"?");
+        dialog.setText(
+                "Are you sure you want to permanently delete " + status.getFormattedStatus() + " for " + stock.getDisplayName() + "?");
+
+        dialog.setCancelable(true);
+
+        dialog.setConfirmText("Delete");
+        dialog.setConfirmButtonTheme("error primary");
+        dialog.addConfirmListener(event -> {
+            statusService.delete(status,stock);
+            listRefreshNeeded();
+        });     
+        dialog.open();
+    }
+
     private Layout createTags(Stock stock, Boolean topLayout){
         Layout tags = new Layout(
-                createPanel("Litters",stock.getLitterCountStr(),false,Utility.PanelType.LITTERS, stock), 
-                createPanel("Kits", stock.getKitCountStr(),false,Utility.PanelType.KITS, stock), 
+                createPanel("Litters",litterService.getLitterCountForParent(stock).toString(),false,Utility.PanelType.LITTERS, stock), 
+                createPanel("Kits", stockService.getKitCountForParent(stock).toString(),false,Utility.PanelType.KITS, stock), 
                 createPanel("Age", stock.getAge().getAgeFormattedHTML(),true,Utility.PanelType.NONE, stock), 
                 createPanel("Weight", stock.getWeightInLbsOz(),true,Utility.PanelType.NONE, stock));
         tags.setAlignItems(Layout.AlignItems.STRETCH);
@@ -808,7 +926,9 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         
         Div panelValue = new Div();
         panelValue.getElement().setProperty("innerHTML", value);
-        panelValue.addClassNames(FontWeight.BOLD, FontSize.LARGE);
+        //panelValue.addClassNames(FontWeight.BOLD, FontSize.LARGE);
+        panelValue.addClassName("tag-panel-value-responsive");
+        
         Layout layoutValue = new Layout(panelValue);
 
         Layout panel = new Layout(layoutValue,layoutTitle);

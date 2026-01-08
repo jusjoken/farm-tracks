@@ -8,6 +8,7 @@ import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +26,7 @@ public class LitterService {
     
     public List<Litter> getLitters(Stock stock){
         List<Litter> litters = new ArrayList<>();
-        if(!stock.isBreeder() || stock.getSex().equals(Utility.Gender.NA)) return List.of();
+        if(!stock.getBreeder() || stock.getSex().equals(Utility.Gender.NA)) return List.of();
         if(stock.getSex().equals(Utility.Gender.FEMALE)){
             return litterRepository.findByMotherId(stock.getId());
         }else{ //male
@@ -34,4 +35,20 @@ public class LitterService {
         
     }
     
+    public Long getLitterCountForParent(Stock stock){
+        List<Litter> litters = new ArrayList<>();
+        if(!stock.getBreeder() || stock.getSex().equals(Utility.Gender.NA)) return 0L;
+        if(stock.getSex().equals(Utility.Gender.FEMALE)){
+            return litterRepository.countByMotherId(stock.getId());
+        }else{ //male
+            return litterRepository.countByFatherId(stock.getId());
+        }
+        
+    }
+    
+    public List<Litter> getActiveLitters(){
+        List<Litter> litters = litterRepository.findNotArchived();
+        Collections.sort(litters, new LitterComparator().reversed());
+        return litters;
+    }
 }

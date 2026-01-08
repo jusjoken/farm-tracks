@@ -16,22 +16,30 @@ public class StockStatus {
 private String name;
 private Utility.ICONS icon;
 private String longName;
+private String actionName;
 private Integer sortOrder;
 private Boolean stopsAgeCalculation;
+private String prompt = null;
 
     public StockStatus() {
     }
 
-    public StockStatus(String name, Utility.ICONS icon, String longName, Boolean stopsAgeCalculation, Integer sortOrder) {
+    public StockStatus(String name, Utility.ICONS icon, String longName, String actionName, Boolean stopsAgeCalculation, Integer sortOrder, String prompt) {
         this.name = name;
         this.icon = icon;
         this.longName = longName;
+        this.actionName = actionName;
         this.stopsAgeCalculation = stopsAgeCalculation;
         this.sortOrder = sortOrder;
+        this.prompt = prompt;
+    }
+    
+    public StockStatus(String name, Utility.ICONS icon, String longName, String actionName, Boolean stopsAgeCalculation, Integer sortOrder) {
+        this(name, icon, longName, actionName, stopsAgeCalculation, sortOrder, null);
     }
     
     public StockStatus getDefault(){
-        return new StockStatus("active", Utility.ICONS.STATUS_ACTIVE, "Active",Boolean.FALSE,1);
+        return new StockStatus("active", Utility.ICONS.STATUS_ACTIVE, "Active", null, Boolean.FALSE,1);
     }
 
     @Override
@@ -92,12 +100,18 @@ private Boolean stopsAgeCalculation;
         if(this.stopsAgeCalculation==null) return Boolean.FALSE;
         return this.stopsAgeCalculation;
     }
-    
-    @Override
-    public String toString() {
-        return "StockStatus{" + "name=" + name + ", icon=" + icon + ", longName=" + longName + ", sortOrder=" + sortOrder + ", stopsAgeCalculation=" + stopsAgeCalculation + '}';
+
+    public String getPrompt() {
+        return prompt;
     }
 
+    public String getActionName() {
+        return actionName;
+    }
 
+    @Override
+    public String toString() {
+        return "StockStatus{" + "name=" + name + ", icon=" + icon + ", longName=" + longName + ", actionName=" + actionName + ", sortOrder=" + sortOrder + ", stopsAgeCalculation=" + stopsAgeCalculation + ", prompt=" + prompt + '}';
+    }
     
 }

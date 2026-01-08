@@ -1,0 +1,32 @@
+
+/* small vaadin icon */
+vaadin-icon.vaadin-icon-responsive {
+    --vaadin-icon-visual-size: 1.0rem;
+    --vaadin-icon-size: 1.0rem;
+}
+
+span.stock-name-responsive {
+    font-size: var(--lumo-font-size-s);
+    font-weight: 300;
+}
+
+div.tag-panel-value-responsive {
+    font-size: var(--lumo-font-size-s);
+    font-weight: 500;
+}
+
+@media (min-width: 640px) { /* settings for larger screens */
+    vaadin-icon.vaadin-icon-responsive {
+        --vaadin-icon-visual-size: 1.2rem;
+        --vaadin-icon-size: 1.2rem;
+    }
+    span.stock-name-responsive {
+        font-size: var(--lumo-font-size-l);
+        font-weight: 500;
+    }
+    div.tag-panel-value-responsive {
+        font-size: var(--lumo-font-size-l);
+        font-weight: 700;
+    }
+
+}

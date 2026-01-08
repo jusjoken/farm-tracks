@@ -4,21 +4,27 @@
  */
 package ca.jusjoken.data;
 
+import ca.jusjoken.component.ProgressBarUpdateListener;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
+import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.service.LitterRepository;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockRepository;
 import ca.jusjoken.data.service.StockService;
+import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeRepository;
 import com.opencsv.bean.CsvToBeanBuilder;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.springframework.scheduling.annotation.Async;
+
 
 /**
  *
@@ -29,15 +35,18 @@ public class Import {
     StockService stockService;
     StockTypeRepository stockTypeRepository;
     LitterRepository litterRepository;
+    StockStatusHistoryService statusService;
     private List<Stock> breederImportList = new ArrayList<>();
     private List<Stock> kitImportList = new ArrayList<>();
     private List<Litter> litterImportList = new ArrayList<>();
+    private List<ProgressBarUpdateListener> listProgressListeners = new ArrayList<>();
 
     public Import() {
         this.stockRepository = Registry.getBean(StockRepository.class);
         this.stockService = Registry.getBean(StockService.class);
         this.stockTypeRepository = Registry.getBean(StockTypeRepository.class);
         this.litterRepository = Registry.getBean(LitterRepository.class);
+        this.statusService = Registry.getBean(StockStatusHistoryService.class);
     }
     
     public void importBreederFromEverbreed(String filePath){
@@ -69,13 +78,23 @@ public class Import {
             Logger.getLogger(Import.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
-
-    public Boolean processAllImportsFromEverbreed(){
+    
+    @Async
+    public CompletableFuture processAllImportsFromEverbreed(){
+        notifyProgressMax(1.0);
+        notifyProgressStatus("Deleting all existing everbreed records prior to import.");
         System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed stock records");
+        notifyProgressUpdate(0.2);
         stockRepository.deleteAll();
 
         System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed litter records");
+        notifyProgressUpdate(0.7);
         litterRepository.deleteAllLittersNative();
+        
+        System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed status history records");
+        notifyProgressUpdate(0.9);
+        statusService.deleteAll();
+        notifyProgressUpdate(1.0);
 
         if(!kitImportList.isEmpty()){
             System.out.println("processAllImportsFromEverbreed: processing kits");
@@ -100,7 +119,7 @@ public class Import {
         }
         
         System.out.println("processAllImportsFromEverbreed: complete processing " + kitImportList.size() + " kits, " + breederImportList.size() + " breeders, " + litterImportList.size() + " litters.");
-        return Boolean.TRUE;
+        return CompletableFuture.completedFuture("done");
     }
     
     public Boolean processBreedersFromEverbreed(){
@@ -133,6 +152,13 @@ public class Import {
         StockType stRabbit = stockTypeRepository.findByName("Rabbit");
         if(stRabbit==null) stRabbit = new StockType("Rabbits", "Buck", "Doe", "Breeders", "Kits", Boolean.TRUE);
 
+        notifyProgressMax(Double.valueOf(importList.size()));
+        if(isBreeder){
+            notifyProgressStatus("Processing all Breeders from everbreed.");
+        }else{
+            notifyProgressStatus("Processing all Kits from everbreed.");
+        }
+        Double counter = 0.0;
         for(Stock item: importList){
             //process the import
             //determine if this is an existing record to update
@@ -140,29 +166,45 @@ public class Import {
             Stock existingStock = stockRepository.findByNameAndTattoo(item.getName(), item.getTattoo());
             if(existingStock==null){
                 item.setNeedsSaving(Boolean.TRUE);
-                System.out.println("processStockList: existing Not Found for:" + item.toString());
+                System.out.println("processStockList " + isBreeder + ": existing Not Found for:" + item.toString());
                 item.updateFromImported(isBreeder,null,stRabbit);
             }else{
                 //existing record exists so ensure if this is a KIT it does not overwrite the existing breeder
-                if(!item.isBreeder() && existingStock.isBreeder()){
+                if(!item.getBreeder() && existingStock.getBreeder()){
                     //skip this KIT record as Breeder info should be more current
                     item.setNeedsSaving(Boolean.FALSE);
-                    System.out.println("processStockList: existing: skipping KIT record as breeder already exists:" + existingStock.toString());
+                    System.out.println("processStockList " + isBreeder + ": existing: skipping KIT record as breeder already exists:" + existingStock.toString());
                 }else{
                     item.setNeedsSaving(Boolean.TRUE);
-                    System.out.println("processStockList: existing:" + existingStock.toString());
+                    System.out.println("processStockList " + isBreeder + ": existing:" + existingStock.toString());
                     item.updateFromImported(isBreeder,existingStock.getId(),stRabbit);
                 }
             }
             if(item.getNeedsSaving()){
-                stockRepository.saveAndFlush(item);
-                System.out.println("processStockList: item after save:" + item.toString());
+                Stock newStock = stockRepository.saveAndFlush(item);
+                List<StockStatusHistory> statusList = statusService.findByStockId(newStock.getId());
+                if(statusList.isEmpty()){
+                    //save new status history item
+                    statusService.save(new StockStatusHistory(newStock.getId(),newStock.getStatus(),newStock.getStatusDate()),newStock,Boolean.TRUE);
+                    System.out.println("processStockList " + isBreeder + ": status new saved:" + newStock.getStatus() + " : " + newStock.getStatusDate());
+                }else{
+                    //update existing imported item
+                    statusList.get(0).setStatusName(newStock.getStatus());
+                    statusService.save(statusList.get(0),newStock,Boolean.TRUE);
+                    System.out.println("processStockList " + isBreeder + ": status updated:" + newStock.getStatus() + " : " + newStock.getStatusDate());
+                }
+                System.out.println("processStockList " + isBreeder + ": item after save:" + item.toString());
             }
+            counter++;
+            notifyProgressUpdate(counter);
         }
     }
     
     private void processStockParents(List<Stock> importList) {
         //run to update stock for fields that could be in the imported stock (mother/father)
+        notifyProgressMax(Double.valueOf(importList.size()));
+        Double counter = 0.0;
+        notifyProgressStatus("Processing all Parent records from everbreed.");
         for(Stock item: importList){
             //process the import
             Integer fatherId = null;
@@ -197,11 +239,15 @@ public class Import {
             }else{
                 System.out.println("processStockParents: item does not need saving:" + item.toString());
             }
-
+            counter++;
+            notifyProgressUpdate(counter);
         }
     }
     
     private void processLitterList(List<Litter> importList) {
+        notifyProgressMax(Double.valueOf(importList.size()));
+        Double counter = 0.0;
+        notifyProgressStatus("Processing all Litter records from everbreed.");
         List<Litter> litterMissingKits = new ArrayList<>();
         for(Litter item: importList){
             System.out.println("processLitterList: processing item:" + item.toString());
@@ -248,9 +294,7 @@ public class Import {
                 System.out.println("processLitterList: item does not need saving:" + item.toString());
             }
             
-            //TODO: find each kit in the stock and set the LitterId
             //loop to find matching kits and store when you do not find a match
-            //List<Stock> kitsFromLitter = stockRepository.findAllKitsByLitterName(item.getName());
             //work around null mother and/or father
             if(item.getMother()==null || item.getFather()==null){
                 System.out.println("processLitterList: " + item.toString() + ": has NULL Mother and/or Father - skipping kit processing");
@@ -265,13 +309,12 @@ public class Import {
                     litterMissingKits.add(item);
                 }
             }
-            
+            counter++;
+            notifyProgressUpdate(counter);
         }
         for(Litter item: litterMissingKits){
             System.out.println("processLitterList: this litter is missing kits:" + item.toString());
         }
-
-
         
     }
 
@@ -299,4 +342,30 @@ public class Import {
         return !litterImportList.isEmpty();
     }
 
+    public void addListener(ProgressBarUpdateListener listener){
+        listProgressListeners.add(listener);
+    }
+
+    private void notifyProgressUpdate(Double value){
+        System.out.println("notifyProgressUpdate:" + value);
+        for (ProgressBarUpdateListener listener: listProgressListeners) {
+            listener.progressUpdate(value);
+        }
+    }
+
+    private void notifyProgressMax(Double value){
+        System.out.println("notifyProgressMax:" + value);
+        for (ProgressBarUpdateListener listener: listProgressListeners) {
+            listener.progressMax(value);
+        }
+    }
+
+    private void notifyProgressStatus(String value){
+        System.out.println("notifyProgressStatus:" + value);
+        for (ProgressBarUpdateListener listener: listProgressListeners) {
+            listener.progressStatusMessage(value);
+        }
+    }
+
+    
 }

@@ -6,6 +6,7 @@ package ca.jusjoken.utility;
 
 import java.time.LocalDate;
 import java.time.Period;
+import java.time.temporal.ChronoUnit;
 
 /**
  *
@@ -16,8 +17,12 @@ public class AgeBetween {
     private Integer months = 0;
     private Integer weeks = 0;
     private Integer days = 0;
+    private LocalDate startDate;
+    private LocalDate endDate;
 
     public AgeBetween(LocalDate date1, LocalDate date2) {
+        startDate = date1;
+        endDate = date2;
         if(date1==null || date2==null){
             //do nothing
         }else{
@@ -44,6 +49,14 @@ public class AgeBetween {
 
     public Integer getDays() {
         return days;
+    }
+    
+    public Long getAgeInDays(){
+        if(startDate==null || endDate==null){
+            return 0L;
+        }else{
+            return ChronoUnit.DAYS.between(startDate, endDate);
+        }
     }
     
     public String getAgeFormattedHTML(){

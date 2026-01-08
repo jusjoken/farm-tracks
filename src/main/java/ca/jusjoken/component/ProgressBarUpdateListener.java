@@ -1,0 +1,16 @@
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Interface.java to edit this template
+ */
+package ca.jusjoken.component;
+
+/**
+ *
+ * @author birch
+ */
+public interface ProgressBarUpdateListener {
+    void progressUpdate(Double value);
+    void progressMax(Double value);
+    void progressStatusMessage(String value);
+
+}

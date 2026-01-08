@@ -10,6 +10,7 @@ import ca.jusjoken.data.service.StockStatusComparator;
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -35,6 +36,8 @@ public class Utility {
     
     private static final Map<String, StockStatus> stockStatusList = new HashMap();
     private static final Map<String, ColumnName> stockColumnNameList = new HashMap();
+    
+    public static final LocalDateTime nullDate = LocalDateTime.of(1970, 1, 1, 0, 0);
 
     public static enum Gender{
         MALE("M"), FEMALE("F"), NA("NA");
@@ -165,8 +168,9 @@ public class Utility {
         stockColumnNameList.put("prefix", new ColumnName("Prefix", "prefix"));
         stockColumnNameList.put("status", new ColumnName("Status", "status"));
         stockColumnNameList.put("weight", new ColumnName("Weight", "weight"));
-        stockColumnNameList.put("litterCount", new ColumnName("# of Litters", "litterCount"));
-        stockColumnNameList.put("kitCount", new ColumnName("# of Kits", "kitCount"));
+        //removed the 2 below as not likely needed and helped improve performance of stock query
+        //stockColumnNameList.put("litterCount", new ColumnName("# of Litters", "litterCount"));
+        //stockColumnNameList.put("kitCount", new ColumnName("# of Kits", "kitCount"));
     }
 
     public Collection<ColumnName> getStockColumnNameList() {
@@ -192,16 +196,16 @@ public class Utility {
 
     private static void createStockStatusList(){
         stockStatusList.clear();
-        stockStatusList.put("active", new StockStatus("active", ICONS.STATUS_ACTIVE, "Active",Boolean.FALSE,1));
-        stockStatusList.put("inactive", new StockStatus("inactive", ICONS.STATUS_INACTIVE, "Inactive",Boolean.FALSE,2));
-        stockStatusList.put("all", new StockStatus("all", ICONS.STATUS_ALL, "All",Boolean.FALSE,3));
-        stockStatusList.put("archived", new StockStatus("archived", ICONS.STATUS_ARCHIVED, "Archived",Boolean.TRUE,5));
-        stockStatusList.put("butchered", new StockStatus("butchered", ICONS.STATUS_BUTCHERED, "Butchered",Boolean.TRUE,6));
-        stockStatusList.put("culled", new StockStatus("culled", ICONS.STATUS_CULLED, "Culled",Boolean.TRUE,7));
-        stockStatusList.put("died", new StockStatus("died", ICONS.STATUS_DIED, "Died",Boolean.TRUE,8));
-        stockStatusList.put("forsale", new StockStatus("forsale", ICONS.ACTION_MARK_FOR_SALE, "For sale",Boolean.FALSE,9));
-        stockStatusList.put("sold", new StockStatus("sold", ICONS.STATUS_SOLD, "Sold",Boolean.TRUE,10));
-        stockStatusList.put("deposit", new StockStatus("deposit", ICONS.STATUS_SOLD_W_DEPOSIT, "Sold with deposit",Boolean.FALSE,11));
+        stockStatusList.put("active", new StockStatus("active", ICONS.STATUS_ACTIVE, "Active","Make Active",Boolean.FALSE,1, "Do you want to make %s active?"));
+        stockStatusList.put("inactive", new StockStatus("inactive", ICONS.STATUS_INACTIVE, "Inactive",null,Boolean.FALSE,2));
+        stockStatusList.put("all", new StockStatus("all", ICONS.STATUS_ALL, "All",null,Boolean.FALSE,3));
+        stockStatusList.put("archived", new StockStatus("archived", ICONS.STATUS_ARCHIVED, "Archived","Archive",Boolean.TRUE,5, "Do you want to archive %s?"));
+        stockStatusList.put("butchered", new StockStatus("butchered", ICONS.STATUS_BUTCHERED, "Butchered","Butcher",Boolean.TRUE,6));
+        stockStatusList.put("culled", new StockStatus("culled", ICONS.STATUS_CULLED, "Culled","Cull",Boolean.TRUE,7, "Do you want to cull %s?"));
+        stockStatusList.put("died", new StockStatus("died", ICONS.STATUS_DIED, "Died","Died",Boolean.TRUE,8, "Why did %s die?"));
+        stockStatusList.put("forsale", new StockStatus("forsale", ICONS.ACTION_MARK_FOR_SALE, "For sale","Mark for Sale",Boolean.FALSE,9, "Do you want to mark %s for sale?"));
+        stockStatusList.put("sold", new StockStatus("sold", ICONS.STATUS_SOLD, "Sold","Sell",Boolean.TRUE,10));
+        stockStatusList.put("deposit", new StockStatus("deposit", ICONS.STATUS_SOLD_W_DEPOSIT, "Sold with deposit","Deposit taken",Boolean.FALSE,11, "Do you want to record a deposit for the sale of %s?"));
     }
     
     public Boolean hasStockStatus(String name){
@@ -219,8 +223,14 @@ public class Utility {
         }
     }
 
-    public Collection<StockStatus> getStockStatusList() {
+    public Collection<StockStatus> getStockStatusList(Boolean includeSummaryItems) {
         List<StockStatus> list = new ArrayList<StockStatus>(stockStatusList.values());
+        if(!includeSummaryItems){
+            //remove the general items not needed here (all, active, inactive)
+            list.remove(getStockStatus("all"));
+            //list.remove(getStockStatus("active"));
+            list.remove(getStockStatus("inactive"));
+        }
         Collections.sort(list, new StockStatusComparator());
         return list;
     }
@@ -247,9 +257,9 @@ public class Utility {
     }
     
     public Integer WeightConverterOzToRemainingOunces(Integer ounces){
-        System.out.println("WeightConverterOzToRemainingOunces: ounces in:" + ounces);
+        //System.out.println("WeightConverterOzToRemainingOunces: ounces in:" + ounces);
         Integer remainingOunces = (int) (ounces % 16);
-        System.out.println("WeightConverterOzToRemainingOunces: remainingOunces:" + remainingOunces);
+        //System.out.println("WeightConverterOzToRemainingOunces: remainingOunces:" + remainingOunces);
         return remainingOunces;        
     }
     

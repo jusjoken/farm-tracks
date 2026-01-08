@@ -4,21 +4,31 @@
  */
 package ca.jusjoken.views.utility;
 
+import ca.jusjoken.component.ProgressBarUpdateListener;
 import ca.jusjoken.data.Import;
 import ca.jusjoken.data.Utility;
+import ca.jusjoken.data.service.BackendService;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dependency.Uses;
-import com.vaadin.flow.component.details.Details;
 import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.NativeLabel;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
+import com.vaadin.flow.component.orderedlayout.FlexComponent.JustifyContentMode;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.FileBuffer;
 import com.vaadin.flow.component.upload.receivers.FileData;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.VaadinService;
 import jakarta.annotation.security.PermitAll;
+import java.text.NumberFormat;
 
 /**
  *
@@ -28,18 +38,25 @@ import jakarta.annotation.security.PermitAll;
 @Route("maintenance")
 @PermitAll
 @Uses(Icon.class)
-public class MaintenanceView extends Div{
+public class MaintenanceView extends Div implements ProgressBarUpdateListener{
     private Import importUtility = new Import();
     private Button processButton = new Button("Process import");
+    private ProgressBar progress = new ProgressBar();
+    private NativeLabel progressBarLabelText = new NativeLabel();
+    private Span progressBarLabelValue = new Span();
+
     private Upload kitUpload;
     private Upload breederUpload;
     private Upload litterUpload;
+    private VaadinService vService = VaadinService.getCurrent();
+    private UI ui;
     
     public MaintenanceView() {
+        importUtility.addListener(this);
         setSizeFull();
         addClassNames("maintenance-view");
         
-        VerticalLayout layout = new VerticalLayout(createImportAllSection(), createIndividualImportSection());
+        VerticalLayout layout = new VerticalLayout(createImportAllSection());
         layout.setSizeFull();
         layout.setPadding(false);
         layout.setSpacing(false);
@@ -48,33 +65,54 @@ public class MaintenanceView extends Div{
     }
 
     //this will be a controlled import that will remove all Everbreed data and reimport from breeders, kits and litters csv files
-    private Details createImportAllSection() {
+    private VerticalLayout createImportAllSection() {
         VerticalLayout importItems = new VerticalLayout();
         importItems.setSizeFull();
-        Details details = new Details("Full import from Everbreed", importItems);
-        details.setOpened(true);
+        importItems.setAlignItems(FlexComponent.Alignment.START);
+        importItems.setJustifyContentMode(JustifyContentMode.START);
+        BackendService backendService = new BackendService();
 
         processButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         processButton.setEnabled(false);
         processButton.setDisableOnClick(true);
-        processButton.addClickListener(event -> {
-            importUtility.processAllImportsFromEverbreed();
-            kitUpload.clearFileList();
-            breederUpload.clearFileList();
-            litterUpload.clearFileList();
-            processButton.setEnabled(false);
+
+        processButton.addClickListener(clickEvent -> {
+            ui = clickEvent.getSource().getUI().orElseThrow();
+            System.out.println("processButton: before calling long");
+            progressStatusMessage("Processing imports from Everbreed...");
+            
+            vService.getExecutor().execute(() -> {
+                backendService.longRunningTask(importUtility);
+                
+                ui.access(() -> {
+                    progressStatusMessage("All imports completed.");
+                    kitUpload.clearFileList();
+                    breederUpload.clearFileList();
+                    litterUpload.clearFileList();
+                    processButton.setEnabled(false);
+                });
+            });
+            
         });
 
         importItems.add(createImportLayout(Utility.ImportType.BREEDERS,Boolean.FALSE));
         importItems.add(createImportLayout(Utility.ImportType.KITS,Boolean.FALSE));
         importItems.add(createImportLayout(Utility.ImportType.LITTERS,Boolean.FALSE));
+        
+        HorizontalLayout progressBarLabel = new HorizontalLayout(progressBarLabelText, progressBarLabelValue);
+        progressBarLabel.setJustifyContentMode(JustifyContentMode.BETWEEN);
+        progressBarLabel.setWidthFull();
+        importItems.add(progressBarLabel);
+        progress.setWidthFull();
+        importItems.add(progress);
+
         importItems.add(processButton);
-        return details;
+        return importItems;
     }
 
     private VerticalLayout createImportLayout(Utility.ImportType importType, Boolean autoProcess) {
         VerticalLayout importItems = new VerticalLayout();
-        importItems.setSizeFull();
+        importItems.setWidthFull();
 
         FileBuffer fileBuffer = new FileBuffer();
         Upload upload = new Upload(fileBuffer);
@@ -122,6 +160,9 @@ public class MaintenanceView extends Div{
             }
         });
         upload.addSucceededListener(event -> {
+            //clear any previous status
+            progressBarLabelText.setText("");
+            progressBarLabelValue.setText("");
             FileData savedFileData = fileBuffer.getFileData();
             String filePath = savedFileData.getFile().getAbsolutePath();
             System.out.println("file:" + filePath);
@@ -154,16 +195,32 @@ public class MaintenanceView extends Div{
         return importItems;
     }
 
-    private Details createIndividualImportSection() {
-        VerticalLayout importItems = new VerticalLayout();
-        importItems.setSizeFull();
-        Details details = new Details("Individual import from Everbreed exports", importItems);
-        details.setOpened(true);
-        importItems.add(createImportLayout(Utility.ImportType.BREEDERS,Boolean.TRUE));
-        importItems.add(createImportLayout(Utility.ImportType.KITS,Boolean.TRUE));
-        importItems.add(createImportLayout(Utility.ImportType.LITTERS,Boolean.TRUE));
-        
-        return details;
+    @Override
+    public void progressUpdate(Double value) {
+        System.out.println("progressUpdate:" + value);
+        ui.access(() -> {
+            progress.setValue(value);
+            Double percent = progress.getValue() / progress.getMax();
+            NumberFormat nf = NumberFormat.getPercentInstance();
+            nf.setMaximumFractionDigits(0);
+            System.out.println("progressStatusMessage: percent:" + nf.format(percent));
+            progressBarLabelValue.setText(nf.format(percent));
+        });
+    }
+
+    @Override
+    public void progressMax(Double value) {
+        ui.access(() -> {
+            progress.setMax(value);
+            progress.setWidthFull();
+        });
+    }
+
+    @Override
+    public void progressStatusMessage(String value) {
+        ui.access(() -> {
+            progressBarLabelText.setText(value);
+        });
     }
     
 }
