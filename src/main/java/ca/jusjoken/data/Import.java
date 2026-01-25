@@ -9,12 +9,14 @@ import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
+import ca.jusjoken.data.entity.StockWeightHistory;
 import ca.jusjoken.data.service.LitterRepository;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockRepository;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeRepository;
+import ca.jusjoken.data.service.StockWeightHistoryService;
 import com.opencsv.bean.CsvToBeanBuilder;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -36,6 +38,7 @@ public class Import {
     StockTypeRepository stockTypeRepository;
     LitterRepository litterRepository;
     StockStatusHistoryService statusService;
+    StockWeightHistoryService weightService;
     private List<Stock> breederImportList = new ArrayList<>();
     private List<Stock> kitImportList = new ArrayList<>();
     private List<Litter> litterImportList = new ArrayList<>();
@@ -47,6 +50,7 @@ public class Import {
         this.stockTypeRepository = Registry.getBean(StockTypeRepository.class);
         this.litterRepository = Registry.getBean(LitterRepository.class);
         this.statusService = Registry.getBean(StockStatusHistoryService.class);
+        this.weightService = Registry.getBean(StockWeightHistoryService.class);
     }
     
     public void importBreederFromEverbreed(String filePath){
@@ -92,8 +96,13 @@ public class Import {
         litterRepository.deleteAllLittersNative();
         
         System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed status history records");
-        notifyProgressUpdate(0.9);
+        notifyProgressUpdate(0.8);
         statusService.deleteAll();
+
+        System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed weight history records");
+        notifyProgressUpdate(0.9);
+        weightService.deleteAll();
+
         notifyProgressUpdate(1.0);
 
         if(!kitImportList.isEmpty()){
@@ -182,6 +191,7 @@ public class Import {
             }
             if(item.getNeedsSaving()){
                 Stock newStock = stockRepository.saveAndFlush(item);
+                //status info
                 List<StockStatusHistory> statusList = statusService.findByStockId(newStock.getId());
                 if(statusList.isEmpty()){
                     //save new status history item
@@ -192,6 +202,20 @@ public class Import {
                     statusList.get(0).setStatusName(newStock.getStatus());
                     statusService.save(statusList.get(0),newStock,Boolean.TRUE);
                     System.out.println("processStockList " + isBreeder + ": status updated:" + newStock.getStatus() + " : " + newStock.getStatusDate());
+                }
+                //weight info to save if > 0
+                if(newStock.getWeight()>0){
+                    List<StockWeightHistory> weightList = weightService.findByStockId(newStock.getId());
+                    if(weightList.isEmpty()){
+                        //save new weight history item
+                        weightService.save(new StockWeightHistory(newStock.getId(),newStock.getWeight(),newStock.getWeightDate()),newStock);
+                        System.out.println("processStockList " + isBreeder + ": weight new saved:" + newStock.getWeight() + " : " + newStock.getWeightDate());
+                    }else{
+                        //update existing imported item
+                        weightList.get(0).setWeight(newStock.getWeight());
+                        weightService.save(weightList.get(0),newStock);
+                        System.out.println("processStockList " + isBreeder + ": weight updated:" + newStock.getWeight() + " : " + newStock.getWeightDate());
+                    }
                 }
                 System.out.println("processStockList " + isBreeder + ": item after save:" + item.toString());
             }

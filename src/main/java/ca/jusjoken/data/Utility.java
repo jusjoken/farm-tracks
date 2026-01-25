@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -39,6 +40,7 @@ public class Utility {
     
     public static final LocalDateTime nullDate = LocalDateTime.of(1970, 1, 1, 0, 0);
 
+    //Note: GenderConverter class is used to convert these so the shortname is stored in the database
     public static enum Gender{
         MALE("M"), FEMALE("F"), NA("NA");
 
@@ -136,9 +138,10 @@ public class Utility {
         STATUS_ARCHIVED(FontAwesome.Solid.ARCHIVE.create().getIcon()),
         ACTION_DELETE(FontAwesome.Solid.TRASH.create().getIcon()),
         ACTION_MARK_FOR_SALE(FontAwesome.Solid.MONEY_BILL.create().getIcon()),
-        ACTION_CAGE_CARD(FontAwesome.Solid.LIST.create().getIcon()),
         ACTION_BIRTH(FontAwesome.Solid.BIRTHDAY_CAKE.create().getIcon()),
         ACTION_EDIT(FontAwesome.Solid.PENCIL_ALT.create().getIcon()),
+        ACTION_WEIGH(FontAwesome.Solid.BALANCE_SCALE.create().getIcon()),
+        ACTION_PEDIGREE(FontAwesome.Solid.SITEMAP.create().getIcon()),
         GENDER_FEMALE(FontAwesome.Solid.VENUS.create().getIcon()),
         GENDER_MALE(FontAwesome.Solid.MARS.create().getIcon()),
         TYPE_BREEDER(FontAwesome.Solid.VENUS_MARS.create().getIcon());
@@ -203,6 +206,8 @@ public class Utility {
         stockStatusList.put("butchered", new StockStatus("butchered", ICONS.STATUS_BUTCHERED, "Butchered","Butcher",Boolean.TRUE,6));
         stockStatusList.put("culled", new StockStatus("culled", ICONS.STATUS_CULLED, "Culled","Cull",Boolean.TRUE,7, "Do you want to cull %s?"));
         stockStatusList.put("died", new StockStatus("died", ICONS.STATUS_DIED, "Died","Died",Boolean.TRUE,8, "Why did %s die?"));
+        
+        //TODO:: replace these SALE status' with fields in Stock
         stockStatusList.put("forsale", new StockStatus("forsale", ICONS.ACTION_MARK_FOR_SALE, "For sale","Mark for Sale",Boolean.FALSE,9, "Do you want to mark %s for sale?"));
         stockStatusList.put("sold", new StockStatus("sold", ICONS.STATUS_SOLD, "Sold","Sell",Boolean.TRUE,10));
         stockStatusList.put("deposit", new StockStatus("deposit", ICONS.STATUS_SOLD_W_DEPOSIT, "Sold with deposit","Deposit taken",Boolean.FALSE,11, "Do you want to record a deposit for the sale of %s?"));

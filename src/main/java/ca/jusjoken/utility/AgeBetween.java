@@ -88,6 +88,32 @@ public class AgeBetween {
         return retVal;
     }
 
+    public String getAgeFormattedString(){
+        String retVal = "";
+        if(this.years>0 && this.months>0){
+            retVal += this.years + "yr " + this.months + "mo";
+        }else if(this.years>0 && this.weeks>0){
+            retVal += this.years + "yr " + this.weeks + "wk";
+        }else if(this.years>0 && this.days>0){
+            retVal += this.years + "yr " + this.days + "dy";
+        }else if(this.years>0){
+            retVal += this.years + "yr";
+        }else if(this.months>0 && this.weeks>0){
+            retVal += this.months+ "mo " + this.weeks + "wk";
+        }else if(this.months>0 && this.days>0){
+            retVal += this.months + "mo " + this.days + "dy";
+        }else if(this.months>0){
+            retVal += this.months + "mo";
+        }else if(this.weeks>0){
+            retVal += this.weeks + "wk " + this.days + "dy";
+        }else if(this.days>0){
+            retVal += this.days + "dy";
+        }else{
+            retVal += "--";
+        }
+        return retVal;
+    }
+
     @Override
     public String toString() {
         return "AgeBetween{" + "years=" + years + ", months=" + months + ", weeks=" + weeks + '}';

@@ -33,7 +33,6 @@ import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.formlayout.FormLayout.ResponsiveStep;
 import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
@@ -155,8 +154,6 @@ public class DialogCommon {
 
     @PropertyId("genotype")
     private TextField fieldGenotype = UIUtilities.getTextField();
-    @PropertyId("category")
-    private TextField fieldCategory = UIUtilities.getTextField(); //TODO - needs to be a pickbox
     
     @PropertyId("status")
     private TextField fieldStatus = new TextField();
@@ -252,7 +249,6 @@ public class DialogCommon {
         fieldWeight.setWidthFull();
         fieldFather.setWidthFull();
         fieldMother.setWidthFull();
-        fieldCategory.setWidthFull();
         fieldStatus.setWidthFull();
         fieldFoster.setWidthFull();
         fieldAquiredDate.setWidthFull();
@@ -619,6 +615,7 @@ public class DialogCommon {
 
         //fields that are always ReadOnly
         fieldStatus.setReadOnly(true);
+        fieldWeight.setReadOnly(true);
         
         stockFormLayout.setResponsiveSteps(
         // Use one column by default
@@ -651,7 +648,6 @@ public class DialogCommon {
             stockFormLayout.addFormItem(fieldRegNo,"Registration Number");
             stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
             stockFormLayout.addFormItem(fieldStatus,"Status");
-            stockFormLayout.addFormItem(fieldCategory,"Category");
             stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
             stockFormLayout.addFormItem(fieldAquiredDate,"Aquired");
             stockFormLayout.addFormItem(fieldBornDate,"Born");

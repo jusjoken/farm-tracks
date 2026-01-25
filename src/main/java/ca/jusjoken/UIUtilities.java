@@ -28,7 +28,16 @@ import com.vaadin.flow.component.textfield.TextFieldVariant;
  */
 public class UIUtilities {
     
-    public static String borderSizeSmall = "2px";
+    public static enum BorderSize{
+        LARGE("6px"), SMALL("2px"), XSMALL("1px");
+
+        public final String sizeName;
+        private BorderSize(String s) {
+            this.sizeName = s;
+        }
+    }
+    
+    public static String borderSizeSmall = "1px";
     public static String borderSizeLarge = "6px";
 
     public static String borderColorFemale = "#ca195a";
@@ -183,7 +192,7 @@ public class UIUtilities {
         return textField;
     }
 
-    public static void setBorders(Component component, Stock stock, Boolean largeBorder){
+    public static void setBorders(Component component, Stock stock, BorderSize borderSize){
         if(stock==null){
             component.getStyle().set("border-color", UIUtilities.borderColorError);
             component.getStyle().set("border-width", UIUtilities.borderSizeSmall);
@@ -197,11 +206,14 @@ public class UIUtilities {
         }else{
             component.getStyle().set("border-color", UIUtilities.borderColorNA);
         }
+        component.getStyle().set("border-width", borderSize.sizeName);
+        /*
         if(largeBorder){
             component.getStyle().set("border-width", UIUtilities.borderSizeLarge);
         }else{
             component.getStyle().set("border-width", UIUtilities.borderSizeSmall);
         }
+        */
         component.getStyle().set("border-style", "solid");
     }
     

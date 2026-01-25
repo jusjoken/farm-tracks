@@ -14,7 +14,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -25,7 +24,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
  */
 @Entity
 @EntityListeners(AuditingEntityListener.class)
-public class StockStatusHistory {
+public class StockWeightHistory {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -35,9 +34,8 @@ public class StockStatusHistory {
     @Column(name = "stock_id", nullable = false)
     private Integer stockId;
     
-    //statusName must be one from Utility list of valid status'
-    @Column(name = "status_name", nullable = false)
-    private String statusName;
+    @Column(name = "weight", nullable = false)
+    private Integer weight;
     
     @Column(name = "custom_date", nullable = true)
     private LocalDateTime customDate;
@@ -72,18 +70,19 @@ public class StockStatusHistory {
         this.lastModifiedDate = lastModifiedDate;
     }
     //END Common time stamps for records
-    public StockStatusHistory() {
+
+    public StockWeightHistory() {
     }
 
-    public StockStatusHistory(Integer stockId, String statusName) {
+    public StockWeightHistory(Integer stockId, Integer weight) {
         this.stockId = stockId;
-        this.statusName = statusName;
+        this.weight = weight;
     }
 
-    public StockStatusHistory(Integer stockId, String statusName, LocalDateTime statusDate) {
+    public StockWeightHistory(Integer stockId, Integer weight, LocalDateTime customDate) {
         this.stockId = stockId;
-        this.statusName = statusName;
-        this.customDate = statusDate;
+        this.weight = weight;
+        this.customDate = customDate;
     }
 
     public Integer getId() {
@@ -102,12 +101,12 @@ public class StockStatusHistory {
         this.stockId = stockId;
     }
 
-    public String getStatusName() {
-        return statusName;
+    public Integer getWeight() {
+        return weight;
     }
 
-    public void setStatusName(String statusName) {
-        this.statusName = statusName;
+    public void setWeight(Integer weight) {
+        this.weight = weight;
     }
 
     public LocalDateTime getCustomDate() {
@@ -125,15 +124,23 @@ public class StockStatusHistory {
     public void setNote(String note) {
         this.note = note;
     }
-    
+
     public Boolean hasNote(){
         if(note==null || note.isEmpty()) return Boolean.FALSE;
         else return Boolean.TRUE;
     }
-    
+
     public LocalDateTime getSortDate(){
         if(getCustomDate()!=null) return getCustomDate();
+        if(getLastModifiedDate()==null) return LocalDateTime.now();
         return getLastModifiedDate();
+    }
+
+    public String getWeightInLbsOz() {
+        if (getWeight() > 0) {
+            return Utility.getInstance().WeightConverterOzToString(getWeight());
+        }
+        return Utility.emptyValue;
     }
     
     public String getAge(Stock stock){
@@ -146,15 +153,10 @@ public class StockStatusHistory {
         return age.getAgeFormattedString();
     }
 
-    public String getFormattedStatus(){
-        return getStatusName() + " - " + getSortDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HHmm"));
-    }
-
     @Override
     public String toString() {
-        return "StockStatusHistory{" + "id=" + id + ", stockId=" + stockId + ", statusName=" + statusName + ", sortDate=" + getSortDate() + ", customDate=" + customDate + ", statusNote=" + note + ", createdDate=" + createdDate + ", lastModifiedDate=" + lastModifiedDate + '}';
+        return "StockWeightHistory{" + "id=" + id + ", stockId=" + stockId + ", weight=" + weight + ", customDate=" + customDate + ", note=" + note + ", createdDate=" + createdDate + ", lastModifiedDate=" + lastModifiedDate + '}';
     }
 
     
-
 }

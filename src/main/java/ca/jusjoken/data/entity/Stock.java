@@ -1,5 +1,7 @@
 package ca.jusjoken.data.entity;
 
+import ca.jusjoken.UIUtilities;
+import ca.jusjoken.component.AvatarDiv;
 import ca.jusjoken.component.Badge;
 import ca.jusjoken.component.Layout;
 import ca.jusjoken.data.Utility;
@@ -13,6 +15,7 @@ import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.vaadin.flow.component.avatar.Avatar;
 import com.vaadin.flow.component.avatar.AvatarVariant;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.SvgIcon;
@@ -91,8 +94,9 @@ public class Stock {
     @CsvBindByName(column = "Weight")
     private String weightText;  //weight used for import only - needs converting
 
-    //TODO:: needs to be a table with weight and dateWeighed
     private Integer weight;  //weight in Oz (convert to lbs/oz for display)
+    
+    private LocalDateTime weightDate;
 
     @CsvCustomBindByName(column = "DoB", converter = LocalDateCsvConverter.class)
     private LocalDate doB;
@@ -113,8 +117,6 @@ public class Stock {
     //private Integer littersCount;   // make a getter and return a count
     //private Integer kitsCount;   // make a getter and return a count
 
-    @CsvBindByName(column = "Category")
-    private String category;
     @CsvBindByName(column = "Notes")
     private String notes;
 
@@ -175,28 +177,9 @@ public class Stock {
     //the getter below is accessed by JPA to return the calculated age
     private Long ageInDays;
     
-    /*
-    @Override
-    public boolean equals(Object obj) {
-       if (this == obj) {
-           //System.out.println("STOCK EQUALS: this = obj");
-            return true;
-        }
-        if (!(obj instanceof Stock)) {
-           //System.out.println("STOCK EQUALS: obj not stock:" + obj);
-            return false;
-        }
-        Stock other = (Stock) obj;
-        //System.out.println("STOCK EQUALS: other = obj value:" + getDisplayName() == other.getDisplayName());
-        return getDisplayName() == other.getDisplayName();
-    }
-
-    @Override
-    public int hashCode() {
-        return id;
-    }
-    */
-
+    private Double stockValue;
+    
+    
     @Override
     public int hashCode() {
         int hash = 7;
@@ -348,6 +331,14 @@ public class Stock {
         return doB;
     }
 
+    public LocalDateTime getWeightDate() {
+        return weightDate;
+    }
+
+    public void setWeightDate(LocalDateTime weightDate) {
+        this.weightDate = weightDate;
+    }
+
     public void setDoB(LocalDate doB) {
         this.doB = doB;
     }
@@ -413,15 +404,6 @@ public class Stock {
 
     public void setGenotype(String genotype) {
         this.genotype = genotype;
-    }
-
-    public String getCategory() {
-        if(category==null) return "";
-        return category;
-    }
-
-    public void setCategory(String category) {
-        this.category = category;
     }
 
     public String getNotes() {
@@ -614,6 +596,13 @@ public class Stock {
         return "<p>" + Utility.emptyValue + "</p>";
     }
 
+    public String getWeightInLbsOzAsString() {
+        if (getWeight() > 0) {
+            return Utility.getInstance().WeightConverterOzToString(getWeight());
+        }
+        return Utility.emptyValue;
+    }
+
     public Boolean getNeedsSaving() {
         return needsSaving;
     }
@@ -759,35 +748,61 @@ public class Stock {
         return row;
     }
     
-
     public Layout getHeader(){
+        return getHeader(Boolean.FALSE);
+    }
+
+    public Layout getHeader(Boolean forPedigree){
         // Header
         Layout header = new Layout();
+        if(forPedigree){
+            header.setJustifyContent(Layout.JustifyContent.BETWEEN);
+        }
         header.setAlignItems(Layout.AlignItems.CENTER);
         header.setGap(Layout.Gap.SMALL);
         header.setWidthFull();
         header.setFlexWrap(Layout.FlexWrap.WRAP);
-        if(!getPrefix().isEmpty()){
-            Badge badge = new Badge(getPrefix());
+        
+        Layout nameAndPrefix = new Layout();
+        if(forPedigree){
+            nameAndPrefix.setFlexDirection(Layout.FlexDirection.COLUMN);
+            nameAndPrefix.setAlignItems(Layout.AlignItems.START);
+        }else{
+            nameAndPrefix.setFlexDirection(Layout.FlexDirection.ROW);
+            nameAndPrefix.setAlignItems(Layout.AlignItems.CENTER);
+        }
+
+        if(forPedigree){
+            Badge badge = new Badge(Utility.emptyValue);
+            if(!getPrefix().isEmpty()){
+                badge.setText(getPrefix());
+            }
             badge.addThemeVariants(BadgeVariant.PILL, BadgeVariant.SMALL);
-            header.add(badge);
+            nameAndPrefix.add(badge);
+        }else{
+            if(!getPrefix().isEmpty()){
+                Badge badge = new Badge(getPrefix());
+                badge.addThemeVariants(BadgeVariant.PILL, BadgeVariant.SMALL);
+                nameAndPrefix.add(badge);
+            }
         }
         Span stockName = new Span(getDisplayName());
         //stockName.addClassNames(LumoUtility.FontSize.LARGE, LumoUtility.FontWeight.MEDIUM);
         stockName.addClassNames("stock-name-responsive");
         
-        header.add(stockName);
+        nameAndPrefix.add(stockName);
+        header.add(nameAndPrefix);
         //add icons
         if(getSex().equals(Gender.FEMALE)){
             header.add(showIcon(getStockType().getFemaleName(),Utility.ICONS.GENDER_FEMALE.getIconSource()));
         }else if(getSex().equals(Gender.MALE)){
             header.add(showIcon(getStockType().getMaleName(),Utility.ICONS.GENDER_MALE.getIconSource()));
         }
-        if(getBreeder()){
+        if(!forPedigree && getBreeder()){
             header.add(showIcon(getStockType().getBreederName(),Utility.ICONS.TYPE_BREEDER.getIconSource()));
         }
         //System.out.println("getHeader: StockStatus:" + getStatus());
-        if(Utility.getInstance().hasStockStatus(getStatus())){
+        if(!forPedigree && Utility.getInstance().hasStockStatus(getStatus())){
             StockStatus stockStatus = Utility.getInstance().getStockStatus(getStatus());
             header.add(showIcon(stockStatus.getLongName(),stockStatus.getIcon().getIconSource()));
         }
@@ -807,6 +822,15 @@ public class Stock {
         //svgIcon.getStyle().set("--vaadin-icon-size", "1.0rem");
         layout.add(svgIcon);
         return layout;
+    }
+    
+    public AvatarDiv getAvatar(Boolean largeBorder){
+        Avatar avatar = new Avatar();
+        AvatarDiv avatarDiv = new AvatarDiv(avatar);
+        avatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
+        avatar.setImageHandler(DownloadHandler.forFile(getProfileFile()));
+        UIUtilities.setBorders(avatar, this, UIUtilities.BorderSize.LARGE);
+        return avatarDiv;
     }
     
     public void updateFromImported(Boolean importBreeder, Integer importId, StockType importStockType) {
@@ -852,10 +876,17 @@ public class Stock {
         return temp;
     }
 
-    @Override
-    public String toString() {
-        return "Stock{" + "id=" + id + ", breeder=" + breeder + ", stockType=" + stockType + ", sexText=" + sexText + ", sex=" + sex + ", prefix=" + prefix + ", name=" + name + ", tattoo=" + tattoo + ", cage=" + cage + ", fatherName=" + fatherName + ", motherName=" + motherName + ", fatherId=" + fatherId + ", motherId=" + motherId + ", fatherExtName=" + fatherExtName + ", motherExtName=" + motherExtName + ", color=" + color + ", breed=" + breed + ", weightText=" + weightText + ", weight=" + weight + ", doB=" + doB + ", acquired=" + acquired + ", regNo=" + regNo + ", champNo=" + champNo + ", legs=" + legs + ", genotype=" + genotype + ", category=" + category + ", notes=" + notes + ", status=" + status + ", statusDate=" + statusDate + ", active=" + active + ", profileImage=" + profileImage + ", defaultImageSource=" + defaultImageSource + ", profileImagePath=" + profileImagePath + ", litter=" + litter + ", fosterLitter=" + fosterLitter + ", needsSaving=" + needsSaving + ", ageInDays=" + ageInDays + ", temp=" + temp + ", createdDate=" + createdDate + ", lastModifiedDate=" + lastModifiedDate + '}';
+    public Double getStockValue() {
+        return stockValue;
     }
 
+    public void setStockValue(Double stockValue) {
+        this.stockValue = stockValue;
+    }
+
+    @Override
+    public String toString() {
+        return "Stock{" + "id=" + id + ", breeder=" + breeder + ", stockType=" + stockType + ", sexText=" + sexText + ", sex=" + sex + ", prefix=" + prefix + ", name=" + name + ", tattoo=" + tattoo + ", cage=" + cage + ", fatherName=" + fatherName + ", motherName=" + motherName + ", fatherId=" + fatherId + ", motherId=" + motherId + ", fatherExtName=" + fatherExtName + ", motherExtName=" + motherExtName + ", color=" + color + ", breed=" + breed + ", weightText=" + weightText + ", weight=" + weight + ", weightDate=" + weightDate + ", doB=" + doB + ", acquired=" + acquired + ", regNo=" + regNo + ", champNo=" + champNo + ", legs=" + legs + ", genotype=" + genotype + ", notes=" + notes + ", status=" + status + ", statusDate=" + statusDate + ", active=" + active + ", profileImage=" + profileImage + ", defaultImageSource=" + defaultImageSource + ", profileImagePath=" + profileImagePath + ", litter=" + litter + ", fosterLitter=" + fosterLitter + ", needsSaving=" + needsSaving + ", ageInDays=" + ageInDays + ", stockValue=" + stockValue + ", temp=" + temp + ", createdDate=" + createdDate + ", lastModifiedDate=" + lastModifiedDate + '}';
+    }
 
 }

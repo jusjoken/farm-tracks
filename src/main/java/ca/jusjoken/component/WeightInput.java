@@ -6,10 +6,12 @@ package ca.jusjoken.component;
 
 import ca.jusjoken.data.Utility;
 import com.vaadin.flow.component.AbstractCompositeField;
+import com.vaadin.flow.component.AbstractField;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.textfield.NumberField;
+import com.vaadin.flow.shared.Registration;
 
 /**
  *
@@ -23,21 +25,24 @@ public class WeightInput extends AbstractCompositeField<HorizontalLayout,WeightI
     public WeightInput() {
         super(null);
         
+        pounds.setSuffixComponent(new Div("lbs"));
+        ounces.setSuffixComponent(new Div("oz"));
         getContent().add(pounds, ounces);
         // Optionally, add validation or formatting
         getContent().setPadding(false);
         getContent().setSpacing(true);
         getContent().setMargin(false);
         getContent().setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        getContent().setAlignItems(FlexComponent.Alignment.BASELINE);
         pounds.setWidth("45%");
         ounces.setWidth("45%");
         pounds.addValueChangeListener(listener -> {
             calculateTotalOunces();
-            setModelValue(totalOunces, false);
+            setModelValue(totalOunces, true);
         });
         ounces.addValueChangeListener(listener -> {
             calculateTotalOunces();
-            setModelValue(totalOunces, false);
+            setModelValue(totalOunces, true);
         });
     }
 
@@ -50,10 +55,8 @@ public class WeightInput extends AbstractCompositeField<HorizontalLayout,WeightI
         //set each of the fields values
         //System.out.println("setTotalOunces: totalOunces:" + tOunces);
         pounds.setValue(Utility.getInstance().WeightConverterOzToPounds(tOunces).doubleValue());
-        pounds.setSuffixComponent(new Div("lbs"));
         //System.out.println("setTotalOunces: pounds:" + pounds.getValue());
         ounces.setValue(Utility.getInstance().WeightConverterOzToRemainingOunces(tOunces).doubleValue());
-        ounces.setSuffixComponent(new Div("oz"));
         //System.out.println("setTotalOunces: ounces:" + ounces.getValue());
     }
 
@@ -67,13 +70,18 @@ public class WeightInput extends AbstractCompositeField<HorizontalLayout,WeightI
     }
 
     @Override
+    public void setValue(Integer value) {
+        super.setValue(value);
+    }
+
+    @Override
     protected void setPresentationValue(Integer tOunces) {
         if(tOunces==null){
             setTotalOunces(0);
         }else{
             setTotalOunces(tOunces);
         }
-        getElement().setProperty("value", tOunces);
+        getElement().setProperty("value", getTotalOunces());
     }
     
     @Override
@@ -101,13 +109,21 @@ public class WeightInput extends AbstractCompositeField<HorizontalLayout,WeightI
     public boolean isRequiredIndicatorVisible() {
         return pounds.isRequiredIndicatorVisible();
     }
-    
+
     public String getLabel(){
         return pounds.getLabel();
     }
     
     public void setLabel(String label){
         pounds.setLabel(label);
+    }
+    
+    public String getHelperText(){
+        return pounds.getHelperText();
+    }
+    
+    public void setHelperText(String text){
+        pounds.setHelperText(text);
     }
     
 }   

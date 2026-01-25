@@ -11,6 +11,7 @@ import ca.jusjoken.data.service.ParentIntegerToStringConverter;
 import ca.jusjoken.data.service.StatusHistoryConverter;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.formlayout.FormLayout;
+import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.data.binder.PropertyId;
@@ -41,9 +42,10 @@ public class StockDetailsFormLayout extends FormLayout{
 
     @PropertyId("status")
     private TextField fieldStatus = new TextField();
-    @PropertyId("category")
-    private TextField fieldCategory = UIUtilities.getTextField(); //TODO - needs to be a pickbox
-
+    
+    @PropertyId("stockValue")
+    private NumberField fieldValue = UIUtilities.getNumberField(); //TODO - needs to be a pickbox
+    
     @PropertyId("acquired")
     private DatePicker fieldAquiredDate = new DatePicker();
     @PropertyId("doB")
@@ -82,7 +84,7 @@ public class StockDetailsFormLayout extends FormLayout{
         fieldChampNo.setReadOnly(true);
         fieldRegNo.setReadOnly(true);
         fieldStatus.setReadOnly(true);
-        fieldCategory.setReadOnly(true);
+        fieldValue.setReadOnly(true);
         fieldAquiredDate.setReadOnly(true);
         fieldBornDate.setReadOnly(true);
         fieldFosterName.setReadOnly(true);
@@ -96,7 +98,7 @@ public class StockDetailsFormLayout extends FormLayout{
         addFormItem(fieldRegNo,"Registration Number");
         getElement().appendChild(ElementFactory.createBr()); // row break
         addFormItem(fieldStatus,"Status");
-        addFormItem(fieldCategory,"Category");
+        addFormItem(fieldValue, "Value");
         getElement().appendChild(ElementFactory.createBr()); // row break
         addFormItem(fieldAquiredDate,"Aquired");
         addFormItem(fieldBornDate,"Born");

@@ -8,16 +8,18 @@ import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockStatusHistory;
+import ca.jusjoken.data.entity.StockWeightHistory;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockStatusHistoryService;
+import ca.jusjoken.data.service.StockWeightHistoryService;
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.ShortcutRegistration;
 import com.vaadin.flow.component.Shortcuts;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.datetimepicker.DateTimePicker;
 import com.vaadin.flow.component.dialog.Dialog;
-import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.html.Hr;
 import com.vaadin.flow.component.html.NativeLabel;
 import com.vaadin.flow.component.html.Span;
@@ -25,6 +27,7 @@ import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 import java.util.ArrayList;
@@ -38,9 +41,16 @@ import org.slf4j.LoggerFactory;
  * @author birch
  */
 public class StatusEditor {
+    public enum DialogMode{
+        EDIT, CREATE
+    }
+    
+    private DialogMode dialogMode = DialogMode.CREATE;
+    
     private Logger log = LoggerFactory.getLogger(StatusEditor.class);
     private Collection<StockStatus> statusTypes = Utility.getInstance().getStockStatusList(Boolean.FALSE);
     private String stockStatusToEdit;
+    private StockStatusHistory statusEntity;
     private Dialog dialog = new Dialog();
     private Boolean isStatusValid = Boolean.FALSE;
     private Boolean isCustom = Boolean.FALSE;
@@ -53,14 +63,21 @@ public class StatusEditor {
     private Button dialogCloseButton = new Button(new Icon("lumo", "cross"));
     
     private TextArea notes = new TextArea();
+    private DateTimePicker statusDateTime = new DateTimePicker();
     private NativeLabel promptLabel = new NativeLabel();
     private VerticalLayout dialogLayout = new VerticalLayout();
+    private Span ageAsOf = new Span();
+    private WeightInput preButcherWeight = new WeightInput();
+    private WeightInput butcheredWeight = new WeightInput();
+    private NumberField butcheredValue = UIUtilities.getNumberField("Optional value", Boolean.FALSE, "$");
 
     private List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
     private StockStatusHistoryService statusService;
+    private StockWeightHistoryService weightService;
    
     public StatusEditor() {
         statusService = Registry.getBean(StockStatusHistoryService.class);
+        weightService = Registry.getBean(StockWeightHistoryService.class);
         dialogConfigure();
     }
 
@@ -103,13 +120,37 @@ public class StatusEditor {
         promptLabel.addClassName(LumoUtility.TextColor.ERROR);
         notes.setLabel("Optional notes:");
         notes.setWidthFull();
+        statusDateTime.setLabel("Optional status date/time");
+        statusDateTime.setWidthFull();
+        statusDateTime.addValueChangeListener(event -> {
+            updateAge();
+        });
+        //custom js code to force a default time of midnight if only the date is entered
+        statusDateTime.getElement().executeJs("this.getElementsByTagName(\"vaadin-date-picker\")[0].addEventListener('change', function(){this.getElementsByTagName(\"vaadin-time-picker\")[0].value='00:00';}.bind(this));");
         
+        butcheredWeight.setWidthFull();
+        butcheredWeight.setLabel("Butchered");
+        butcheredWeight.setHelperText("Optional");
+        preButcherWeight.setWidthFull();
+        preButcherWeight.setLabel("Pre-butcher");
+        preButcherWeight.setHelperText("Optional");
+        butcheredValue.setWidthFull();
+
         
     }    
     
     public void dialogOpen(Stock stockEntity, String stockStatusToEdit){
+        StockStatusHistory newStatus = new StockStatusHistory();
+        newStatus.setStockId(stockEntity.getId());
+        newStatus.setStatusName(stockStatusToEdit);
+        dialogOpen(stockEntity, stockStatusToEdit, newStatus, DialogMode.CREATE);
+        
+    }
+    public void dialogOpen(Stock stockEntity, String stockStatusToEdit, StockStatusHistory statusEntity, DialogMode mode){
         this.stockEntity = stockEntity;
+        this.statusEntity = statusEntity;
         this.stockStatusToEdit = stockStatusToEdit;
+        dialogMode = mode;
         //check if the passed status is a valid one for edit
         isStatusValid = Utility.getInstance().hasStockStatus(stockStatusToEdit);
         if(isStatusValid) stockStatus = Utility.getInstance().getStockStatus(stockStatusToEdit);
@@ -121,9 +162,15 @@ public class StatusEditor {
             promptLabel.setText(String.format(stockStatus.getPrompt(),stockEntity.getDisplayName()));
         }
         
-        System.out.println("dialogOpen: name:" + stockEntity.getDisplayName() + " isCustom:" + isCustom + " status:" + stockStatusToEdit + " prompt:" + promptLabel.getText());
-        dialogTitle = stockStatus.getActionName();
+        System.out.println("dialogOpen: name:" + stockEntity.getDisplayName() + " isCustom:" + isCustom + " status:" + stockStatusToEdit + " prompt:" + promptLabel.getText() + " mode:" + mode);
 
+        dialogOkButton.setEnabled(true);
+        if(dialogMode.equals(DialogMode.CREATE)){
+            dialogTitle = stockStatus.getActionName();
+        }else{ //edit
+            dialogTitle = "Edit " + stockStatus.getActionName();
+        }
+        
         dialogLayout.removeAll();
 
         dialog.setHeaderTitle(dialogTitle);
@@ -139,47 +186,80 @@ public class StatusEditor {
 
         //add the needed fields
         if(isCustom){ //add custom fields based on specific status
-            dialogLayout.add(new Span("!! NOT YET IMPLEMENTED !!"));
+            //butcher is the only custom so handle here
+            VerticalLayout promptLayout = UIUtilities.getVerticalLayout(true, true, true);
+            if(dialogMode.equals(DialogMode.CREATE)){
+                promptLayout.add(preButcherWeight, butcheredWeight, butcheredValue);
+            }else{ //edit
+                promptLayout.add(butcheredValue);
+            }
+            promptLayout.add(notes, statusDateTime, ageAsOf);
+            dialogLayout.add(promptLayout);
             //likely need to use showItem here for more complex forms
             //dialogLayout.add(showItem());
         }else{ //general form using prompt
             VerticalLayout promptLayout = UIUtilities.getVerticalLayout(true, true, true);
-            promptLayout.add(promptLabel, notes);
+            promptLayout.add(promptLabel, notes, statusDateTime, ageAsOf);
             dialogLayout.add(promptLayout);
         }
+        
+        //set values here
+        if(dialogMode.equals(DialogMode.CREATE)){
+            notes.setValue("");
+            statusDateTime.setValue(null);
+            if(isCustom){
+                preButcherWeight.setValue(stockEntity.getWeight());
+                butcheredWeight.setValue(null);
+                butcheredValue.setValue(stockEntity.getStockValue());
+            }
+        }else{ //edit
+            if(statusEntity.hasNote()){
+                notes.setValue(statusEntity.getNote());
+            }
+            statusDateTime.setValue(statusEntity.getSortDate());
+            if(isCustom){
+                butcheredValue.setValue(stockEntity.getStockValue());
+                //weights are not displayed on edit so make sure they have no value
+                preButcherWeight.setValue(null);
+                butcheredWeight.setValue(null);
+            }
+        }
+        updateAge();
 
         dialog.open();
         
     }
 
-    public FormLayout showItem(){
-        FormLayout stockFormLayout = new FormLayout();
-        stockFormLayout.setWidthFull();
-        stockFormLayout.setAutoResponsive(false);
-        stockFormLayout.setExpandColumns(true);
-        stockFormLayout.setExpandFields(true);
-        stockFormLayout.setMaxColumns(3);
-        stockFormLayout.setMinColumns(1);
-
-        stockFormLayout.setResponsiveSteps(
-        // Use one column by default
-        new FormLayout.ResponsiveStep("0", 1, FormLayout.ResponsiveStep.LabelsPosition.ASIDE),
-        // Use two columns, if the layout's width exceeds 320px
-        new FormLayout.ResponsiveStep("600px", 2,FormLayout.ResponsiveStep.LabelsPosition.TOP),
-        // Use three columns, if the layout's width exceeds 500px
-        new FormLayout.ResponsiveStep("900px", 3,FormLayout.ResponsiveStep.LabelsPosition.TOP));        
-        stockFormLayout.removeAll();
-
-        //add all the appropriate fields and set their values
-        //TODO:: for complex forms
-
-        return stockFormLayout;
+    private void updateAge(){
+        System.out.println("updateAge: fieldVale:" + statusDateTime.getValue() + " stockAge:" + stockEntity.getAge().getAgeFormattedString());
+        if(statusDateTime.getValue()==null){
+            ageAsOf.setText("Age:" + stockEntity.getAge().getAgeFormattedString());
+        }else{
+            ageAsOf.setText("Age:" + statusEntity.getAge(stockEntity, statusDateTime.getValue().toLocalDate()));
+        }
     }
-    
+
     private void dialogSave() {
-        StockStatusHistory newStatus = new StockStatusHistory(stockEntity.getId(), stockStatusToEdit);
-        if(!notes.isEmpty()) newStatus.setStatusNote(notes.getValue());
-        statusService.save(newStatus, stockEntity, Boolean.FALSE);
+        if(!notes.isEmpty()) statusEntity.setNote(notes.getValue());
+        if(!statusDateTime.isEmpty()) statusEntity.setCustomDate(statusDateTime.getValue());
+        if(isCustom){
+            if(!butcheredValue.isEmpty()) stockEntity.setStockValue(butcheredValue.getValue());
+            //create a weight for each filled in optional weight
+            if(!preButcherWeight.isEmpty() && preButcherWeight.getValue()>0){
+                //do not ave this if it's the current value as no need having 2 records
+                if(!preButcherWeight.getValue().equals(stockEntity.getWeight())){
+                    StockWeightHistory newWeight = new StockWeightHistory(stockEntity.getId(), preButcherWeight.getValue());
+                    if(!statusDateTime.isEmpty()) newWeight.setCustomDate(statusDateTime.getValue());
+                    weightService.save(newWeight, stockEntity);
+                }
+            }
+            if(!butcheredWeight.isEmpty() && butcheredWeight.getValue()>0){
+                StockWeightHistory newWeight = new StockWeightHistory(stockEntity.getId(), butcheredWeight.getValue());
+                if(!statusDateTime.isEmpty()) newWeight.setCustomDate(statusDateTime.getValue());
+                weightService.save(newWeight, stockEntity);
+            }
+        }
+        statusService.save(statusEntity, stockEntity, Boolean.FALSE);
         notifyRefreshNeeded();
         dialogClose();
     }

@@ -7,6 +7,7 @@ import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockTypeService;
+import ca.jusjoken.views.stock.StockPedigreeView;
 import ca.jusjoken.views.stock.StockView;
 import ca.jusjoken.views.utility.MaintenanceView;
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;

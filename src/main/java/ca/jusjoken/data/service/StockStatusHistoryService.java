@@ -31,41 +31,48 @@ public class StockStatusHistoryService {
     public void delete(StockStatusHistory entity, Stock stock){
         statusRepository.delete(entity);
         //now update the stock to the newest status
+        saveLatestToStock(stock, Boolean.FALSE);
+    }
+    
+    private void saveLatestToStock(Stock stock, Boolean fromImport){
         List<StockStatusHistory> statusList = findByStockId(stock.getId());
-        StockStatusHistory statusHistory = statusList.get(0);
-        stock.setStatus(statusHistory.getStatusName());
-        stock.setStatusDate(statusHistory.getSortDate());
-        //save the stock item
-        stockService.save(stock);
+        if(!statusList.isEmpty()){
+            StockStatusHistory statusHistory = statusList.get(0);
+            //System.out.println("saveLatestToStock: latest:" + statusHistory);
+            stock.setStatus(statusHistory.getStatusName());
+            /*
+            if(fromImport){
+                //skip an existing date from the import to maintain original dates
+                if(stock.getStatusDate()==null){
+                    stock.setStatusDate(statusHistory.getSortDate());
+                }
+            }else{
+                stock.setStatusDate(statusHistory.getSortDate());
+            }
+            */
+            stock.setStatusDate(statusHistory.getSortDate());
+            //save the stock item
+            stockService.save(stock);
+        }
     }
     
     public StockStatusHistory save(StockStatusHistory statusHistory, Stock stock, Boolean fromImport){
         //save the passed status item
         StockStatusHistory updated = statusRepository.save(statusHistory);
         //update the stock item so it always has the newest status and date
-        stock.setStatus(statusHistory.getStatusName());
-        if(fromImport){
-            //skip an existing date from the import to maintain original dates
-            if(stock.getStatusDate()==null){
-                stock.setStatusDate(updated.getLastModifiedDate());
-            }
-        }else{
-            stock.setStatusDate(updated.getSortDate());
-        }
-        //save the stock item
-        stockService.save(stock);
+        saveLatestToStock(stock, fromImport);
         return updated;
     }
     
     public List<StockStatusHistory> findByStockId(Integer stockId){
         List<StockStatusHistory> list = statusRepository.findByStockId(stockId);
         Collections.sort(list, new StatusHistoryComparator().reversed());
+        //System.out.println("findByStockId: sorted list:" + list);
         return list;
     }
     
     public Long getStatusCount(Integer stockId){
         Long count = statusRepository.countByStockId(stockId);
-        System.out.println("getStatusCount: stock:" + stockId + " count:" + count);
         return count;
     }
 

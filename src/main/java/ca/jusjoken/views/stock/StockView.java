@@ -1,6 +1,7 @@
 package ca.jusjoken.views.stock;
 
 import ca.jusjoken.UIUtilities;
+import ca.jusjoken.component.AvatarDiv;
 import ca.jusjoken.component.ComponentConfirmEvent;
 import ca.jusjoken.component.DialogCommon;
 import ca.jusjoken.component.Item;
@@ -9,6 +10,7 @@ import ca.jusjoken.component.LazyComponent;
 import ca.jusjoken.component.ListRefreshNeededListener;
 import ca.jusjoken.component.StatusEditor;
 import ca.jusjoken.component.StockDetailsFormLayout;
+import ca.jusjoken.component.WeightEditor;
 import ca.jusjoken.data.ColumnName;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.BreederFilter;
@@ -18,6 +20,7 @@ import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
 import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
+import ca.jusjoken.data.entity.StockWeightHistory;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.StockRepository;
 import ca.jusjoken.data.service.StockService;
@@ -25,6 +28,7 @@ import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeRepository;
+import ca.jusjoken.data.service.StockWeightHistoryService;
 import ca.jusjoken.views.MainLayout;
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import com.vaadin.flow.component.Component;
@@ -58,7 +62,6 @@ import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
-import com.vaadin.flow.data.renderer.NativeButtonRenderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.BeforeEvent;
@@ -86,6 +89,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private final StockService stockService;
     private final StockSavedQueryService queryService;
     private final StockStatusHistoryService statusService;
+    private final StockWeightHistoryService weightService;
     private String currentSearchName = "";
     private StockSavedQuery currentStockSavedQuery;
     private String currentSavedQueryId = null;
@@ -101,6 +105,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Button resetOptionsButton = new Button(FontAwesome.Solid.UNDO.create());
     private DialogCommon dialogCommon;
     private StatusEditor statusEditor;
+    private WeightEditor weightEditor;
     private ConfirmDialog saveQueryDialog = new ConfirmDialog();
     private ConfirmDialog deleteQueryDialog = new ConfirmDialog();
     private ConfirmDialog resetQueryDialog = new ConfirmDialog();
@@ -114,18 +119,22 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private RadioButtonGroup<String> sort2Direction = new RadioButtonGroup<>();
     private Boolean skipSidebarUpdates = Boolean.FALSE;
 
-    public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService) {
+    public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService, StockWeightHistoryService weightService) {
         this.stockRepository = stockRepository;
         this.stockTypeRepository = stockTypeRepository;
         this.litterService = litterService;
         this.stockService = stockService;
         this.queryService = queryService;
         this.statusService = statusService;
+        this.weightService = weightService;
+        
         //this.defaultStockSort.addOrder(new SortOrder(currentSortDirection.name(), "tattoo"));
         this.dialogCommon = new DialogCommon();
         dialogCommon.addListener(this);
         this.statusEditor = new StatusEditor();
         statusEditor.addListener(this);
+        this.weightEditor = new WeightEditor();
+        weightEditor.addListener(this);
         
         addClassNames(Display.FLEX, Height.FULL, Overflow.HIDDEN);
         //loadFilters();
@@ -567,16 +576,20 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
     private Details createListItemLayout(Stock stock) {
         // Image and favourite button
-        Avatar avatar = new Avatar();
-        Div avatarDiv = new Div(avatar);
-        avatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
-        avatar.setHeight("6em");
-        avatar.setWidth("6em");
-        avatar.setImageHandler(DownloadHandler.forFile(stock.getProfileFile()));
+//        Avatar avatar = new Avatar();
+//        Div avatarDiv = new Div(avatar);
+//        avatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
+//        avatar.setHeight("6em");
+//        avatar.setWidth("6em");
+//        avatar.setImageHandler(DownloadHandler.forFile(stock.getProfileFile()));
+        AvatarDiv avatarDiv = stock.getAvatar(Boolean.TRUE);
+        avatarDiv.getAvatar().setHeight("6em");
+        avatarDiv.getAvatar().setWidth("6em");
+
         
-        UIUtilities.setBorders(avatar, stock, true);
+//        UIUtilities.setBorders(avatar, stock, true);
         
-        avatar.getElement().addEventListener("click", click -> {
+        avatarDiv.getAvatar().getElement().addEventListener("click", click -> {
             //open image dialog
             dialogCommon.setDialogMode(DialogCommon.DialogMode.EDIT);
             //dialogCommon.setDisplayMode(DialogCommon.DisplayMode.PROFILE_IMAGE);
@@ -638,7 +651,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         Details detailsPanel = new Details(layout);
         detailsPanel.add(createTabbedContentArea(stock));
         detailsPanel.addClassNames(Padding.NONE,Margin.Left.MEDIUM,Margin.Right.MEDIUM);
-        UIUtilities.setBorders(detailsPanel, stock, false);
+        UIUtilities.setBorders(detailsPanel, stock, UIUtilities.BorderSize.SMALL);
         detailsPanel.addClassNames(Border.ALL,BorderRadius.LARGE, BoxShadow.SMALL);
         detailsPanel.addThemeVariants(DetailsVariant.LUMO_REVERSE);
         
@@ -672,7 +685,6 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         });
         menu.addItem(new Item("Breed", Utility.ICONS.TYPE_BREEDER.getIconSource()));
         menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
-        menu.addItem(new Item("Cage Card", Utility.ICONS.ACTION_CAGE_CARD.getIconSource()));
         createStatusMenuItem(menu, stockEntity, "sold");
         createStatusMenuItem(menu, stockEntity, "forsale");
         createStatusMenuItem(menu, stockEntity, "deposit");
@@ -681,7 +693,20 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         createStatusMenuItem(menu, stockEntity, "archived");
         createStatusMenuItem(menu, stockEntity, "culled");
         createStatusMenuItem(menu, stockEntity, "active");
-        //TODO:: add a confirm dialoge for delete or customize status editor for delete
+        MenuItem weighMenu = menu.addItem(new Item("Weigh", Utility.ICONS.ACTION_WEIGH.getIconSource()));
+        weighMenu.addClickListener(click -> {
+            weightEditor.dialogOpen(stockEntity);
+        });
+        MenuItem pedigreeMenu = menu.addItem(new Item("Pedigree", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
+        pedigreeMenu.addClickListener(click -> {
+            UI.getCurrent().navigate(StockPedigreeView.class, stockEntity.getId().toString());
+        });
+        menu.addSeparator();
+        MenuItem pedigreeEditorMenu = menu.addItem(new Item("Pedigree Editor", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
+        pedigreeEditorMenu.addClickListener(click -> {
+            UI.getCurrent().navigate(StockPedigreeEditor.class, stockEntity.getId().toString());
+        });
+        menu.addSeparator();
         MenuItem deleteMenu = menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
         deleteMenu.addClickListener(click -> {
             deleteStockEntityWithConfirm(stockEntity);
@@ -748,6 +773,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         tabs.add(createTab("Kits", TabType.COUNT, stockService.getKitCountForParent(stock).toString()),createTabKits(stock));
         tabs.add(createTab("Notes", TabType.HASDATA, stock.getNotes()),createTabNotes(stock));
         tabs.add(createTab("Status'", TabType.NONE, Utility.emptyValue),createTabStatuses(stock));
+        tabs.add(createTab("Weights'", TabType.NONE, Utility.emptyValue),createTabWeights(stock));
         //TODO:: add list of weights
         
         content.add(tabs);
@@ -854,20 +880,34 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         grid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
         grid.setHeight("200px");
 
+        grid.addComponentColumn(item -> {
+            Icon editIcon = new Icon("lumo", "edit");
+            editIcon.addClickListener(e -> {
+                statusEditor.dialogOpen(stock,item.getStatusName(), item, StatusEditor.DialogMode.EDIT);
+            });
+            return editIcon;
+        }).setWidth("50px").setFlexGrow(0).setFrozen(true);
         //only add the DELETE action column if there are more than 1 status so as to not remove the last one
         if(statuses.size()>1){
-            grid.addColumn(
-                    new NativeButtonRenderer<>("Delete", clickedItem -> {
-                        System.out.println("createTabStatuses: delete:" + clickedItem);
-                        deleteStockStatusWithConfirm(clickedItem, stock);
-                    })
-            ).setAutoWidth(true).setFlexGrow(0);
+            grid.addComponentColumn(item -> {
+                Icon detailsDeleteIcon = new Icon("lumo", "cross");
+                detailsDeleteIcon.setTooltipText("Delete status entry");
+                detailsDeleteIcon.setColor("red");
+                detailsDeleteIcon.addClickListener(e -> {
+                    //confirm delete
+                        deleteStockStatusWithConfirm(item, stock);
+                });
+                return detailsDeleteIcon;
+            }).setWidth("50px").setFlexGrow(0);
         }
         grid.addColumn(StockStatusHistory::getStatusName).setHeader("Status");
+        grid.addColumn(item -> {
+            return item.getAge(stock, item.getSortDate().toLocalDate());
+        }).setHeader("Age");
+        grid.addColumn(new LocalDateTimeRenderer<>(StockStatusHistory::getSortDate,"MM-dd-YYYY HHmm")).setHeader("Status Date");
         grid.addColumn(new LocalDateTimeRenderer<>(StockStatusHistory::getCreatedDate,"MM-dd-YYYY HHmm")).setHeader("Created");
         grid.addColumn(new LocalDateTimeRenderer<>(StockStatusHistory::getLastModifiedDate,"MM-dd-YYYY HHmm")).setHeader("Modified");
-        grid.addColumn(new LocalDateTimeRenderer<>(StockStatusHistory::getOriginalStatusDate,"MM-dd-YYYY HHmm")).setHeader("Everbreed");
-        grid.addColumn(StockStatusHistory::getStatusNote).setHeader("Note");
+        grid.addColumn(StockStatusHistory::getNote).setHeader("Note");
 
         grid.setItems(statuses);
         layout.add(grid);
@@ -886,6 +926,65 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         dialog.setConfirmButtonTheme("error primary");
         dialog.addConfirmListener(event -> {
             statusService.delete(status,stock);
+            listRefreshNeeded();
+        });     
+        dialog.open();
+    }
+
+    private LazyComponent createTabWeights(Stock stock) {
+        Layout layout = new Layout();
+        List<StockWeightHistory> weights = weightService.findByStockId(stock.getId());
+        Grid<StockWeightHistory> grid = new Grid<StockWeightHistory>(StockWeightHistory.class,false);
+        grid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
+        grid.setHeight("200px");
+
+        grid.addComponentColumn(item -> {
+            Icon editIcon = new Icon("lumo", "edit");
+            editIcon.addClickListener(e -> {
+                weightEditor.dialogOpen(stock, item, WeightEditor.DialogMode.EDIT);
+            });
+            return editIcon;
+        }).setWidth("50px").setFlexGrow(0).setFrozen(true);
+        //only add the DELETE action column if there are more than 1 status so as to not remove the last one
+        if(weights.size()>1){
+            grid.addComponentColumn(item -> {
+                Icon detailsDeleteIcon = new Icon("lumo", "cross");
+                detailsDeleteIcon.setTooltipText("Delete weight entry");
+                detailsDeleteIcon.setColor("red");
+                detailsDeleteIcon.addClickListener(e -> {
+                    //confirm delete
+                        deleteStockWeightWithConfirm(item, stock);
+                });
+                return detailsDeleteIcon;
+            }).setWidth("50px").setFlexGrow(0);
+
+        }
+        grid.addColumn(StockWeightHistory::getWeightInLbsOz).setHeader("Weight");
+        grid.addColumn(item -> {
+            return item.getAge(stock, item.getSortDate().toLocalDate());
+        }).setHeader("Age");
+        grid.addColumn(new LocalDateTimeRenderer<>(StockWeightHistory::getSortDate,"MM-dd-YYYY HHmm")).setHeader("Weight Date");
+        grid.addColumn(new LocalDateTimeRenderer<>(StockWeightHistory::getCreatedDate,"MM-dd-YYYY HHmm")).setHeader("Created");
+        grid.addColumn(new LocalDateTimeRenderer<>(StockWeightHistory::getLastModifiedDate,"MM-dd-YYYY HHmm")).setHeader("Modified");
+        grid.addColumn(StockWeightHistory::getNote).setHeader("Note");
+
+        grid.setItems(weights);
+        layout.add(grid);
+        return new LazyComponent(() -> layout);
+    }
+    
+    private void deleteStockWeightWithConfirm(StockWeightHistory weight, Stock stock){
+        ConfirmDialog dialog = new ConfirmDialog();
+        dialog.setHeader("Delete \"" + weight.getWeightInLbsOz() + "\"?");
+        dialog.setText(
+                "Are you sure you want to permanently delete " + weight.getWeightInLbsOz() + " for " + stock.getDisplayName() + "?");
+
+        dialog.setCancelable(true);
+
+        dialog.setConfirmText("Delete");
+        dialog.setConfirmButtonTheme("error primary");
+        dialog.addConfirmListener(event -> {
+            weightService.delete(weight,stock);
             listRefreshNeeded();
         });     
         dialog.open();
