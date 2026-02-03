@@ -34,4 +34,7 @@ public interface LitterRepository extends JpaRepository<Litter, UUID>  {
     @Query(value = "DELETE FROM litter", nativeQuery = true)
     public void deleteAllLittersNative();   
     
+    public void deleteByFatherId(Integer stockId);
+    public void deleteByMotherId(Integer stockId);
+    
 }

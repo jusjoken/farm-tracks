@@ -9,9 +9,11 @@ import ca.jusjoken.data.entity.StockType;
 import java.time.LocalDate;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.repository.query.QueryByExampleExecutor;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  *
@@ -56,5 +58,11 @@ public interface StockRepository extends JpaRepository<Stock, Long>, QueryByExam
     
     public Stock findAllById(Integer id);
     
+    public List<Stock> findAllByStockTypeId(Integer id);
+    
+    @Transactional
+    @Modifying
+    @Query(value = "DELETE FROM stock WHERE stock_type_id = :stock_type_id", nativeQuery = true)
+    public int deleteByStockType(@Param("stock_type_id") Integer stockTypeId);
     
 }

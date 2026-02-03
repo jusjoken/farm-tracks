@@ -42,6 +42,7 @@ public class Generation {
     private String regNo;
     private Gender sex;
     private String breed;
+    private  String genotype;
 
     private List<Generation> breadcrumbs = new ArrayList<>();
     
@@ -139,6 +140,15 @@ public class Generation {
         if(stock==null) return "";
         return stock.getWeightInLbsOzAsString();
     }
+
+    public String getGenotype() {
+        return genotype;
+    }
+
+    public void setGenotype(String genotype) {
+        this.genotype = genotype;
+    }
+
     
     public String getLegs() {
         return legs;
@@ -216,6 +226,7 @@ public class Generation {
                 regNo = Utility.emptyValue;
                 sex = Gender.NA;
                 breed = Utility.emptyValue;
+                genotype = Utility.emptyValue;
             }else{ //use entity
                 //prefilled
             }
@@ -231,6 +242,7 @@ public class Generation {
             regNo = stock.getRegNo();
             sex = stock.getSex();
             breed = stock.getBreed();
+            genotype = stock.getGenotype();
         }
         
         details.addThemeVariants(DetailsVariant.LUMO_FILLED);
@@ -251,7 +263,7 @@ public class Generation {
         header.setAlignItems(Layout.AlignItems.START);
         header.setJustifyContent(Layout.JustifyContent.BETWEEN);
         for(int i = 1; i < getLevel(); i++){
-            System.out.println("getHeader: loop:" + name + " i:" + i);
+            //System.out.println("getHeader: loop:" + name + " i:" + i);
             Div spacer = new Div("");
             spacer.setWidth("80px");
             spacer.getStyle().set("flex-shrink", "0");
@@ -271,8 +283,9 @@ public class Generation {
 
     @Override
     public String toString() {
-        return "Generation{" + "level=" + level + ", father=" + father + ", mother=" + mother + ", child=" + child + ", details=" + details + ", header=" + header + ", stock=" + stock + ", name=" + name + ", prefix=" + prefix + ", tattoo=" + tattoo + ", doB=" + doB + ", color=" + color + ", weight=" + weight + ", legs=" + legs + ", champNo=" + champNo + ", regNo=" + regNo + ", sex=" + sex + ", breed=" + breed + ", breadcrumbs=" + breadcrumbs + '}';
+        return "Generation{" + "level=" + level + ", father=" + father.getName() + ", mother=" + mother.getName() + ", child=" + child + ", name=" + name + ", prefix=" + prefix + ", tattoo=" + tattoo + ", doB=" + doB + ", color=" + color + ", weight=" + weight + ", legs=" + legs + ", champNo=" + champNo + ", regNo=" + regNo + ", sex=" + sex + ", breed=" + breed + ", genotype=" + genotype + '}';
     }
+
 
 
 }

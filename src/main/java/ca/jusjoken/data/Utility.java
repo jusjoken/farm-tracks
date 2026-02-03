@@ -140,6 +140,7 @@ public class Utility {
         ACTION_MARK_FOR_SALE(FontAwesome.Solid.MONEY_BILL.create().getIcon()),
         ACTION_BIRTH(FontAwesome.Solid.BIRTHDAY_CAKE.create().getIcon()),
         ACTION_EDIT(FontAwesome.Solid.PENCIL_ALT.create().getIcon()),
+        ACTION_ADDNEW(FontAwesome.Solid.PLUS.create().getIcon()),
         ACTION_WEIGH(FontAwesome.Solid.BALANCE_SCALE.create().getIcon()),
         ACTION_PEDIGREE(FontAwesome.Solid.SITEMAP.create().getIcon()),
         GENDER_FEMALE(FontAwesome.Solid.VENUS.create().getIcon()),

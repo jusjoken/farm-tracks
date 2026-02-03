@@ -4,7 +4,10 @@
  */
 package ca.jusjoken.data.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import java.util.Objects;
 
@@ -16,18 +19,24 @@ import java.util.Objects;
 public class StockType {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "id", nullable = false)
+    private Integer id;
     private String name;
+    private String nameSingular;
     private String maleName;
     private String femaleName;
     private String breederName;  //name like breeder for a rabbit if breeder is true
     private String nonBreederName;  //name like kit for a rabbit if breeder is false
     private Boolean defaultType;
+    private String imageFileName;
 
     public StockType() {
     }
 
-    public StockType(String name, String maleName, String femaleName, String breederName, String nonBreederName, Boolean defaultType) {
+    public StockType(String name, String nameSingular, String maleName, String femaleName, String breederName, String nonBreederName, Boolean defaultType) {
         this.name = name;
+        this.nameSingular = nameSingular;
         this.maleName = maleName;
         this.femaleName = femaleName;
         this.breederName = breederName;
@@ -56,6 +65,15 @@ public class StockType {
         final StockType other = (StockType) obj;
         return Objects.equals(this.name, other.name);
     }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+    
     
     public String getName() {
         return name;
@@ -105,12 +123,27 @@ public class StockType {
     public void setDefaultType(Boolean defaultType) {
         this.defaultType = defaultType;
     }
-    
-    
+
+    public String getNameSingular() {
+        return nameSingular;
+    }
+
+    public void setNameSingular(String nameSingular) {
+        this.nameSingular = nameSingular;
+    }
+
+    public String getImageFileName() {
+        if(imageFileName==null) return "farmtracks_blank.jpg";
+        return imageFileName;
+    }
+
+    public void setImageFileName(String imageFileName) {
+        this.imageFileName = imageFileName;
+    }
+
     @Override
     public String toString() {
-        return "StockType{" + "name=" + name + ", maleName=" + maleName + ", femaleName=" + femaleName + ", nonBreederName=" + nonBreederName + '}';
+        return "StockType{" + "id=" + id + ", name=" + name + ", nameSingular=" + nameSingular + ", maleName=" + maleName + ", femaleName=" + femaleName + ", breederName=" + breederName + ", nonBreederName=" + nonBreederName + ", defaultType=" + defaultType + '}';
     }
-    
-    
+
 }

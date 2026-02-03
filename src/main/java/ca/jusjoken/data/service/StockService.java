@@ -36,9 +36,15 @@ import org.springframework.data.domain.Sort;
 @Transactional
 public class StockService {
     private final StockRepository stockRepository;
+    private final StockTypeService typeService;
+    //private final StockWeightHistoryService weightService;
+    //private final StockStatusHistoryService statusService;
+    private final LitterService litterService;
 
-    public StockService(StockRepository stockRepository) {
+    public StockService(StockRepository stockRepository, StockTypeService typeService, LitterService litterService) {
         this.stockRepository = stockRepository;
+        this.typeService = typeService;
+        this.litterService = litterService;
     }
     
     public List<Stock> getKitsForLitter(Litter litter){
@@ -77,8 +83,7 @@ public class StockService {
         return "N/A";
     }
     
-    public List<Stock> findStockWithCustomMatcherPageable(Pageable pageable, String name, StockSavedQuery savedQuery) {
-        Instant start = Instant.now();
+    private Example<Stock> getExample(String name, StockSavedQuery savedQuery){
         Stock stock = new Stock();
         stock.setName(name);
         stock.setStockType(savedQuery.getStockType());
@@ -96,29 +101,36 @@ public class StockService {
             stock.setStatus(savedQuery.getStockStatus().getName());
             stock.setActive(null);
         }
-        System.out.println("findStockWithCustomMatcher: stock:" + stock);
-        System.out.println("findStockWithCustomMatcher: sort:" + savedQuery.getSort1().getColumnName() + "/" + savedQuery.getSort1().getColumnSortDirection() + "," + savedQuery.getSort2().getColumnName() + "/" + savedQuery.getSort2().getColumnSortDirection());
+        System.out.println("getExample: stock:" + stock);
         
         // Create a custom ExampleMatcher
         ExampleMatcher matcher = matchingAll()
                 .withIgnoreCase()                          // Ignore case for all string matches
                 .withStringMatcher(StringMatcher.CONTAINING)// Use LIKE %value% for strings
                 .withIgnoreNullValues()                    // Ignore null values
-                .withIgnorePaths("needsSaving","profileImage","defaultImageSource","sexText","sex","category","prefix","tattoo","cage","fatherName","motherName","fatherId","motherId","color","breed","weightText","weight","doB","acquired","regNo","champNo","legs","genotype","kitsCount","notes","litter","fosterLitter","ageInDays","litterCount","kitCount","createdDate","lastModifiedDate")
+                .withIgnorePaths("needsSaving","profileImage","defaultImageSource","sexText","sex","category","prefix","tattoo","cage","fatherName","motherName","fatherId","motherId","color","breed","weightText","weight","doB","acquired","regNo","champNo","legs","genotype","kitsCount","notes","litter","fosterLitter","ageInDays","litterCount","kitCount","createdDate","lastModifiedDate","external")
                 .withMatcher("name", ExampleMatcher.GenericPropertyMatchers.startsWith()); // make name startsWith
         
         Example<Stock> example = Example.of(stock, matcher);
-
+        return example;
+    }
+    
+    private Sort getSort(StockSavedQuery savedQuery){
         Sort thisSort;
         if(savedQuery.getSort2()==null || savedQuery.getSort2().getSortOrder()==null){
             thisSort = Sort.by(savedQuery.getSort1().getSortOrder());
         }else{
             thisSort = Sort.by(savedQuery.getSort1().getSortOrder(), savedQuery.getSort2().getSortOrder());
         }
+        return thisSort;
+    }
+    
+    public List<Stock> findStockWithCustomMatcherPageable(Pageable pageable, String name, StockSavedQuery savedQuery) {
+        Instant start = Instant.now();
 
-        Pageable newPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),thisSort);
+        Pageable newPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),getSort(savedQuery));
         System.out.println("findStockWithCustomMatcher: pageNumber:" + pageable.getPageNumber() + " pageSize:" + pageable.getPageSize());
-        Page<Stock> page = stockRepository.findAll(example, newPageable);
+        Page<Stock> page = stockRepository.findAll(getExample(name, savedQuery), newPageable);
         List<Stock> returnList = page.getContent();
         //System.out.println("findStockWithCustomMatcher: first stock item:" + returnList.get(0));
         
@@ -126,42 +138,17 @@ public class StockService {
         Duration duration = Duration.between(start, end);
         System.out.println("***Stock query time:" + duration.toMillis() + " milliseconds");
         return returnList;
-        
     }
 
     public Long findStockWithCustomMatcherCount(String name, StockSavedQuery savedQuery) {
-        Stock stock = new Stock();
-        stock.setName(name);
-        stock.setStockType(savedQuery.getStockType());
-        stock.setBreeder(savedQuery.getBreeder());
-        if(savedQuery.getStockStatus().getName().equals("active")){
-            stock.setActive(Boolean.TRUE);
-            stock.setStatus("active");
-        }else if(savedQuery.getStockStatus().getName().equals("inactive")){
-            stock.setActive(Boolean.FALSE);
-            stock.setStatus(null);
-        }else if(savedQuery.getStockStatus().getName().equals("all")){
-            stock.setActive(null);
-            stock.setStatus(null);
-        }else{
-            stock.setStatus(savedQuery.getStockStatus().getName());
-            stock.setActive(null);
-        }
-        System.out.println("findStockWithCustomMatcherCount: stock:" + stock);
-        
-        // Create a custom ExampleMatcher
-        ExampleMatcher matcher = matchingAll()
-                .withIgnoreCase()                          // Ignore case for all string matches
-                .withStringMatcher(StringMatcher.CONTAINING)// Use LIKE %value% for strings
-                .withIgnoreNullValues()                    // Ignore null values
-                .withIgnorePaths("needsSaving","profileImage","defaultImageSource","sexText","sex","category","prefix","tattoo","cage","fatherName","motherName","fatherId","motherId","color","breed","weightText","weight","doB","acquired","regNo","champNo","legs","genotype","kitsCount","notes","litter","fosterLitter","ageInDays","litterCount","kitCount")
-                .withMatcher("name", ExampleMatcher.GenericPropertyMatchers.startsWith()); // make name startsWith
-        
-        Example<Stock> example = Example.of(stock, matcher);
-
-        return stockRepository.count(example);
+        return stockRepository.count(getExample(name, savedQuery));
         
     }
+
+    public List<Stock> listByExample(String name, StockSavedQuery savedQuery){
+        return stockRepository.findAll(getExample(name, savedQuery), getSort(savedQuery));
+    }
+    
 
     public Stock findById(Integer id) {
         return stockRepository.findAllById(id);
@@ -228,7 +215,34 @@ public class StockService {
     }
     
     public List<Stock> findAllBreeders(){
-        return stockRepository.findAllBreeders();
+        List<Stock> stockList = stockRepository.findAllBreeders();
+        Collections.sort(stockList, new StockComparator());
+        return stockList;
     }
 
+    public List<Stock> list(Pageable pageable)   {
+        return stockRepository.findAll(pageable).getContent();
+    }
+    
+    /*
+    public void deleteEverbreedRabbits(){
+        StockType rabbitType = typeService.findRabbits();
+        if(rabbitType==null){
+            System.out.println("deleteEverbreedRabbits: Rabbit Stock Type not found.  Nothing deleted");
+            return;
+        }else{
+            //firsdt delete related records
+            List<Stock> rabbitStock = stockRepository.findAllByStockTypeId(rabbitType.getId());
+            for(Stock rabbit: rabbitStock){
+                //delete status
+                statusService.deleteByStockId(rabbit.getId());
+                //delete weight
+                weightService.deleteByStockId(rabbit.getId());
+                //delete litters
+                litterService.deleteByStockId(rabbit.getId());
+            }
+            stockRepository.deleteByStockType(rabbitType.getId());
+        }
+    }
+    */
 }

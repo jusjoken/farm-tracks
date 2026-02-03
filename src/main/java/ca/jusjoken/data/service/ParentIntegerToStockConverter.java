@@ -28,7 +28,7 @@ public class ParentIntegerToStockConverter implements Converter<Stock, Integer>{
     @Override
     public Result<Integer> convertToModel(Stock prsntn, ValueContext vc) {
         //System.out.println("convertToModel: stock:" + gender.getShortName() + " : " + prsntn);
-        if(prsntn==null) return Result.error("No parent found");
+        if(prsntn==null) return Result.ok(null);  //as parent can be blank need to return an Ok result
         return Result.ok(prsntn.getId());
     }
 

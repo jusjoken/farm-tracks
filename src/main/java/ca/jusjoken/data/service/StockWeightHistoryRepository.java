@@ -18,4 +18,6 @@ public interface StockWeightHistoryRepository extends JpaRepository<StockWeightH
     public List<StockWeightHistory> findByStockId(Integer stockId);
     
     public Long countByStockId(Integer stockId);
+    
+    public void deleteAllByStockId(Integer stockId);
 }

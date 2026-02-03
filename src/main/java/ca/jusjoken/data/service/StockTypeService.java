@@ -24,4 +24,12 @@ public class StockTypeService {
     public List<StockType> findAllStockTypes(){
         return typeRepository.findAll(Sort.by("name"));
     }
+    
+    public StockType findById(Integer id){
+        return typeRepository.findById(id);
+    }
+    
+    public StockType findRabbits(){
+        return typeRepository.findByName("Rabbits");
+    }
 }

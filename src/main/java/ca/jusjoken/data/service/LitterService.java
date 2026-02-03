@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  *
@@ -50,5 +51,11 @@ public class LitterService {
         List<Litter> litters = litterRepository.findNotArchived();
         Collections.sort(litters, new LitterComparator().reversed());
         return litters;
+    }
+    
+    @Transactional
+    public void deleteByStockId(Integer stockId){
+        litterRepository.deleteByFatherId(stockId);
+        litterRepository.deleteByMotherId(stockId);
     }
 }

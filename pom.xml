@@ -127,6 +127,11 @@
             <artifactId>spire.doc.free</artifactId>
             <version>5.3.2</version>
         </dependency>   
+        <dependency>
+           <groupId>com.flowingcode.vaadin.addons</groupId>
+           <artifactId>badge-list-addon</artifactId>
+           <version>1.2.0</version>
+        </dependency>        
     </dependencies>
 
     <build>

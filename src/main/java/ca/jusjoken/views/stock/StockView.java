@@ -4,6 +4,7 @@ import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.AvatarDiv;
 import ca.jusjoken.component.ComponentConfirmEvent;
 import ca.jusjoken.component.DialogCommon;
+import ca.jusjoken.component.DialogCommonEvent;
 import ca.jusjoken.component.Item;
 import ca.jusjoken.component.Layout;
 import ca.jusjoken.component.LazyComponent;
@@ -28,17 +29,17 @@ import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeRepository;
+import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.data.service.StockWeightHistoryService;
 import ca.jusjoken.views.MainLayout;
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
+import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentUtil;
 import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
-import com.vaadin.flow.component.avatar.Avatar;
-import com.vaadin.flow.component.avatar.AvatarVariant;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
@@ -55,6 +56,7 @@ import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
+import com.vaadin.flow.component.grid.dataview.GridLazyDataView;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.menubar.MenuBar;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -64,19 +66,23 @@ import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
+import com.vaadin.flow.function.SerializableConsumer;
 import com.vaadin.flow.router.BeforeEvent;
 import com.vaadin.flow.router.HasDynamicTitle;
 import com.vaadin.flow.router.HasUrlParameter;
 import com.vaadin.flow.router.OptionalParameter;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.streams.DownloadHandler;
+import com.vaadin.flow.shared.Registration;
+import com.vaadin.flow.spring.data.VaadinSpringDataHelpers;
 import com.vaadin.flow.theme.lumo.LumoIcon;
 import com.vaadin.flow.theme.lumo.LumoUtility.*;
 import jakarta.annotation.security.PermitAll;
 import java.util.ArrayList;
 import java.util.Collection;
-
 import java.util.List;
+import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 @Route(value = "stock", layout = MainLayout.class)
@@ -85,11 +91,13 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
     private final StockRepository stockRepository;
     private final StockTypeRepository stockTypeRepository;
+    private final StockTypeService stockTypeService;
     private final LitterService litterService;
     private final StockService stockService;
     private final StockSavedQueryService queryService;
     private final StockStatusHistoryService statusService;
     private final StockWeightHistoryService weightService;
+    private Registration registration;
     private String currentSearchName = "";
     private StockSavedQuery currentStockSavedQuery;
     private String currentSavedQueryId = null;
@@ -97,6 +105,8 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Long stockListCountAll = 0L;
     private Long stockListCount = 0L;
     private Grid<Stock> list = new Grid<>();
+    private GridLazyDataView<Stock> listDataView;
+    private Stock selectedStock;
     private Section sidebar;
     private NativeLabel countLabel = new NativeLabel();
     private Button saveOptionsButton = new Button(FontAwesome.Regular.SAVE.create());
@@ -118,10 +128,12 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Select<ColumnName> stockSort2Column = new Select<>();
     private RadioButtonGroup<String> sort2Direction = new RadioButtonGroup<>();
     private Boolean skipSidebarUpdates = Boolean.FALSE;
+    private UI ui;
 
-    public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService, StockWeightHistoryService weightService) {
+    public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockTypeService stockTypeService, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService, StockWeightHistoryService weightService) {
         this.stockRepository = stockRepository;
         this.stockTypeRepository = stockTypeRepository;
+        this.stockTypeService = stockTypeService;
         this.litterService = litterService;
         this.stockService = stockService;
         this.queryService = queryService;
@@ -530,15 +542,21 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         System.out.println("loadFilters: currentSavedQueryId:" + currentSavedQueryId + " saveQuery:" + currentStockSavedQuery );
         if(currentSavedQueryId==null){
             currentStockSavedQuery = queryService.getSavedQueryList().get(0);
+        }else if(Long.valueOf(currentSavedQueryId) < 0){
+            //negative query ids are defaults created by the service so get them by the stocktype with the same id
+            currentStockSavedQuery = queryService.getDefaultSaveQueryByType(stockTypeService.findById(Integer.valueOf(currentSavedQueryId)));
         }else{
             currentStockSavedQuery = queryService.getSavedQueryById(currentSavedQueryId);
         }
+        //clear selectedStock
+        selectedStock = null;
         sidebarChanged(Boolean.FALSE);
         updateStockTypeCount();
     }
     
     private void applyFilters(){
-        System.out.println("applyFilters: stock(start):" + currentStockSavedQuery.toString() );
+        //System.out.println("applyFilters: stock(start):" + currentStockSavedQuery.toString() );
+        Stock tempSelected = selectedStock;
         list.setPageSize(25);
         list.setItemsPageable((pageable) -> {
             return stockService.findStockWithCustomMatcherPageable(pageable, currentSearchName, currentStockSavedQuery);
@@ -547,12 +565,26 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             updateCounts();
             return stockListCount;
         });
-        list.scrollToIndex(0);
+        //the above loses the selected item - so restore it from the temp one saved before
+        selectedStock = tempSelected;
+        
+        if(selectedStock==null){
+            list.scrollToIndex(0);
+        }else{
+            list.scrollToItem(selectedStock);
+            //runBeforeClientResponse(ui -> list.scrollToItem(selectedStock));
+            listDataView.refreshItem(selectedStock);
+        }
+        
         applyOptionsButton.setEnabled(false);
         currentStockSavedQuery.setDirty(Boolean.FALSE);
         saveOptionsButton.setEnabled(currentStockSavedQuery.getNeedsSaving());
         sidebarSetValues();
     }
+    
+    private void runBeforeClientResponse(SerializableConsumer<UI> command) {
+        getElement().getNode().runWhenAttached(ui -> ui.beforeClientResponse(this, context -> command.accept(ui)));
+    }        
     
     private Component createContent() {
         Layout content = new Layout(createToolbar(), createList());
@@ -563,9 +595,35 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     }
     
     private Component createList(){
-        list.setItems(stockList);
+        list.setPageSize(25);
+        list.setItemsPageable((pageable) -> {
+            return stockService.findStockWithCustomMatcherPageable(pageable, currentSearchName, currentStockSavedQuery);
+        }, countCallback -> {
+            stockListCount = stockService.findStockWithCustomMatcherCount(currentSearchName, currentStockSavedQuery);
+            updateCounts();
+            return stockListCount;
+        });
+
+        listDataView = list.getLazyDataView();
+        listDataView.setItemIndexProvider((item, query) -> {
+            if(item==null) return null;
+            // Use the same query to fetch the full data set with filter and sort
+            List<Stock> items = stockService.listByExample(currentSearchName, currentStockSavedQuery);
+            // Find the index of the matching item in the filtered and sorted list
+            int index = items.indexOf(item);
+            System.out.println("createList: setItemIndexProvider: index:" + index + " looking for item:" + item);
+            return index >= 0 ? index : null;            
+        });        
         list.addColumn(stockCardRenderer);
         list.setWidthFull();
+        list.asSingleSelect().addValueChangeListener(event -> {
+            Stock selected = event.getValue();
+            if(selected==null){
+                selectedStock = null;
+            }else{
+                selectedStock = selected;
+            }
+        });
         return list;        
     }
     
@@ -591,7 +649,6 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         
         avatarDiv.getAvatar().getElement().addEventListener("click", click -> {
             //open image dialog
-            dialogCommon.setDialogMode(DialogCommon.DialogMode.EDIT);
             //dialogCommon.setDisplayMode(DialogCommon.DisplayMode.PROFILE_IMAGE);
             dialogCommon.setDialogTitle("Edit Profile Image");
             dialogCommon.dialogOpen(stock,DialogCommon.DisplayMode.PROFILE_IMAGE);
@@ -676,10 +733,24 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         menu.addComponent(heading);
         menu.addSeparator();
 
+        MenuItem addNewMenu = menu.addItem(new Item("Add new", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+        addNewMenu.addClickListener(click -> {
+            //open stock edit dialog
+            Stock newStock = new Stock();
+            newStock.setExternal(false);
+            newStock.setBreeder(true);
+            newStock.setStockType(stockEntity.getStockType());
+            newStock.setWeight(0);
+            //newStock.setStatus("active");
+            //newStock.setStatusDate(LocalDateTime.now());
+            
+            dialogCommon.setDialogTitle("Create new");
+            dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
+            
+        });
         MenuItem editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
         editMenu.addClickListener(click -> {
             //open stock edit dialog
-            dialogCommon.setDialogMode(DialogCommon.DialogMode.EDIT);
             dialogCommon.setDialogTitle("Edit Stock");
             dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.STOCK_DETAILS);
         });
@@ -697,12 +768,8 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         weighMenu.addClickListener(click -> {
             weightEditor.dialogOpen(stockEntity);
         });
-        MenuItem pedigreeMenu = menu.addItem(new Item("Pedigree", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
-        pedigreeMenu.addClickListener(click -> {
-            UI.getCurrent().navigate(StockPedigreeView.class, stockEntity.getId().toString());
-        });
         menu.addSeparator();
-        MenuItem pedigreeEditorMenu = menu.addItem(new Item("Pedigree Editor", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
+        MenuItem pedigreeEditorMenu = menu.addItem(new Item("Pedigree", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
         pedigreeEditorMenu.addClickListener(click -> {
             UI.getCurrent().navigate(StockPedigreeEditor.class, stockEntity.getId().toString());
         });
@@ -770,7 +837,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         tabs.setWidthFull();
         tabs.add("Overview", createTabOverview(stock));
         tabs.add(createTab("Litters", TabType.COUNT, litterService.getLitterCountForParent(stock).toString()), createTabLitters(stock));
-        tabs.add(createTab("Kits", TabType.COUNT, stockService.getKitCountForParent(stock).toString()),createTabKits(stock));
+        tabs.add(createTab(stock.getStockType().getNonBreederName(), TabType.COUNT, stockService.getKitCountForParent(stock).toString()),createTabKits(stock));
         tabs.add(createTab("Notes", TabType.HASDATA, stock.getNotes()),createTabNotes(stock));
         tabs.add(createTab("Status'", TabType.NONE, Utility.emptyValue),createTabStatuses(stock));
         tabs.add(createTab("Weights'", TabType.NONE, Utility.emptyValue),createTabWeights(stock));
@@ -822,7 +889,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         litterGrid.addColumn(Litter::getParentsFormatted).setHeader("Parents");
         litterGrid.addColumn(new LocalDateRenderer<>(Litter::getDoB,"MM-dd-YYYY")).setHeader("Born");
         litterGrid.addColumn(new LocalDateRenderer<>(Litter::getBred,"MM-dd-YYYY")).setHeader("Bred");
-        litterGrid.addColumn(item -> item.getKitsCount()).setHeader("Kits");
+        litterGrid.addColumn(item -> item.getKitsCount()).setHeader(stock.getStockType().getNonBreederName());
         litterGrid.addColumn(item -> item.getSurvivalRate()).setHeader("Survival Rate");
         litterGrid.addColumn(item -> item.getDiedKitsCount()).setHeader("Died");
         litterGrid.addColumn(item -> item.getKitsSurvivedCount()).setHeader("Survived");
@@ -993,7 +1060,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Layout createTags(Stock stock, Boolean topLayout){
         Layout tags = new Layout(
                 createPanel("Litters",litterService.getLitterCountForParent(stock).toString(),false,Utility.PanelType.LITTERS, stock), 
-                createPanel("Kits", stockService.getKitCountForParent(stock).toString(),false,Utility.PanelType.KITS, stock), 
+                createPanel(stock.getStockType().getNonBreederName(), stockService.getKitCountForParent(stock).toString(),false,Utility.PanelType.KITS, stock), 
                 createPanel("Age", stock.getAge().getAgeFormattedHTML(),true,Utility.PanelType.NONE, stock), 
                 createPanel("Weight", stock.getWeightInLbsOz(),true,Utility.PanelType.NONE, stock));
         tags.setAlignItems(Layout.AlignItems.STRETCH);
@@ -1068,18 +1135,29 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     }
 
     @Override
+    protected void onAttach(AttachEvent attachEvent) {
+        registration = ComponentUtil.addListener(attachEvent.getUI(), DialogCommonEvent.class, event ->{
+            System.out.println("StockView: onAttach: Dialog Common event called: stock:" + event.getSource().getReturnStock());
+            if(event.getSource().getReturnStock()!=null){
+                selectedStock = event.getSource().getReturnStock();
+            }
+            applyFilters();
+        });
+    }
+    
+
+    @Override
     public void listRefreshNeeded() {
+        //System.out.println("listRefreshNeeded: selectedStock:" + selectedStock);
+        if(dialogCommon.getReturnStock()!=null) selectedStock = dialogCommon.getReturnStock();
         applyFilters();
-        //list.getDataProvider().refreshItem(stockRepository.findByNameAndTattoo("Aspen", "BR29"),true);
     }
 
     @Override
     public void setParameter(BeforeEvent event, @OptionalParameter String parameter) {
-
         currentSavedQueryId = parameter;
         loadFilters();
         applyFilters();
-        
     }    
 
     @Override

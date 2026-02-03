@@ -9,6 +9,7 @@ import ca.jusjoken.data.entity.StockWeightHistory;
 import java.util.Collections;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  *
@@ -32,6 +33,11 @@ public class StockWeightHistoryService {
         weightRepository.delete(entity);
         //now update the stock to the newest status
         saveLatestToStock(stock);
+    }
+    
+    @Transactional
+    public void deleteByStockId(Integer stockID){
+        weightRepository.deleteAllByStockId(stockID);
     }
     
     private void saveLatestToStock(Stock stock){

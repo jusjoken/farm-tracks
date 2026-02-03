@@ -12,16 +12,22 @@ import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
+import ca.jusjoken.data.entity.StockStatusHistory;
+import ca.jusjoken.data.entity.StockWeightHistory;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.ParentIntegerToStockConverter;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StatusHistoryConverter;
 import ca.jusjoken.data.service.StockService;
+import ca.jusjoken.data.service.StockStatusHistoryService;
+import ca.jusjoken.data.service.StockWeightHistoryService;
 import com.flowingcode.vaadin.addons.imagecrop.Crop;
 import com.flowingcode.vaadin.addons.imagecrop.ImageCrop;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.ShortcutRegistration;
 import com.vaadin.flow.component.Shortcuts;
+import com.vaadin.flow.component.Tag;
 import com.vaadin.flow.component.avatar.Avatar;
 import com.vaadin.flow.component.avatar.AvatarVariant;
 import com.vaadin.flow.component.button.Button;
@@ -31,6 +37,7 @@ import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
+import com.vaadin.flow.component.formlayout.FormLayout.FormItem;
 import com.vaadin.flow.component.formlayout.FormLayout.ResponsiveStep;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.icon.Icon;
@@ -61,6 +68,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.time.LocalDateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +78,8 @@ import java.util.List;
 import javax.imageio.ImageIO;
 import org.imgscalr.Scalr;
 
-public class DialogCommon {
+@Tag("dialog-common")
+public class DialogCommon extends Component{
 
     public enum DialogMode{
         EDIT, DELETE, VIEW
@@ -78,9 +87,6 @@ public class DialogCommon {
 
     private Binder<Stock> binder;
     private static final String notFostered = "Not fostered";
-
-    //default is EDIT - must be superUser to allow DELETE
-    private DialogMode dialogMode = DialogMode.VIEW;
 
     public enum DisplayMode{
         LITTER_LIST, KIT_LIST, STOCK_DETAILS, PROFILE_IMAGE
@@ -92,6 +98,10 @@ public class DialogCommon {
     private Long taskID = 0L;
     private Stock stockEntity;
     private String dialogTitle = "";
+    private Boolean isNewStock = Boolean.FALSE;
+    
+    private Integer returnId = null;
+    private Stock returnStock;
 
     private List<Stock> stockList = new ArrayList<>();
     private List<Litter> litterList = new ArrayList<>();
@@ -118,6 +128,8 @@ public class DialogCommon {
     private Boolean profileAvatarHasChanges = Boolean.FALSE;
 
 
+    @PropertyId("external")
+    private Checkbox fieldExternal = new Checkbox();
     @PropertyId("breeder")
     private Checkbox fieldBreeder = new Checkbox();
     @PropertyId("sex")
@@ -161,14 +173,21 @@ public class DialogCommon {
     @PropertyId("fosterLitter")
     private Select<Litter> fieldFoster = new Select();
 
-
+    @PropertyId("notes")
     private TextArea fieldNotes = new TextArea();
+    
+    //FormItems that may be hidden
+    FormItem fieldFosterFormItem;
+    FormItem fieldStatusFormItem;
+    FormItem fieldAquiredFormItem;
 
     private VerticalLayout dialogLayout = new VerticalLayout();
 
     private Boolean hasChangedValues = Boolean.FALSE;
     private StockService stockService;
     private LitterService litterService;
+    private StockStatusHistoryService statusService;
+    private StockWeightHistoryService weightService;
     private DisplayMode openedDisplayMode = DisplayMode.STOCK_DETAILS;
 
     private List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
@@ -182,6 +201,8 @@ public class DialogCommon {
     public DialogCommon(DisplayMode currentDisplayMode) {
         this.stockService = Registry.getBean(StockService.class);
         this.litterService = Registry.getBean(LitterService.class);
+        this.statusService = Registry.getBean(StockStatusHistoryService.class);
+        this.weightService = Registry.getBean(StockWeightHistoryService.class);
         profileImagePath = System.getenv("PROFILE_IMAGE_PATH");
         dialogConfigure(currentDisplayMode);
     }
@@ -189,7 +210,6 @@ public class DialogCommon {
 
     private void dialogConfigure(DisplayMode currentDisplayMode) {
 
-        binder = new Binder<Stock>(Stock.class);
         //configure the dialog internal layout for the form
         dialogLayout.setSpacing(false);
         dialogLayout.setPadding(false);
@@ -230,15 +250,15 @@ public class DialogCommon {
         dialog.getFooter().add(footerLayout);
 
         //one time configuration for any fields
-        fieldGender.setItems(Gender.MALE, Gender.FEMALE);
-        if(dialogMode.equals(DialogMode.EDIT)){
-            fieldMother.setAllowCustomValue(true);
-            fieldFather.setAllowCustomValue(true);
-        }
+        fieldGender.setItems(Gender.MALE, Gender.FEMALE, Gender.NA);
+        fieldMother.setAllowCustomValue(true);
+        fieldFather.setAllowCustomValue(true);
         fieldFoster.setEmptySelectionAllowed(true);
         fieldFoster.setEmptySelectionCaption(notFostered);
+        fieldExternal.setLabel("not on farm");
         
         //form fields need width full to fill the column they are in
+        fieldExternal.setWidthFull();
         fieldBreeder.setWidthFull();
         fieldGender.setWidthFull();
         fieldPrefix.setWidthFull();
@@ -257,6 +277,7 @@ public class DialogCommon {
         fieldGenotype.setWidthFull();
         fieldLegs.setWidthFull();
         fieldRegNo.setWidthFull();
+        fieldNotes.setWidthFull();
 
         fieldFather.addCustomValueSetListener(item -> {
             //add the custom value to the list and set as value
@@ -269,6 +290,10 @@ public class DialogCommon {
             fieldMother.setItems(stockService.getMothers(item.getDetail(), stockEntity.getStockType()));
             fieldMother.setValue(stockService.getParentExt(item.getDetail(), stockEntity.getStockType()));
             System.out.println("**Mother custom changed to:" + item.getDetail() + " getValue =" + item.getSource().getValue());
+        });
+        
+        fieldExternal.addValueChangeListener(event -> {
+            toggleHiddenFormFields(!event.getValue());
         });
 
     }
@@ -286,12 +311,14 @@ public class DialogCommon {
     }
 
     private void dialogSave() {
+        returnId = null;
+        returnStock = null;
         DisplayMode currentDisplayMode = openedDisplayMode;
         System.out.println("dialogSave: stockEntity start save:" + stockEntity);
         //save here
         
         //retrieve the stock entity from the database before saving so it is the same entity
-        this.stockEntity = stockService.findById(stockEntity.getId());
+        if(this.stockEntity.getId()!=null) this.stockEntity = stockService.findById(stockEntity.getId());
         
         //update stockEntity from fields
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
@@ -321,6 +348,25 @@ public class DialogCommon {
 
             System.out.println("dialogSave: stockEntity before save:" + stockEntity);
             stockService.save(this.stockEntity);
+
+            //handle NEW stock items
+            if(isNewStock){
+                if(this.stockEntity.getExternal()){
+                    //use archived status for external stock
+                    statusService.save(new StockStatusHistory(this.stockEntity.getId(),"archived",LocalDateTime.now()),this.stockEntity,Boolean.FALSE);
+                    
+                }else{
+                    //use active status
+                    statusService.save(new StockStatusHistory(this.stockEntity.getId(),"active",LocalDateTime.now()),this.stockEntity,Boolean.FALSE);
+                }
+                if(this.stockEntity.getWeight()>0){
+                    //save a new weight history item
+                    weightService.save(new StockWeightHistory(this.stockEntity.getId(),this.stockEntity.getWeight(),LocalDateTime.now()),this.stockEntity);
+                }
+            }
+
+            returnId = this.stockEntity.getId();
+            returnStock = this.stockEntity;
             System.out.println("dialogSave: stockEntity after save:" + stockEntity);
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
             //write the profile image to file
@@ -349,7 +395,14 @@ public class DialogCommon {
         }
     }
     public void dialogOpen(Stock stockEntity, DisplayMode currentDisplayMode){
+        binder = new Binder<Stock>(Stock.class);
         this.stockEntity = stockEntity;
+        
+        if(this.stockEntity.getId()==null){
+            isNewStock = Boolean.TRUE;
+        }else isNewStock = Boolean.FALSE;
+        
+        System.out.println("dialogOpen: external:" + stockEntity.getExternal());
         
         openedDisplayMode = currentDisplayMode;
         //set values and visibility for fields
@@ -374,7 +427,6 @@ public class DialogCommon {
             //dialogLayout.add(getStockHeader(stockEntity, false), avatarDiv, createImageUploadLayout());
             dialogLayout.add(showItem(this.stockEntity,currentDisplayMode), createImageUploadLayout(currentDisplayMode));
         }else{
-            System.out.println("dialogOpen: dialogMode:" + dialogMode + " NOTHING");
             //nothing
         }
 
@@ -596,14 +648,6 @@ public class DialogCommon {
         litterList.clear();
     }
     
-    public DialogMode getDialogMode() {
-        return dialogMode;
-    }
-
-    public void setDialogMode(DialogMode dialogMode) {
-        this.dialogMode = dialogMode;
-    }
-
     public FormLayout showItem(Stock currentStock, DisplayMode currentDisplayMode){
         FormLayout stockFormLayout = new FormLayout();
         stockFormLayout.setWidthFull();
@@ -615,7 +659,12 @@ public class DialogCommon {
 
         //fields that are always ReadOnly
         fieldStatus.setReadOnly(true);
-        fieldWeight.setReadOnly(true);
+        
+        if(isNewStock){
+            fieldWeight.setReadOnly(false);
+        }else{
+            fieldWeight.setReadOnly(true); 
+        }
         
         stockFormLayout.setResponsiveSteps(
         // Use one column by default
@@ -631,9 +680,10 @@ public class DialogCommon {
 
         //fields by displayMode type
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
-            stockFormLayout.addFormItem(fieldName,"Name");
+            stockFormLayout.addFormItem(fieldExternal,"External");
             stockFormLayout.addFormItem(fieldPrefix,"Prefix");
-            stockFormLayout.addFormItem(fieldTattoo,"Tattoo");
+            stockFormLayout.addFormItem(fieldName,"Name");
+            stockFormLayout.addFormItem(fieldTattoo,"Tattoo/ID");
             stockFormLayout.addFormItem(fieldBreed,"Breed");
             stockFormLayout.addFormItem(fieldGender,"Gender");
             stockFormLayout.addFormItem(fieldBreeder,"Breeder");
@@ -647,13 +697,13 @@ public class DialogCommon {
             stockFormLayout.addFormItem(fieldChampNo,"Championship Number");
             stockFormLayout.addFormItem(fieldRegNo,"Registration Number");
             stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
-            stockFormLayout.addFormItem(fieldStatus,"Status");
+            fieldStatusFormItem = stockFormLayout.addFormItem(fieldStatus,"Status");
             stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
-            stockFormLayout.addFormItem(fieldAquiredDate,"Aquired");
+            fieldAquiredFormItem = stockFormLayout.addFormItem(fieldAquiredDate,"Aquired");
             stockFormLayout.addFormItem(fieldBornDate,"Born");
-            if(dialogMode.equals(DialogMode.EDIT)){
-                stockFormLayout.addFormItem(fieldFoster,"Foster");
-            }
+            fieldFosterFormItem = stockFormLayout.addFormItem(fieldFoster,"Foster");
+            stockFormLayout.addFormItem(fieldNotes,"Notes");
+            
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
             stockFormLayout.add(avatarDiv);
         }
@@ -662,54 +712,84 @@ public class DialogCommon {
         setValues(currentStock, currentDisplayMode);
         return stockFormLayout;
     }
+    
+    private void toggleHiddenFormFields(Boolean show){
+        fieldStatusFormItem.setVisible(show);
+        fieldFosterFormItem.setVisible(show);
+        fieldAquiredFormItem.setVisible(show);
+    }
 
     private void setValues(Stock currentStock, DisplayMode currentDisplayMode){
 
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
-            if(dialogMode.equals(DialogMode.EDIT)){
-                fieldGender.setRenderer(new TextRenderer<Gender>(gender -> {
-                    if(gender.equals(Gender.MALE)) return currentStock.getStockType().getMaleName();
-                    return currentStock.getStockType().getFemaleName();
-                }));        
-                
-                fieldFather.setItemLabelGenerator(Stock::getDisplayName);
-                fieldMother.setItemLabelGenerator(Stock::getDisplayName);
-                fieldFoster.setItems(litterService.getActiveLitters());
-                fieldFoster.setItemLabelGenerator(litter -> {
-                    if(litter == null) return notFostered;
-                    return litter.getDisplayName();
-                });
-
-                //retrieve the stock entity from the database
-                this.stockEntity = stockService.findById(currentStock.getId());
-
-                fieldFather.setItems(stockService.getFathers(currentStock.getFatherExtName(),currentStock.getStockType()));
-                binder.forField(fieldFather)
-                        .withConverter(new ParentIntegerToStockConverter(stockEntity, Gender.MALE))
-                        .bind(Stock::getFatherId, Stock::setFatherId);
-                fieldMother.setItems(stockService.getMothers(currentStock.getMotherExtName(),currentStock.getStockType()));
-                binder.forField(fieldMother)
-                        .withConverter(new ParentIntegerToStockConverter(stockEntity, Gender.FEMALE))
-                        .bind(Stock::getMotherId, Stock::setMotherId);
-
-                binder.forField(fieldStatus)
-                        .withConverter(new StatusHistoryConverter(this.stockEntity))
-                        .bindReadOnly(Stock::getStatus);
-
-                binder.bindInstanceFields(this);
-                binder.readBean(this.stockEntity);
-
-                binder.addStatusChangeListener(listener -> {
-                    boolean isValid = listener.getBinder().isValid();
-                    boolean hasChanges = listener.getBinder().hasChanges();
-                    System.out.println("addStatusChangeListener: isValid:" + isValid + " hasChanges:" + hasChanges);
-
-                    dialogOkButton.setEnabled(hasChanges && isValid);
-                    dialogResetButton.setEnabled(hasChanges);
-                });
-
-            }
             
+            fieldGender.setRenderer(new TextRenderer<Gender>(gender -> {
+                if(gender.equals(Gender.MALE)) return currentStock.getStockType().getMaleName();
+                else if(gender.equals(Gender.FEMALE)) return currentStock.getStockType().getFemaleName();
+                return "NA";
+            }));        
+
+            fieldFather.setItemLabelGenerator(Stock::getDisplayName);
+            fieldMother.setItemLabelGenerator(Stock::getDisplayName);
+            fieldFoster.setItems(litterService.getActiveLitters());
+            fieldFoster.setItemLabelGenerator(litter -> {
+                if(litter == null) return notFostered;
+                return litter.getDisplayName();
+            });
+
+            //retrieve the stock entity from the database
+            if(currentStock.getId()==null){
+                this.stockEntity = currentStock;
+            }else{
+                this.stockEntity = stockService.findById(currentStock.getId());
+            }
+
+            System.out.println("setValues: currentStock: fatherid:" + currentStock.getFatherId());
+            System.out.println("setValues: stockEntity: fatherid:" + stockEntity.getFatherId());
+
+            fieldFather.setItems(stockService.getFathers(currentStock.getFatherExtName(),currentStock.getStockType()));
+            binder.forField(fieldFather)
+                    .withConverter(new ParentIntegerToStockConverter(stockEntity, Gender.MALE))
+                    //.withDefaultValidator(false)
+                    .bind(Stock::getFatherId, Stock::setFatherId);
+            fieldMother.setItems(stockService.getMothers(currentStock.getMotherExtName(),currentStock.getStockType()));
+            binder.forField(fieldMother)
+                    .withConverter(new ParentIntegerToStockConverter(stockEntity, Gender.FEMALE))
+                    //.withDefaultValidator(false)
+                    .bind(Stock::getMotherId, Stock::setMotherId);
+
+            binder.forField(fieldStatus)
+                    .withConverter(new StatusHistoryConverter(this.stockEntity))
+                    .bindReadOnly(Stock::getStatus);
+
+            Binder.Binding<Stock, String> nameBinding = binder.forField(fieldName)
+                    .withValidator(
+                            name -> name.length() + fieldTattoo.getValue().length() > 0,
+                            "Either Name or ID field must be filled in.")
+                    .bind(Stock::getName, Stock::setName);
+
+            fieldTattoo.addValueChangeListener(event -> nameBinding.validate());
+
+            Binder.Binding<Stock, String> tattooBinding = binder.forField(fieldTattoo)
+                    .withValidator(
+                            tattoo -> tattoo.length() + fieldName.getValue().length() > 0,
+                            "Either Name or ID field must be filled in.")
+                    .bind(Stock::getTattoo, Stock::setTattoo);
+
+            fieldName.addValueChangeListener(event -> tattooBinding.validate());
+
+            binder.bindInstanceFields(this);
+            binder.readBean(this.stockEntity);
+            binder.validate(); //force validation so warnings are displayed on form load
+
+            binder.addStatusChangeListener(listener -> {
+                boolean isValid = listener.getBinder().isValid();
+                boolean hasChanges = listener.getBinder().hasChanges();
+                System.out.println("addStatusChangeListener: isValid:" + isValid + " hasChanges:" + hasChanges);
+                dialogOkButton.setEnabled(hasChanges && isValid);
+                dialogResetButton.setEnabled(hasChanges);
+            });
+
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
             fieldProfileAvatar.setImageHandler(DownloadHandler.forFile(currentStock.getProfileFile()));
             fieldProfileAvatar.setName(currentStock.getProfileImage());
@@ -738,5 +818,27 @@ public class DialogCommon {
     public void setDialogTitle(String dialogTitle) {
         this.dialogTitle = dialogTitle;
     }
+
+    public Integer getReturnId() {
+        return returnId;
+    }
+
+    public void setReturnId(Integer returnId) {
+        this.returnId = returnId;
+    }
+
+    public Stock getReturnStock() {
+        return returnStock;
+    }
+
+    public void setReturnStock(Stock returnStock) {
+        this.returnStock = returnStock;
+    }
+    
+    public Dialog getDialog(){
+        return dialog;
+    }
+
+
     
 }

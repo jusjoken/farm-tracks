@@ -15,7 +15,6 @@ import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.vaadin.flow.component.avatar.Avatar;
 import com.vaadin.flow.component.avatar.AvatarVariant;
-import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.SvgIcon;
@@ -60,17 +59,20 @@ public class Stock {
     @CsvBindByName(column = "Sex")
     private String sexText;  //fro import only - convert to Gender
 
-    private Gender sex;
+    private Gender sex = Gender.NA;
 
     @CsvBindByName(column = "Prefix")
-    private String prefix;
+    private String prefix = "";
 
     @CsvBindByName(column = "Name")
-    private String name;
+    private String name = "";
     @CsvBindByName(column = "Tattoo")
-    private String tattoo;
+    private String tattoo = "";
+    /*
     @CsvBindByName(column = "Cage")
-    private String cage;
+    @Transient
+    private String cage = "";
+    */
 
     @Transient
     @CsvBindByName(column = "Father")
@@ -86,9 +88,9 @@ public class Stock {
     private String motherExtName = null; //only used when the parent is not in the database
 
     @CsvBindByName(column = "Color")
-    private String color; 
+    private String color = ""; 
     @CsvBindByName(column = "Breed")
-    private String breed;
+    private String breed = "";
 
     @Transient
     @CsvBindByName(column = "Weight")
@@ -105,24 +107,24 @@ public class Stock {
     private LocalDate acquired;
 
     @CsvBindByName(column = "Reg #")
-    private String regNo;
+    private String regNo = "";
     @CsvBindByName(column = "Champ #")
-    private String champNo;
+    private String champNo = "";
     @CsvBindByName(column = "Legs")
-    private String legs;
+    private String legs = "";
     @CsvBindByName(column = "Genotype")
-    private String genotype;  //TODO: needs a string builder for genotypes
+    private String genotype = "";  //TODO: needs a string builder for genotypes
 
     //TODO:: removed as the service now retreives these counts
     //private Integer littersCount;   // make a getter and return a count
     //private Integer kitsCount;   // make a getter and return a count
 
     @CsvBindByName(column = "Notes")
-    private String notes;
+    private String notes = "";
 
     //TODO: needs to be a table of status and statusDate
     @CsvBindByName(column = "Status")
-    private String status; 
+    private String status = ""; 
     @CsvCustomBindByName(column = "Status Date", converter = LocalDateCsvConverterDDMMYYYY.class)
     private LocalDateTime statusDate;
 
@@ -201,11 +203,12 @@ public class Stock {
         final Stock other = (Stock) obj;
         return Objects.equals(this.id, other.id);
     }
-    
-    
 
     @Transient
     private Boolean temp = Boolean.FALSE;
+    
+    //used for stock that you do not own but need to track for a pedigree
+    private Boolean external = Boolean.FALSE;
 
     //START Common Audit fields for any entity
     //need to add the below for any entity using these audit fields
@@ -291,6 +294,7 @@ public class Stock {
         this.tattoo = tattoo;
     }
 
+    /*
     public String getCage() {
         if(cage==null) return "";
         return cage;
@@ -299,6 +303,7 @@ public class Stock {
     public void setCage(String cage) {
         this.cage = cage;
     }
+    */
 
     public String getColor() {
         if(color==null) return "";
@@ -618,15 +623,28 @@ public class Stock {
         return getName();
     }
     
+    public String getDisplayNameWithStatus() {
+        String displayName = "";
+        if (getName().isEmpty()) {
+            displayName = getTattoo();
+        }else{
+            displayName = getName();
+        }
+        return displayName + " (" + getStatus() + ")";
+    }
+    
     public File getProfileFile(){
         File profileFile = new File(profileImagePath, getProfileFileName());
         if(profileFile.exists()){
+            //System.out.println("getProfileFile: file found:" + profileFile.toString());
             return profileFile;
         }else{
             profileFile = new File(profileImagePath, getDefaultImageSource());
             if (profileFile.exists()){
+                //System.out.println("getProfileFile: default found:" + profileFile.toString());
                 return profileFile;
             }else{
+                //System.out.println("getProfileFile: default NOT found: default:" + getDefaultImageSource());
                 return null;
             }
         }
@@ -643,7 +661,11 @@ public class Stock {
     private String getProfileFileBaseName() {
         if (getTattoo().isEmpty()) {
             if(getName().isEmpty()){
-                return getId().toString();
+                if(getId()==null){
+                    return getDefaultImageSource();
+                }else{
+                    return getId().toString();
+                }
             }
             return getName();
         }
@@ -666,7 +688,9 @@ public class Stock {
     */
 
     public String getDefaultImageSource() {
-        return defaultImageSource;
+        defaultImageSource = "farmtracks_blank.jpg";
+        if(getStockType()==null) return defaultImageSource;
+        return getStockType().getImageFileName();
     }
 
     public void setDefaultImageSource(String defaultImageSource) {
@@ -876,6 +900,15 @@ public class Stock {
         return temp;
     }
 
+    public Boolean getExternal() {
+        if(external==null) return Boolean.FALSE;
+        return external;
+    }
+
+    public void setExternal(Boolean external) {
+        this.external = external;
+    }
+    
     public Double getStockValue() {
         return stockValue;
     }
@@ -886,7 +919,8 @@ public class Stock {
 
     @Override
     public String toString() {
-        return "Stock{" + "id=" + id + ", breeder=" + breeder + ", stockType=" + stockType + ", sexText=" + sexText + ", sex=" + sex + ", prefix=" + prefix + ", name=" + name + ", tattoo=" + tattoo + ", cage=" + cage + ", fatherName=" + fatherName + ", motherName=" + motherName + ", fatherId=" + fatherId + ", motherId=" + motherId + ", fatherExtName=" + fatherExtName + ", motherExtName=" + motherExtName + ", color=" + color + ", breed=" + breed + ", weightText=" + weightText + ", weight=" + weight + ", weightDate=" + weightDate + ", doB=" + doB + ", acquired=" + acquired + ", regNo=" + regNo + ", champNo=" + champNo + ", legs=" + legs + ", genotype=" + genotype + ", notes=" + notes + ", status=" + status + ", statusDate=" + statusDate + ", active=" + active + ", profileImage=" + profileImage + ", defaultImageSource=" + defaultImageSource + ", profileImagePath=" + profileImagePath + ", litter=" + litter + ", fosterLitter=" + fosterLitter + ", needsSaving=" + needsSaving + ", ageInDays=" + ageInDays + ", stockValue=" + stockValue + ", temp=" + temp + ", createdDate=" + createdDate + ", lastModifiedDate=" + lastModifiedDate + '}';
+        return "Stock{" + "id=" + id + ", name=" + name + ", tattoo=" + tattoo  + ", breeder=" + breeder + ", sexText=" + sexText + ", sex=" + sex + ", prefix=" + prefix+ ", fatherName=" + fatherName + ", motherName=" + motherName + ", fatherId=" + fatherId + ", motherId=" + motherId + ", fatherExtName=" + fatherExtName + ", motherExtName=" + motherExtName + ", color=" + color + ", breed=" + breed + ", weightText=" + weightText + ", weight=" + weight + ", weightDate=" + weightDate + ", doB=" + doB + ", acquired=" + acquired + ", regNo=" + regNo + ", champNo=" + champNo + ", legs=" + legs + ", genotype=" + genotype + ", notes=" + notes + ", status=" + status + ", statusDate=" + statusDate + ", active=" + active + ", profileImage=" + profileImage + ", defaultImageSource=" + defaultImageSource + ", profileImagePath=" + profileImagePath + ", litter=" + litter + ", fosterLitter=" + fosterLitter + ", needsSaving=" + needsSaving + ", ageInDays=" + ageInDays + ", stockValue=" + stockValue + ", temp=" + temp + ", external=" + external + ", createdDate=" + createdDate + ", lastModifiedDate=" + lastModifiedDate + ", stockType=" + stockType  + '}';
     }
+
 
 }

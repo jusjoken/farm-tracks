@@ -15,7 +15,7 @@ public class StockComparator implements Comparator<Stock>{
 
     @Override
     public int compare(Stock t, Stock t1) {
-        return t.getDisplayName().compareTo(t1.getDisplayName());
+        return t.getDisplayName().compareToIgnoreCase(t1.getDisplayName());
     }
     
 }

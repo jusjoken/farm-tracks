@@ -2,12 +2,16 @@ package ca.jusjoken.views;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.ComponentConfirmEvent;
+import ca.jusjoken.component.DialogCommon;
+import ca.jusjoken.component.DialogCommonEvent;
+import ca.jusjoken.component.ListRefreshNeededListener;
+import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockTypeService;
-import ca.jusjoken.views.stock.StockPedigreeView;
+import ca.jusjoken.views.stock.StockPedigreeEditor;
 import ca.jusjoken.views.stock.StockView;
 import ca.jusjoken.views.utility.MaintenanceView;
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
@@ -47,7 +51,7 @@ import org.springframework.security.core.userdetails.UserDetails;
  */
 @Layout
 @AnonymousAllowed
-public class MainLayout extends AppLayout implements AfterNavigationObserver {
+public class MainLayout extends AppLayout implements ListRefreshNeededListener, AfterNavigationObserver {
     
     private final transient AuthenticationContext authContext;
     private final StockSavedQueryService queryService;
@@ -56,6 +60,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     private Registration registration;
     private SideNav nav = new SideNav();
     private AccessAnnotationChecker accessChecker;
+    private DialogCommon dialogCommon;
 
     private H1 viewTitle;
 
@@ -64,6 +69,8 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         this.typeService = Registry.getBean(StockTypeService.class);
         this.authContext = authContext;
         this.accessChecker = accessChecker;
+        this.dialogCommon = new DialogCommon();
+        dialogCommon.addListener(this);
         
         //StockView.class.addListener(this);
         setPrimarySection(Section.DRAWER);
@@ -108,6 +115,24 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         
         if(authContext.isAuthenticated()){
             menu.addComponent(heading);
+            menu.addSeparator();
+            //add new stock item for each StockType
+            
+            List<StockType> stockTypes = typeService.findAllStockTypes();
+            for(StockType type: stockTypes){
+                MenuItem addNew = menu.addItem("Add new " + type.getNameSingular(), event -> {
+                    //open stock edit dialog
+                    Stock newStock = new Stock();
+                    newStock.setExternal(false);
+                    newStock.setBreeder(true);
+                    newStock.setStockType(type);
+                    newStock.setWeight(0);
+
+                    dialogCommon.setDialogTitle("Create new " + type.getNameSingular());
+                    dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
+                });
+            }
+            
             menu.addSeparator();
             MenuItem mode = menu.addItem("Switch mode", event -> {
                 if(ColorScheme.Value.DARK==UI.getCurrentOrThrow().getPage().getColorScheme()){
@@ -165,7 +190,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
             for(StockType type: stockTypes){
                 SideNavItem stockGroupItem = new SideNavItem(type.getName());
                 stockGroupItem.setExpanded(true);
-                List<StockSavedQuery> stockQueryList = queryService.getSavedQueryListByType(type.getName());
+                List<StockSavedQuery> stockQueryList = queryService.getSavedQueryListByType(type);
                 if(stockQueryList.size()>0){
                     nav.addItem(stockGroupItem);
                 }
@@ -182,6 +207,12 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         }
         
 
+        if(accessChecker.hasAccess(StockPedigreeEditor.class)){
+            SideNavItem sn = new SideNavItem("Pedigree Manager", StockPedigreeEditor.class, "");
+            nav.addItem(sn);
+            sn.setPrefixComponent(FontAwesome.Solid.SITEMAP.create());
+        }
+        
         if(accessChecker.hasAccess(MaintenanceView.class)){
             nav.addItem(new SideNavItem("Maintenance", MaintenanceView.class, FontAwesome.Solid.COGS.create()));
         }
@@ -219,6 +250,15 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     public void afterNavigation(AfterNavigationEvent ane) {
         System.out.println("MainLayout: afterNavigation");
         viewTitle.setText(getCurrentPageTitle());
+    }
+
+    @Override
+    public void listRefreshNeeded() {
+        System.out.println("MainLayout: listRefreshNeeded");
+        if(dialogCommon.getReturnStock()!=null){
+            UIUtilities.showNotification("New " + dialogCommon.getReturnStock().getStockType().getNameSingular()+ " created.");
+            ComponentUtil.fireEvent(UI.getCurrent(), new DialogCommonEvent(dialogCommon, false));
+        }
     }
 
     

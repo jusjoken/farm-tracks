@@ -9,6 +9,7 @@ import ca.jusjoken.data.entity.StockStatusHistory;
 import java.util.Collections;
 import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  *
@@ -32,6 +33,11 @@ public class StockStatusHistoryService {
         statusRepository.delete(entity);
         //now update the stock to the newest status
         saveLatestToStock(stock, Boolean.FALSE);
+    }
+    
+    @Transactional
+    public void deleteByStockId(Integer stockId){
+        statusRepository.deleteAllByStockId(stockId);
     }
     
     private void saveLatestToStock(Stock stock, Boolean fromImport){

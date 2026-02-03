@@ -32,4 +32,6 @@ public interface StockTypeRepository extends JpaRepository<StockType, UUID> {
 
     public StockType findFirstByOrderByDefaultTypeDesc();
     
+    public StockType findById(Integer id);
+    
 }

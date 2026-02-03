@@ -18,4 +18,6 @@ public interface StockStatusHistoryRepository extends JpaRepository<StockStatusH
     public List<StockStatusHistory> findByStockId(Integer stockId);
     
     public Long countByStockId(Integer stockId);
+
+    public void deleteAllByStockId(Integer id);
 }

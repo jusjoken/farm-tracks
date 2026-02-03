@@ -37,8 +37,11 @@ public class StockSavedQueryService {
         return list;
     }
     
-    public List<StockSavedQuery> getSavedQueryListByType (String type){
-        List<StockSavedQuery> list = queryRepository.findAllByType(type);
+    public List<StockSavedQuery> getSavedQueryListByType (StockType type){
+        List<StockSavedQuery> list = queryRepository.findAllByType(type.getName());
+        if(list.isEmpty()) {
+            list.add(getDefaultSaveQueryByType(type));
+        }
         return list;
     }
     
@@ -56,6 +59,12 @@ public class StockSavedQueryService {
         ColumnSort sort1 = new ColumnSort("name", Sort.Direction.ASC);
         ColumnSort sort2 = new ColumnSort("tattoo", Sort.Direction.ASC);
         return new StockSavedQuery(0,"Default stock list",true, defaultStockType.get(0), new StockStatus().getDefault(), sort1, sort2);
+    }
+    
+    public StockSavedQuery getDefaultSaveQueryByType(StockType type){
+        ColumnSort sort1 = new ColumnSort("name", Sort.Direction.ASC);
+        ColumnSort sort2 = new ColumnSort("tattoo", Sort.Direction.ASC);
+        return new StockSavedQuery(type.getId(),"Default " + type.getName() + " list",true, type, new StockStatus().getDefault(), sort1, sort2);
     }
     
     public Integer saveAsQuery(StockSavedQuery query, String newName){
