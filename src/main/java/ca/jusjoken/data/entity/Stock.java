@@ -1,16 +1,14 @@
 package ca.jusjoken.data.entity;
 
-import ca.jusjoken.UIUtilities;
-import ca.jusjoken.component.AvatarDiv;
-import ca.jusjoken.component.Badge;
-import ca.jusjoken.component.Layout;
-import ca.jusjoken.data.Utility;
-import ca.jusjoken.data.Utility.Gender;
-import ca.jusjoken.data.service.LocalDateCsvConverter;
-import ca.jusjoken.data.service.LocalDateCsvConverterDDMMYYYY;
-import ca.jusjoken.data.service.StockStatus;
-import ca.jusjoken.utility.AgeBetween;
-import ca.jusjoken.utility.BadgeVariant;
+import java.io.File;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Objects;
+
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.vaadin.flow.component.avatar.Avatar;
@@ -22,6 +20,18 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.server.streams.DownloadHandler;
+
+import ca.jusjoken.UIUtilities;
+import ca.jusjoken.component.AvatarDiv;
+import ca.jusjoken.component.Badge;
+import ca.jusjoken.component.Layout;
+import ca.jusjoken.data.Utility;
+import ca.jusjoken.data.Utility.Gender;
+import ca.jusjoken.data.service.LocalDateCsvConverter;
+import ca.jusjoken.data.service.LocalDateCsvConverterDDMMYYYY;
+import ca.jusjoken.data.service.StockStatus;
+import ca.jusjoken.utility.AgeBetween;
+import ca.jusjoken.utility.BadgeVariant;
 import jakarta.persistence.Access;
 import jakarta.persistence.AccessType;
 import jakarta.persistence.CascadeType;
@@ -34,13 +44,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Transient;
-import java.io.File;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Objects;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
 @EntityListeners(AuditingEntityListener.class)
@@ -138,7 +141,7 @@ public class Stock {
     private String defaultImageSource = "rabbit_blank.jpg";
 
     @Transient
-    private String profileImagePath = System.getenv("PROFILE_IMAGE_PATH");
+    private final String profileImagePath = System.getenv("PATH_TO_PROFILE_IMAGE");
     
     @ManyToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "litterId",foreignKey = @jakarta.persistence.ForeignKey(name = "none"))
@@ -411,6 +414,7 @@ public class Stock {
         this.genotype = genotype;
     }
 
+    @SuppressWarnings("SingleCharRegex")
     public String getNotes() {
         if(this.notes==null) return "";
         return notes.replaceAll("\\[", "").replaceAll("]", "").replaceAll("\"", "");
@@ -469,6 +473,7 @@ public class Stock {
 
     @Access(AccessType.PROPERTY)
     public void setActive(Boolean active) {
+        //System.out.println("Stock.setActive: setting active to:" + active + " for:" + getDisplayName());
         this.active = active;
     }
 
@@ -532,7 +537,7 @@ public class Stock {
     }
 
     private String getNameWithoutTattoo(String inVal) {
-        String retVal = "";
+        String retVal;
         if (inVal.contains("(")) {
             retVal = inVal.substring(0, inVal.lastIndexOf("("));
         } else {
@@ -542,13 +547,11 @@ public class Stock {
     }
 
     private String getTattooFromName(String inVal) {
-        String retVal = "";
         if (inVal.contains("()")) {
-            retVal = "";
+            return "";
         } else {
-            retVal = inVal.substring(inVal.lastIndexOf("(") + 1, inVal.lastIndexOf(")"));
+            return inVal.substring(inVal.lastIndexOf("(") + 1, inVal.lastIndexOf(")"));
         }
-        return retVal;
     }
 
     public String getMotherExtName() {
@@ -624,7 +627,7 @@ public class Stock {
     }
     
     public String getDisplayNameWithStatus() {
-        String displayName = "";
+        String displayName;
         if (getName().isEmpty()) {
             displayName = getTattoo();
         }else{
@@ -698,12 +701,13 @@ public class Stock {
     }
     
     public SvgIcon getGenderIcon(){
-        if(getSex().equals(Utility.Gender.FEMALE)){
-            return new SvgIcon(Utility.ICONS.GENDER_FEMALE.getIconSource());
-        }else if(getSex().equals(Utility.Gender.MALE)){
-            return new SvgIcon(Utility.ICONS.GENDER_MALE.getIconSource());
-        }else{
-            return null;
+        switch(getSex()){
+            case FEMALE:
+                return new SvgIcon(Utility.ICONS.GENDER_FEMALE.getIconSource());
+            case MALE:
+                return new SvgIcon(Utility.ICONS.GENDER_MALE.getIconSource());
+            default:
+                return null;
         }
     }
 
@@ -857,6 +861,7 @@ public class Stock {
         return avatarDiv;
     }
     
+    @SuppressWarnings("ConvertToStringSwitch")
     public void updateFromImported(Boolean importBreeder, Integer importId, StockType importStockType) {
         //only allow this update if the id is null as imported records do not have an id
         needsSaving = Boolean.FALSE;

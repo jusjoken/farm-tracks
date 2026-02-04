@@ -6,7 +6,6 @@ package ca.jusjoken.data.service;
 
 import ca.jusjoken.data.entity.Litter;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
  * @author birch
  */
 @Transactional
-public interface LitterRepository extends JpaRepository<Litter, UUID>  {
+public interface LitterRepository extends JpaRepository<Litter, Integer>  {
 
     public Long countByMotherId(Integer motherId);
 

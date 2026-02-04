@@ -203,7 +203,7 @@ public class DialogCommon extends Component{
         this.litterService = Registry.getBean(LitterService.class);
         this.statusService = Registry.getBean(StockStatusHistoryService.class);
         this.weightService = Registry.getBean(StockWeightHistoryService.class);
-        profileImagePath = System.getenv("PROFILE_IMAGE_PATH");
+        profileImagePath = System.getenv("PATH_TO_PROFILE_IMAGE");
         dialogConfigure(currentDisplayMode);
     }
 

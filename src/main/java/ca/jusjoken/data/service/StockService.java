@@ -4,28 +4,30 @@
  */
 package ca.jusjoken.data.service;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Example;
+import org.springframework.data.domain.ExampleMatcher;
+import org.springframework.data.domain.ExampleMatcher.StringMatcher;
+import static org.springframework.data.domain.ExampleMatcher.matchingAll;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
 import ca.jusjoken.data.entity.StockType;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import org.springframework.data.domain.Example;
-import org.springframework.data.domain.ExampleMatcher;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Optional;
-
-import static org.springframework.data.domain.ExampleMatcher.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 
 /**
  *
@@ -36,20 +38,15 @@ import org.springframework.data.domain.Sort;
 @Transactional
 public class StockService {
     private final StockRepository stockRepository;
-    private final StockTypeService typeService;
     //private final StockWeightHistoryService weightService;
     //private final StockStatusHistoryService statusService;
-    private final LitterService litterService;
 
-    public StockService(StockRepository stockRepository, StockTypeService typeService, LitterService litterService) {
+    public StockService(StockRepository stockRepository) {
         this.stockRepository = stockRepository;
-        this.typeService = typeService;
-        this.litterService = litterService;
     }
     
     public List<Stock> getKitsForLitter(Litter litter){
-        List<Stock> kitsForLitter = new ArrayList<>();
-        kitsForLitter = stockRepository.findAllKitsByLitterId(litter.getId());
+        List<Stock> kitsForLitter = stockRepository.findAllKitsByLitterId(litter.getId());
         //TODO: update to include kits that are fostered
         return kitsForLitter;
     }
@@ -83,20 +80,29 @@ public class StockService {
         return "N/A";
     }
     
+    @SuppressWarnings({"ConvertToStringSwitch", "CollectionsToArray"})
     private Example<Stock> getExample(String name, StockSavedQuery savedQuery){
+        String[] ignoreFields = {"needsSaving","profileImage","defaultImageSource","sexText","sex","prefix","tattoo","fatherName","motherName","fatherId","motherId","color","breed","weightText","weight","doB","acquired","regNo","champNo","legs","genotype","kitsCount","notes","litter","fosterLitter","ageInDays","litterCount","kitCount","createdDate","lastModifiedDate","external"};   
         Stock stock = new Stock();
         stock.setName(name);
         stock.setStockType(savedQuery.getStockType());
         stock.setBreeder(savedQuery.getBreeder());
         if(savedQuery.getStockStatus().getName().equals("active")){
+            System.out.println("getExample: stockStatus Active selected");
             stock.setActive(Boolean.TRUE);
             stock.setStatus("active");
         }else if(savedQuery.getStockStatus().getName().equals("inactive")){
+            System.out.println("getExample: stockStatus Inactive selected");
             stock.setActive(Boolean.FALSE);
             stock.setStatus(null);
         }else if(savedQuery.getStockStatus().getName().equals("all")){
+            System.out.println("getExample: stockStatus All selected");
             stock.setActive(null);
             stock.setStatus(null);
+
+            List<String> list = new ArrayList<>(Arrays.asList(ignoreFields));
+            list.add("active");
+            ignoreFields = list.toArray(new String[list.size()]);            
         }else{
             stock.setStatus(savedQuery.getStockStatus().getName());
             stock.setActive(null);
@@ -108,7 +114,7 @@ public class StockService {
                 .withIgnoreCase()                          // Ignore case for all string matches
                 .withStringMatcher(StringMatcher.CONTAINING)// Use LIKE %value% for strings
                 .withIgnoreNullValues()                    // Ignore null values
-                .withIgnorePaths("needsSaving","profileImage","defaultImageSource","sexText","sex","category","prefix","tattoo","cage","fatherName","motherName","fatherId","motherId","color","breed","weightText","weight","doB","acquired","regNo","champNo","legs","genotype","kitsCount","notes","litter","fosterLitter","ageInDays","litterCount","kitCount","createdDate","lastModifiedDate","external")
+                .withIgnorePaths(ignoreFields)
                 .withMatcher("name", ExampleMatcher.GenericPropertyMatchers.startsWith()); // make name startsWith
         
         Example<Stock> example = Example.of(stock, matcher);
@@ -224,25 +230,4 @@ public class StockService {
         return stockRepository.findAll(pageable).getContent();
     }
     
-    /*
-    public void deleteEverbreedRabbits(){
-        StockType rabbitType = typeService.findRabbits();
-        if(rabbitType==null){
-            System.out.println("deleteEverbreedRabbits: Rabbit Stock Type not found.  Nothing deleted");
-            return;
-        }else{
-            //firsdt delete related records
-            List<Stock> rabbitStock = stockRepository.findAllByStockTypeId(rabbitType.getId());
-            for(Stock rabbit: rabbitStock){
-                //delete status
-                statusService.deleteByStockId(rabbit.getId());
-                //delete weight
-                weightService.deleteByStockId(rabbit.getId());
-                //delete litters
-                litterService.deleteByStockId(rabbit.getId());
-            }
-            stockRepository.deleteByStockType(rabbitType.getId());
-        }
-    }
-    */
 }

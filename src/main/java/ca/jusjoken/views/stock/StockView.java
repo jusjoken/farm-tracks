@@ -32,6 +32,7 @@ import ca.jusjoken.data.service.StockTypeRepository;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.data.service.StockWeightHistoryService;
 import ca.jusjoken.views.MainLayout;
+
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
@@ -72,17 +73,14 @@ import com.vaadin.flow.router.HasDynamicTitle;
 import com.vaadin.flow.router.HasUrlParameter;
 import com.vaadin.flow.router.OptionalParameter;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.shared.Registration;
-import com.vaadin.flow.spring.data.VaadinSpringDataHelpers;
 import com.vaadin.flow.theme.lumo.LumoIcon;
 import com.vaadin.flow.theme.lumo.LumoUtility.*;
+
 import jakarta.annotation.security.PermitAll;
-import java.util.ArrayList;
+
 import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import java.util.NoSuchElementException;
 import org.springframework.data.domain.Sort;
 
 @Route(value = "stock", layout = MainLayout.class)
@@ -97,11 +95,9 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private final StockSavedQueryService queryService;
     private final StockStatusHistoryService statusService;
     private final StockWeightHistoryService weightService;
-    private Registration registration;
     private String currentSearchName = "";
     private StockSavedQuery currentStockSavedQuery;
     private String currentSavedQueryId = null;
-    private List<Stock> stockList = new ArrayList();
     private Long stockListCountAll = 0L;
     private Long stockListCount = 0L;
     private Grid<Stock> list = new Grid<>();
@@ -113,9 +109,9 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Button applyOptionsButton = new Button(FontAwesome.Regular.CHECK_SQUARE.create());
     private Button deleteOptionsButton = new Button(FontAwesome.Regular.TRASH_CAN.create());
     private Button resetOptionsButton = new Button(FontAwesome.Solid.UNDO.create());
-    private DialogCommon dialogCommon;
-    private StatusEditor statusEditor;
-    private WeightEditor weightEditor;
+    private final DialogCommon dialogCommon;
+    private final StatusEditor statusEditor;
+    private final WeightEditor weightEditor;
     private ConfirmDialog saveQueryDialog = new ConfirmDialog();
     private ConfirmDialog deleteQueryDialog = new ConfirmDialog();
     private ConfirmDialog resetQueryDialog = new ConfirmDialog();
@@ -128,7 +124,6 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Select<ColumnName> stockSort2Column = new Select<>();
     private RadioButtonGroup<String> sort2Direction = new RadioButtonGroup<>();
     private Boolean skipSidebarUpdates = Boolean.FALSE;
-    private UI ui;
 
     public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockTypeService stockTypeService, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService, StockWeightHistoryService weightService) {
         this.stockRepository = stockRepository;
@@ -142,11 +137,9 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         
         //this.defaultStockSort.addOrder(new SortOrder(currentSortDirection.name(), "tattoo"));
         this.dialogCommon = new DialogCommon();
-        dialogCommon.addListener(this);
         this.statusEditor = new StatusEditor();
-        statusEditor.addListener(this);
         this.weightEditor = new WeightEditor();
-        weightEditor.addListener(this);
+        setupListeners();  
         
         addClassNames(Display.FLEX, Height.FULL, Overflow.HIDDEN);
         //loadFilters();
@@ -155,6 +148,12 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         closeSidebar();
         saveOptionsConfigure();
         updateStockTypeCount();
+    }
+
+    private void setupListeners(){
+        dialogCommon.addListener(this);
+        statusEditor.addListener(this);
+        weightEditor.addListener(this);
     }
 
     private Hr createHr() {
@@ -230,12 +229,10 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
         breederFilter.addValueChangeListener(event -> {
             if(event.getValue()!=null){
-                if(event.getValue().equals(BreederFilter.ALL)) {
-                    currentStockSavedQuery.setBreeder(null);
-                }else if(event.getValue().equals(BreederFilter.NONBREEDER)) {
-                    currentStockSavedQuery.setBreeder(Boolean.FALSE);
-                }else{
-                    currentStockSavedQuery.setBreeder(Boolean.TRUE);
+                switch (event.getValue()) {
+                    case ALL -> currentStockSavedQuery.setBreeder(null);
+                    case NONBREEDER -> currentStockSavedQuery.setBreeder(Boolean.FALSE);
+                    case BREEDER -> currentStockSavedQuery.setBreeder(Boolean.TRUE);
                 }
                 sidebarChanged(Boolean.TRUE);
             }
@@ -358,7 +355,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             applyOptionsButton.setEnabled(changed);
             saveOptionsButton.setEnabled(changed);
             resetOptionsButton.setEnabled(changed);
-            if(currentSavedQueryId.equals(0)){
+            if(currentSavedQueryId.equals("0")){
                 deleteOptionsButton.setEnabled(false);
             }else{
                 deleteOptionsButton.setEnabled(true);
@@ -571,7 +568,12 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         if(selectedStock==null){
             list.scrollToIndex(0);
         }else{
-            list.scrollToItem(selectedStock);
+            try {
+                list.scrollToItem(selectedStock);
+            } catch (NoSuchElementException e) {
+                System.out.println("applyFilters: scrollToItem cannot find the item in the list:" + selectedStock);
+                //e.printStackTrace();
+            }
             //runBeforeClientResponse(ui -> list.scrollToItem(selectedStock));
             listDataView.refreshItem(selectedStock);
         }
@@ -627,7 +629,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         return list;        
     }
     
-    private ComponentRenderer<Component, Stock> stockCardRenderer = new ComponentRenderer<>(
+    private final ComponentRenderer<Component, Stock> stockCardRenderer = new ComponentRenderer<>(
             stock -> {
                 return createListItemLayout(stock);
             });    
@@ -880,7 +882,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private LazyComponent createTabLitters(Stock stock) {
         Layout layout = new Layout();
         List<Litter> litters = litterService.getLitters(stock);
-        Grid<Litter> litterGrid = new Grid<Litter>(Litter.class,false);
+        Grid<Litter> litterGrid = new Grid<>(Litter.class,false);
         litterGrid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
         litterGrid.setHeight("200px");
 
@@ -915,7 +917,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     }
 
     private Component getKitListGrid(List<Stock> kits){
-        Grid<Stock> kitGrid = new Grid();
+        Grid<Stock> kitGrid = new Grid<>(Stock.class, false);
         //GridCompact<Stock> kitGrid = new GridCompact();
         kitGrid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
         kitGrid.setHeight("200px");
@@ -943,7 +945,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private LazyComponent createTabStatuses(Stock stock) {
         Layout layout = new Layout();
         List<StockStatusHistory> statuses = statusService.findByStockId(stock.getId());
-        Grid<StockStatusHistory> grid = new Grid<StockStatusHistory>(StockStatusHistory.class,false);
+        Grid<StockStatusHistory> grid = new Grid<>(StockStatusHistory.class,false);
         grid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
         grid.setHeight("200px");
 
@@ -1001,7 +1003,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private LazyComponent createTabWeights(Stock stock) {
         Layout layout = new Layout();
         List<StockWeightHistory> weights = weightService.findByStockId(stock.getId());
-        Grid<StockWeightHistory> grid = new Grid<StockWeightHistory>(StockWeightHistory.class,false);
+        Grid<StockWeightHistory> grid = new Grid<>(StockWeightHistory.class,false);
         grid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
         grid.setHeight("200px");
 
@@ -1059,10 +1061,10 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
     private Layout createTags(Stock stock, Boolean topLayout){
         Layout tags = new Layout(
-                createPanel("Litters",litterService.getLitterCountForParent(stock).toString(),false,Utility.PanelType.LITTERS, stock), 
-                createPanel(stock.getStockType().getNonBreederName(), stockService.getKitCountForParent(stock).toString(),false,Utility.PanelType.KITS, stock), 
-                createPanel("Age", stock.getAge().getAgeFormattedHTML(),true,Utility.PanelType.NONE, stock), 
-                createPanel("Weight", stock.getWeightInLbsOz(),true,Utility.PanelType.NONE, stock));
+                createPanel("Litters",litterService.getLitterCountForParent(stock).toString(),false,Utility.PanelType.LITTERS), 
+                createPanel(stock.getStockType().getNonBreederName(), stockService.getKitCountForParent(stock).toString(),false,Utility.PanelType.KITS), 
+                createPanel("Age", stock.getAge().getAgeFormattedHTML(),true,Utility.PanelType.NONE), 
+                createPanel("Weight", stock.getWeightInLbsOz(),true,Utility.PanelType.NONE));
         tags.setAlignItems(Layout.AlignItems.STRETCH);
         tags.setJustifyContent(Layout.JustifyContent.AROUND);
         //tags.setAlignSelf(Layout.AlignSelf.CENTER);
@@ -1081,7 +1083,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         
     }
     
-    private Layout createPanel(String title, String value, Boolean sourceHTML, Utility.PanelType panelType, Stock stock){
+    private Layout createPanel(String title, String value, Boolean sourceHTML, Utility.PanelType panelType){
         if(!sourceHTML){
             value = "<p>" + value + "</p>";
         }
@@ -1136,7 +1138,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
     @Override
     protected void onAttach(AttachEvent attachEvent) {
-        registration = ComponentUtil.addListener(attachEvent.getUI(), DialogCommonEvent.class, event ->{
+        ComponentUtil.addListener(attachEvent.getUI(), DialogCommonEvent.class, event ->{
             System.out.println("StockView: onAttach: Dialog Common event called: stock:" + event.getSource().getReturnStock());
             if(event.getSource().getReturnStock()!=null){
                 selectedStock = event.getSource().getReturnStock();
