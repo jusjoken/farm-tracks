@@ -4,12 +4,16 @@
  */
 package ca.jusjoken.data.service;
 
-import ca.jusjoken.data.entity.Litter;
 import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
+
+import ca.jusjoken.data.entity.Litter;
+import ca.jusjoken.data.entity.StockType;
 
 /**
  *
@@ -26,8 +30,8 @@ public interface LitterRepository extends JpaRepository<Litter, Integer>  {
 
     public List<Litter> findByFatherId(Integer id);
     
-    @Query("select l from Litter l where l.archived IS NULL")
-    public List<Litter> findNotArchived();
+    @Query("select l from Litter l where l.archived IS NULL and l.stockType = :stocktype")
+    public List<Litter> findNotArchived(@Param("stocktype") StockType stockType);
     
     @Modifying
     @Query(value = "DELETE FROM litter", nativeQuery = true)

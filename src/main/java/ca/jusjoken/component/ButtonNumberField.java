@@ -1,6 +1,5 @@
 package ca.jusjoken.component;
 
-import ca.jusjoken.UIUtilities;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentEventListener;
 import com.vaadin.flow.component.button.Button;
@@ -10,9 +9,11 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextFieldVariant;
 
+import ca.jusjoken.UIUtilities;
+
 public class ButtonNumberField extends CustomField<Double> {
-    private NumberField numberField = new NumberField();
-    private Button button = new Button();
+    private final NumberField numberField = new NumberField();
+    private final Button button = new Button();
 
     public ButtonNumberField() {
         super();
@@ -36,6 +37,7 @@ public class ButtonNumberField extends CustomField<Double> {
         button.setIcon(icon);
     }
 
+    @SuppressWarnings({ "rawtypes", "unchecked" })
     public void addClickListener(ComponentEventListener listener) {
         button.addClickListener(listener);
     }

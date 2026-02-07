@@ -4,20 +4,21 @@
  */
 package ca.jusjoken.data.service;
 
-import ca.jusjoken.data.entity.StockType;
 import java.util.List;
-import java.util.UUID;
+
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import ca.jusjoken.data.entity.StockType;
+
 /**
  *
  * @author birch
  */
-public interface StockTypeRepository extends JpaRepository<StockType, UUID> {
+public interface StockTypeRepository extends JpaRepository<StockType, Integer> {
 
     @Query("select s from StockType s where s.name = :stockTypeName")
     StockType findByName(@Param("stockTypeName") String stockTypeName);
@@ -32,6 +33,6 @@ public interface StockTypeRepository extends JpaRepository<StockType, UUID> {
 
     public StockType findFirstByOrderByDefaultTypeDesc();
     
-    public StockType findById(Integer id);
+    //public StockType findById(Integer id);
     
 }

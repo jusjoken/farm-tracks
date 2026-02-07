@@ -4,6 +4,13 @@
  */
 package ca.jusjoken.data.entity;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.utility.AgeBetween;
 import jakarta.persistence.Column;
@@ -12,11 +19,6 @@ import jakarta.persistence.EntityListeners;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 /**
  *
@@ -140,15 +142,15 @@ public class StockWeightHistory {
         if (getWeight() > 0) {
             return Utility.getInstance().WeightConverterOzToString(getWeight());
         }
-        return Utility.emptyValue;
+        return Utility.EMPTY_VALUE;
     }
     
     public String getAge(Stock stock){
         return getAge(stock, null);
     }
     public String getAge(Stock stock, LocalDate toDate){
-        LocalDate ageToDate = getSortDate().toLocalDate();
-        if(toDate==null) ageToDate = LocalDate.now();
+        //LocalDate ageToDate = getSortDate().toLocalDate();
+        if(toDate==null) toDate = LocalDate.now();
         AgeBetween age = new AgeBetween(stock.getDoB(), toDate);
         return age.getAgeFormattedString();
     }

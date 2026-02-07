@@ -8,19 +8,25 @@ package ca.jusjoken.component;
  *
  * @author birch
  */
-import ca.jusjoken.UIUtilities;
-import ca.jusjoken.data.Utility.Gender;
-import ca.jusjoken.data.entity.Litter;
-import ca.jusjoken.data.entity.Stock;
-import ca.jusjoken.data.entity.StockStatusHistory;
-import ca.jusjoken.data.entity.StockWeightHistory;
-import ca.jusjoken.data.service.LitterService;
-import ca.jusjoken.data.service.ParentIntegerToStockConverter;
-import ca.jusjoken.data.service.Registry;
-import ca.jusjoken.data.service.StatusHistoryConverter;
-import ca.jusjoken.data.service.StockService;
-import ca.jusjoken.data.service.StockStatusHistoryService;
-import ca.jusjoken.data.service.StockWeightHistoryService;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
+
+import javax.imageio.ImageIO;
+
+import org.imgscalr.Scalr;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.flowingcode.vaadin.addons.imagecrop.Crop;
 import com.flowingcode.vaadin.addons.imagecrop.ImageCrop;
 import com.vaadin.flow.component.Component;
@@ -60,23 +66,20 @@ import com.vaadin.flow.dom.ElementFactory;
 import com.vaadin.flow.server.streams.DownloadHandler;
 import com.vaadin.flow.server.streams.InMemoryUploadHandler;
 import com.vaadin.flow.server.streams.UploadHandler;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.time.LocalDateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.List;
-import javax.imageio.ImageIO;
-import org.imgscalr.Scalr;
+import ca.jusjoken.UIUtilities;
+import ca.jusjoken.data.Utility.Gender;
+import ca.jusjoken.data.entity.Litter;
+import ca.jusjoken.data.entity.Stock;
+import ca.jusjoken.data.entity.StockStatusHistory;
+import ca.jusjoken.data.entity.StockWeightHistory;
+import ca.jusjoken.data.service.LitterService;
+import ca.jusjoken.data.service.ParentIntegerToStockConverter;
+import ca.jusjoken.data.service.Registry;
+import ca.jusjoken.data.service.StatusHistoryConverter;
+import ca.jusjoken.data.service.StockService;
+import ca.jusjoken.data.service.StockStatusHistoryService;
+import ca.jusjoken.data.service.StockWeightHistoryService;
 
 @Tag("dialog-common")
 public class DialogCommon extends Component{
@@ -86,16 +89,15 @@ public class DialogCommon extends Component{
     }
 
     private Binder<Stock> binder;
-    private static final String notFostered = "Not fostered";
+    private static final String NOT_FOSTERED = "Not fostered";
 
     public enum DisplayMode{
         LITTER_LIST, KIT_LIST, STOCK_DETAILS, PROFILE_IMAGE
     }
     //private DisplayMode displayMode = DisplayMode.PROFILE_IMAGE;
 
-    private Logger log = LoggerFactory.getLogger(DialogCommon.class);
-    private Dialog dialog = new Dialog();
-    private Long taskID = 0L;
+    private final Logger log = LoggerFactory.getLogger(DialogCommon.class);
+    private final Dialog dialog = new Dialog();
     private Stock stockEntity;
     private String dialogTitle = "";
     private Boolean isNewStock = Boolean.FALSE;
@@ -103,13 +105,13 @@ public class DialogCommon extends Component{
     private Integer returnId = null;
     private Stock returnStock;
 
-    private List<Stock> stockList = new ArrayList<>();
-    private List<Litter> litterList = new ArrayList<>();
+    private final List<Stock> stockList = new ArrayList<>();
+    private final List<Litter> litterList = new ArrayList<>();
     
-    private Button dialogResetButton = new Button("Reset");
-    private Button dialogOkButton = new Button("OK");
-    private Button dialogCancelButton = new Button("Cancel");
-    private Button dialogCloseButton = new Button(new Icon("lumo", "cross"));
+    private final Button dialogResetButton = new Button("Reset");
+    private final Button dialogOkButton = new Button("OK");
+    private final Button dialogCancelButton = new Button("Cancel");
+    private final Button dialogCloseButton = new Button(new Icon("lumo", "cross"));
 
     private Upload dialogUploadComponent;
 
@@ -120,79 +122,78 @@ public class DialogCommon extends Component{
 
     //Fields defined here
     //global fields
-    private Avatar fieldProfileAvatar = new Avatar();
-    private Div avatarDiv = new Div(fieldProfileAvatar);    
+    private final Avatar fieldProfileAvatar = new Avatar();
+    private final Div avatarDiv = new Div(fieldProfileAvatar);    
     private ImageCrop fieldProfileImageCrop = new ImageCrop(fieldProfileAvatar.getImage());
-    private Checkbox fieldProfileUseCamera = new Checkbox("Use camera if available");
-    private Button dialogProfileImageRotateButton = new Button("Rotate");
+    private final Checkbox fieldProfileUseCamera = new Checkbox("Use camera if available");
+    private final Button dialogProfileImageRotateButton = new Button("Rotate");
     private Boolean profileAvatarHasChanges = Boolean.FALSE;
 
 
     @PropertyId("external")
-    private Checkbox fieldExternal = new Checkbox();
+    private final Checkbox fieldExternal = new Checkbox();
     @PropertyId("breeder")
-    private Checkbox fieldBreeder = new Checkbox();
+    private final Checkbox fieldBreeder = new Checkbox();
     @PropertyId("sex")
-    private RadioButtonGroup<Gender> fieldGender = new RadioButtonGroup<>();
+    private final RadioButtonGroup<Gender> fieldGender = new RadioButtonGroup<>();
     @PropertyId("prefix")
-    private TextField fieldPrefix = new TextField();
+    private final TextField fieldPrefix = new TextField();
     @PropertyId("name")
-    private TextField fieldName = new TextField();
+    private final TextField fieldName = new TextField();
     @PropertyId("tattoo")
-    private TextField fieldTattoo = new TextField();
+    private final TextField fieldTattoo = new TextField();
     @PropertyId("color")
-    private TextField fieldColor = new TextField();
+    private final TextField fieldColor = new TextField();
     @PropertyId("breed")
-    private TextField fieldBreed = new TextField();
+    private final TextField fieldBreed = new TextField();
     @PropertyId("weight")
-    private WeightInput fieldWeight = new WeightInput();
+    private final WeightInput fieldWeight = new WeightInput();
     
     @PropertyId("acquired")
-    private DatePicker fieldAquiredDate = new DatePicker();
+    private final DatePicker fieldAquiredDate = new DatePicker();
     @PropertyId("doB")
-    private DatePicker fieldBornDate = new DatePicker();
+    private final DatePicker fieldBornDate = new DatePicker();
     @PropertyId("legs")
-    private TextField fieldLegs = UIUtilities.getTextField();
+    private final TextField fieldLegs = UIUtilities.getTextField();
     @PropertyId("champNo")
-    private TextField fieldChampNo = UIUtilities.getTextField();
+    private final TextField fieldChampNo = UIUtilities.getTextField();
     @PropertyId("regNo")
-    private TextField fieldRegNo = UIUtilities.getTextField();
+    private final TextField fieldRegNo = UIUtilities.getTextField();
 
     @PropertyId("fatherId")
-    private ComboBox<Stock> fieldFather = new ComboBox();
+    private final ComboBox<Stock> fieldFather = new ComboBox<>();
     @PropertyId("motherId")
-    private ComboBox<Stock> fieldMother = new ComboBox();
+    private final ComboBox<Stock> fieldMother = new ComboBox<>();
 
 
     @PropertyId("genotype")
-    private TextField fieldGenotype = UIUtilities.getTextField();
+    private final TextField fieldGenotype = UIUtilities.getTextField();
     
     @PropertyId("status")
-    private TextField fieldStatus = new TextField();
+    private final TextField fieldStatus = new TextField();
 
     @PropertyId("fosterLitter")
-    private Select<Litter> fieldFoster = new Select();
+    private final Select<Litter> fieldFoster = new Select<>();
 
     @PropertyId("notes")
-    private TextArea fieldNotes = new TextArea();
+    private final TextArea fieldNotes = new TextArea();
     
     //FormItems that may be hidden
     FormItem fieldFosterFormItem;
     FormItem fieldStatusFormItem;
     FormItem fieldAquiredFormItem;
 
-    private VerticalLayout dialogLayout = new VerticalLayout();
+    private final VerticalLayout dialogLayout = new VerticalLayout();
 
-    private Boolean hasChangedValues = Boolean.FALSE;
     private StockService stockService;
     private LitterService litterService;
     private StockStatusHistoryService statusService;
     private StockWeightHistoryService weightService;
     private DisplayMode openedDisplayMode = DisplayMode.STOCK_DETAILS;
 
-    private List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
+    private final List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
 
-    private String profileImagePath;
+    //private String profileImagePath;
     
     public DialogCommon() {
         this(DisplayMode.STOCK_DETAILS);
@@ -203,7 +204,7 @@ public class DialogCommon extends Component{
         this.litterService = Registry.getBean(LitterService.class);
         this.statusService = Registry.getBean(StockStatusHistoryService.class);
         this.weightService = Registry.getBean(StockWeightHistoryService.class);
-        profileImagePath = System.getenv("PATH_TO_PROFILE_IMAGE");
+        //profileImagePath = System.getenv("PATH_TO_PROFILE_IMAGE");
         dialogConfigure(currentDisplayMode);
     }
 
@@ -254,7 +255,7 @@ public class DialogCommon extends Component{
         fieldMother.setAllowCustomValue(true);
         fieldFather.setAllowCustomValue(true);
         fieldFoster.setEmptySelectionAllowed(true);
-        fieldFoster.setEmptySelectionCaption(notFostered);
+        fieldFoster.setEmptySelectionCaption(NOT_FOSTERED);
         fieldExternal.setLabel("not on farm");
         
         //form fields need width full to fill the column they are in
@@ -376,7 +377,7 @@ public class DialogCommon extends Component{
                 validateProfileAvatar();
             } catch (IOException e) {
                 // Handle exception
-                e.printStackTrace();
+                log.info("Error saving the avatar image:" + e);
             }            
         }
 
@@ -395,7 +396,7 @@ public class DialogCommon extends Component{
         }
     }
     public void dialogOpen(Stock stockEntity, DisplayMode currentDisplayMode){
-        binder = new Binder<Stock>(Stock.class);
+        binder = new Binder<>(Stock.class);
         this.stockEntity = stockEntity;
         
         if(this.stockEntity.getId()==null){
@@ -408,27 +409,27 @@ public class DialogCommon extends Component{
         //set values and visibility for fields
         clearLists();
         dialogLayout.removeAll();
-        if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
-            //binder.readBean(this.stockEntity);
-            dialogLayout.add(showItem(this.stockEntity, currentDisplayMode));
-        }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
-            profileAvatarHasChanges = Boolean.FALSE;
-            validateProfileAvatar();
-            
-            //load stored image or if none load default image
-            fieldProfileAvatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
-            fieldProfileAvatar.setHeight("12em");
-            fieldProfileAvatar.setWidth("12em");
-
-            fieldProfileAvatar.setImageHandler(DownloadHandler.forFile(this.stockEntity.getProfileFile()));
-            fieldProfileAvatar.setName(this.stockEntity.getProfileImage());
-            profileImageData = getByteArrayFromImageFile(this.stockEntity.getProfileFile().getAbsolutePath());
-            profileImageMimeType = "image/*";
-            //dialogLayout.add(getStockHeader(stockEntity, false), avatarDiv, createImageUploadLayout());
-            dialogLayout.add(showItem(this.stockEntity,currentDisplayMode), createImageUploadLayout(currentDisplayMode));
-        }else{
-            //nothing
+        switch (currentDisplayMode) {
+            case STOCK_DETAILS -> //binder.readBean(this.stockEntity);
+                dialogLayout.add(showItem(this.stockEntity, currentDisplayMode));
+            case PROFILE_IMAGE -> {
+                profileAvatarHasChanges = Boolean.FALSE;
+                validateProfileAvatar();
+                //load stored image or if none load default image
+                fieldProfileAvatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
+                fieldProfileAvatar.setHeight("12em");
+                fieldProfileAvatar.setWidth("12em");
+                fieldProfileAvatar.setImageHandler(DownloadHandler.forFile(this.stockEntity.getProfileFile()));
+                fieldProfileAvatar.setName(this.stockEntity.getProfileImage());
+                profileImageData = getByteArrayFromImageFile(this.stockEntity.getProfileFile().getAbsolutePath());
+                profileImageMimeType = "image/*";
+                //dialogLayout.add(getStockHeader(stockEntity, false), avatarDiv, createImageUploadLayout());
+                dialogLayout.add(showItem(this.stockEntity,currentDisplayMode), createImageUploadLayout(currentDisplayMode));
+            }
+            default -> {
+            }
         }
+        //nothing
 
         dialog.setHeaderTitle(dialogTitle);
         dialog.getElement().setAttribute("aria-label", dialogTitle);
@@ -564,8 +565,7 @@ public class DialogCommon extends Component{
         //System.out.println("Rotate: newBi AFTER: width:" + newBi.getWidth() + " height:" + newBi.getHeight());
         
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        boolean result = ImageIO.write(newBi, "png", baos); //changed to png format as jpg was failing for images with same W as H
-        //System.out.println("Rotate: wrtie result:" + result);
+        ImageIO.write(newBi, "png", baos); //changed to png format as jpg was failing for images with same W as H
         byte[] bytes = baos.toByteArray();
         //System.out.println("Rotate: bytes size:" + bytes.length);
         return bytes;
@@ -723,7 +723,7 @@ public class DialogCommon extends Component{
 
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
             
-            fieldGender.setRenderer(new TextRenderer<Gender>(gender -> {
+            fieldGender.setRenderer(new TextRenderer<>(gender -> {
                 if(gender.equals(Gender.MALE)) return currentStock.getStockType().getMaleName();
                 else if(gender.equals(Gender.FEMALE)) return currentStock.getStockType().getFemaleName();
                 return "NA";
@@ -731,9 +731,9 @@ public class DialogCommon extends Component{
 
             fieldFather.setItemLabelGenerator(Stock::getDisplayName);
             fieldMother.setItemLabelGenerator(Stock::getDisplayName);
-            fieldFoster.setItems(litterService.getActiveLitters());
+            fieldFoster.setItems(litterService.getActiveLitters(currentStock.getStockType()));
             fieldFoster.setItemLabelGenerator(litter -> {
-                if(litter == null) return notFostered;
+                if(litter == null) return NOT_FOSTERED;
                 return litter.getDisplayName();
             });
 

@@ -4,19 +4,20 @@
  */
 package ca.jusjoken.data.service;
 
-import com.opencsv.bean.AbstractBeanField;
-import com.opencsv.exceptions.CsvConstraintViolationException;
-import com.opencsv.exceptions.CsvDataTypeMismatchException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 
+import com.opencsv.bean.AbstractBeanField;
+import com.opencsv.exceptions.CsvConstraintViolationException;
+import com.opencsv.exceptions.CsvDataTypeMismatchException;
+
 /**
  *
  * @author birch
  */
-public class LocalDateCsvConverterDDMMYYYY extends AbstractBeanField{
+public class LocalDateCsvConverterDDMMYYYY extends AbstractBeanField<LocalDateTime, String>{
 
     @Override
     protected Object convert(String string) throws CsvDataTypeMismatchException, CsvConstraintViolationException {

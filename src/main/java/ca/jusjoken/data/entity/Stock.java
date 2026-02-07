@@ -601,14 +601,14 @@ public class Stock {
         if (getWeight() > 0) {
             return Utility.getInstance().WeightConverterOzToHTML(getWeight());
         }
-        return "<p>" + Utility.emptyValue + "</p>";
+        return "<p>" + Utility.EMPTY_VALUE + "</p>";
     }
 
     public String getWeightInLbsOzAsString() {
         if (getWeight() > 0) {
             return Utility.getInstance().WeightConverterOzToString(getWeight());
         }
-        return Utility.emptyValue;
+        return Utility.EMPTY_VALUE;
     }
 
     public Boolean getNeedsSaving() {
@@ -701,14 +701,11 @@ public class Stock {
     }
     
     public SvgIcon getGenderIcon(){
-        switch(getSex()){
-            case FEMALE:
-                return new SvgIcon(Utility.ICONS.GENDER_FEMALE.getIconSource());
-            case MALE:
-                return new SvgIcon(Utility.ICONS.GENDER_MALE.getIconSource());
-            default:
-                return null;
-        }
+        return switch(getSex()){
+            case FEMALE -> new SvgIcon(Utility.ICONS.GENDER_FEMALE.getIconSource());
+            case MALE -> new SvgIcon(Utility.ICONS.GENDER_MALE.getIconSource());
+            default -> null;
+        };
     }
 
     public String getProfileImage() {
@@ -801,7 +798,7 @@ public class Stock {
         }
 
         if(forPedigree){
-            Badge badge = new Badge(Utility.emptyValue);
+            Badge badge = new Badge(Utility.EMPTY_VALUE);
             if(!getPrefix().isEmpty()){
                 badge.setText(getPrefix());
             }

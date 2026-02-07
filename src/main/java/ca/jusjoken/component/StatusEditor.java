@@ -31,7 +31,6 @@ import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,29 +46,28 @@ public class StatusEditor {
     
     private DialogMode dialogMode = DialogMode.CREATE;
     
-    private Logger log = LoggerFactory.getLogger(StatusEditor.class);
-    private Collection<StockStatus> statusTypes = Utility.getInstance().getStockStatusList(Boolean.FALSE);
-    private String stockStatusToEdit;
+    @SuppressWarnings("unused")
+    private final Logger log = LoggerFactory.getLogger(StatusEditor.class);
     private StockStatusHistory statusEntity;
-    private Dialog dialog = new Dialog();
+    private final Dialog dialog = new Dialog();
     private Boolean isStatusValid = Boolean.FALSE;
     private Boolean isCustom = Boolean.FALSE;
     private StockStatus stockStatus;
     private Stock stockEntity;
     private String dialogTitle = "";
 
-    private Button dialogOkButton = new Button("OK");
-    private Button dialogCancelButton = new Button("Cancel");
-    private Button dialogCloseButton = new Button(new Icon("lumo", "cross"));
+    private final Button dialogOkButton = new Button("OK");
+    private final Button dialogCancelButton = new Button("Cancel");
+    private final Button dialogCloseButton = new Button(new Icon("lumo", "cross"));
     
-    private TextArea notes = new TextArea();
-    private DateTimePicker statusDateTime = new DateTimePicker();
-    private NativeLabel promptLabel = new NativeLabel();
-    private VerticalLayout dialogLayout = new VerticalLayout();
-    private Span ageAsOf = new Span();
-    private WeightInput preButcherWeight = new WeightInput();
-    private WeightInput butcheredWeight = new WeightInput();
-    private NumberField butcheredValue = UIUtilities.getNumberField("Optional value", Boolean.FALSE, "$");
+    private final TextArea notes = new TextArea();
+    private final DateTimePicker statusDateTime = new DateTimePicker();
+    private final NativeLabel promptLabel = new NativeLabel();
+    private final VerticalLayout dialogLayout = new VerticalLayout();
+    private final Span ageAsOf = new Span();
+    private final WeightInput preButcherWeight = new WeightInput();
+    private final WeightInput butcheredWeight = new WeightInput();
+    private final NumberField butcheredValue = UIUtilities.getNumberField("Optional value", Boolean.FALSE, "$");
 
     private List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
     private StockStatusHistoryService statusService;
@@ -149,7 +147,6 @@ public class StatusEditor {
     public void dialogOpen(Stock stockEntity, String stockStatusToEdit, StockStatusHistory statusEntity, DialogMode mode){
         this.stockEntity = stockEntity;
         this.statusEntity = statusEntity;
-        this.stockStatusToEdit = stockStatusToEdit;
         dialogMode = mode;
         //check if the passed status is a valid one for edit
         isStatusValid = Utility.getInstance().hasStockStatus(stockStatusToEdit);

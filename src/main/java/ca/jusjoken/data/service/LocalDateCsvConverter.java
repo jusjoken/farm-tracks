@@ -15,6 +15,7 @@ import java.time.format.DateTimeParseException;
  *
  * @author birch
  */
+@SuppressWarnings("rawtypes")
 public class LocalDateCsvConverter extends AbstractBeanField{
 
     @Override

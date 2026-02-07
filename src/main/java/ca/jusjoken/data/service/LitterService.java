@@ -4,14 +4,16 @@
  */
 package ca.jusjoken.data.service;
 
+import java.util.Collections;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import ca.jusjoken.data.entity.StockType;
 
 /**
  *
@@ -19,14 +21,13 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class LitterService {
-    private LitterRepository litterRepository;
+    private final LitterRepository litterRepository;
 
     public LitterService(LitterRepository litterRepository) {
         this.litterRepository = litterRepository;
     }
     
     public List<Litter> getLitters(Stock stock){
-        List<Litter> litters = new ArrayList<>();
         if(!stock.getBreeder() || stock.getSex().equals(Utility.Gender.NA)) return List.of();
         if(stock.getSex().equals(Utility.Gender.FEMALE)){
             return litterRepository.findByMotherId(stock.getId());
@@ -37,7 +38,6 @@ public class LitterService {
     }
     
     public Long getLitterCountForParent(Stock stock){
-        List<Litter> litters = new ArrayList<>();
         if(!stock.getBreeder() || stock.getSex().equals(Utility.Gender.NA)) return 0L;
         if(stock.getSex().equals(Utility.Gender.FEMALE)){
             return litterRepository.countByMotherId(stock.getId());
@@ -47,8 +47,8 @@ public class LitterService {
         
     }
     
-    public List<Litter> getActiveLitters(){
-        List<Litter> litters = litterRepository.findNotArchived();
+    public List<Litter> getActiveLitters(StockType stockType){
+        List<Litter> litters = litterRepository.findNotArchived(stockType);
         Collections.sort(litters, new LitterComparator().reversed());
         return litters;
     }

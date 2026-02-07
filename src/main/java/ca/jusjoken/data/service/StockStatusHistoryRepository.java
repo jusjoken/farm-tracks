@@ -6,14 +6,13 @@ package ca.jusjoken.data.service;
 
 import ca.jusjoken.data.entity.StockStatusHistory;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
  *
  * @author birch
  */
-public interface StockStatusHistoryRepository extends JpaRepository<StockStatusHistory, UUID>{
+public interface StockStatusHistoryRepository extends JpaRepository<StockStatusHistory, Integer>{
 
     public List<StockStatusHistory> findByStockId(Integer stockId);
     

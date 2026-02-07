@@ -6,14 +6,13 @@ package ca.jusjoken.data.service;
 
 import ca.jusjoken.data.entity.StockWeightHistory;
 import java.util.List;
-import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**
  *
  * @author birch
  */
-public interface StockWeightHistoryRepository extends JpaRepository<StockWeightHistory, UUID> {
+public interface StockWeightHistoryRepository extends JpaRepository<StockWeightHistory, Integer> {
     
     public List<StockWeightHistory> findByStockId(Integer stockId);
     

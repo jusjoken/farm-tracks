@@ -4,11 +4,18 @@
  */
 package ca.jusjoken.data.entity;
 
+import java.text.DecimalFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Objects;
+
+import com.opencsv.bean.CsvBindByName;
+import com.opencsv.bean.CsvCustomBindByName;
+
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.service.LocalDateCsvConverter;
 import ca.jusjoken.data.service.LocalDateTimeCsvConverter;
-import com.opencsv.bean.CsvBindByName;
-import com.opencsv.bean.CsvCustomBindByName;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -17,11 +24,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Transient;
-import java.text.DecimalFormat;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Objects;
 
 /**
  *
@@ -33,6 +35,9 @@ public class Litter {
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "id", nullable = false)    
     private Integer id;
+
+    @ManyToOne
+    private StockType stockType;  //rabbit, goat, pig, cow etc.
 
     @CsvBindByName(column = "Prefix")
     private String prefix;
@@ -83,17 +88,19 @@ public class Litter {
     public String getDisplayName(){
         return getDoB().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) + " (" + getParentsFormatted() + ") - " + getName();
     }
+
+    
     
     public String getParentsFormatted(){
-        String motherName = "Unknown";
+        String motherNameStr = "Unknown";
         if(getMother()!=null) {
-            motherName = getMother().getName();
+            motherNameStr = getMother().getName();
         }
-        String fatherName = "Unknown";
+        String fatherNameStr = "Unknown";
         if(getFather()!=null) {
-            fatherName = getFather().getName();
+            fatherNameStr = getFather().getName();
         }
-        return motherName + "/" + fatherName;
+        return motherNameStr + "/" + fatherNameStr;
     }
     
     @CsvCustomBindByName(column = "Bred", converter = LocalDateCsvConverter.class)
@@ -199,7 +206,7 @@ public class Litter {
     private String getNameWithoutTattoo(String inVal){
         String retVal = "";
         if(inVal.contains("(")){
-            retVal = inVal.substring(0, inVal.indexOf("("));
+            retVal = inVal.substring(0, inVal.lastIndexOf("("));
         }else{
             retVal = inVal;
         }
@@ -211,7 +218,7 @@ public class Litter {
         if(inVal.contains("()")){
             retVal = "";
         }else{
-            retVal = inVal.substring(inVal.indexOf("(")+1, inVal.indexOf(")"));
+            retVal = inVal.substring(inVal.lastIndexOf("(")+1, inVal.lastIndexOf(")"));
         }
         return retVal;
     }
@@ -347,9 +354,40 @@ public class Litter {
     
     
 
+    public StockType getStockType() {
+        return stockType;
+    }
+
+    public void setStockType(StockType stockType) {
+        this.stockType = stockType;
+    }
+
     @Override
     public String toString() {
-        return "Litter{" + "id=" + id + ", prefix=" + prefix + ", name=" + name + ", breed=" + breed + ", cage=" + cage + ", fatherName=" + fatherName + ", motherName=" + motherName + ", father=" + father + ", mother=" + mother + ", bred=" + bred + ", doB=" + doB + ", kitsCount=" + kitsCount + ", soldKitsCount=" + soldKitsCount + ", diedKitsCount=" + diedKitsCount + ", litterWeightText=" + litterWeightText + ", litterWeight=" + litterWeight + ", archived=" + archived + ", notes=" + notes + ", needsSaving=" + needsSaving + '}';
+        StringBuilder sb = new StringBuilder();
+        sb.append("Litter{");
+        sb.append("id=").append(id);
+        sb.append(", stockType=").append(stockType);
+        sb.append(", prefix=").append(prefix);
+        sb.append(", name=").append(name);
+        sb.append(", breed=").append(breed);
+        sb.append(", cage=").append(cage);
+        sb.append(", fatherName=").append(fatherName);
+        sb.append(", motherName=").append(motherName);
+        sb.append(", father=").append(father);
+        sb.append(", mother=").append(mother);
+        sb.append(", bred=").append(bred);
+        sb.append(", doB=").append(doB);
+        sb.append(", kitsCount=").append(kitsCount);
+        sb.append(", soldKitsCount=").append(soldKitsCount);
+        sb.append(", diedKitsCount=").append(diedKitsCount);
+        sb.append(", litterWeightText=").append(litterWeightText);
+        sb.append(", litterWeight=").append(litterWeight);
+        sb.append(", archived=").append(archived);
+        sb.append(", notes=").append(notes);
+        sb.append(", needsSaving=").append(needsSaving);
+        sb.append('}');
+        return sb.toString();
     }
 
 

@@ -179,7 +179,7 @@ public class StockService {
     }
     
     public List<Stock> getMothers(String name, StockType stockType){
-        List<Stock> stockList = stockRepository.findAllMothers();
+        List<Stock> stockList = stockRepository.findAllMothers(stockType.getId());
         if(name==null || name.isEmpty()){
             Collections.sort(stockList, new StockComparator());
             return stockList;
@@ -191,7 +191,7 @@ public class StockService {
     }
     
     public List<Stock> getFathers(String name, StockType stockType){
-        List<Stock> stockList = stockRepository.findAllFathers();
+        List<Stock> stockList = stockRepository.findAllFathers(stockType.getId());
         if(name==null || name.isEmpty()){
             Collections.sort(stockList, new StockComparator());
             return stockList;

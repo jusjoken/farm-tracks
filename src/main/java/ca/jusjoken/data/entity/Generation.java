@@ -4,18 +4,20 @@
  */
 package ca.jusjoken.data.entity;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.vaadin.flow.component.details.Details;
+import com.vaadin.flow.component.details.DetailsVariant;
+import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.theme.lumo.LumoUtility;
+
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.AvatarDiv;
 import ca.jusjoken.component.Layout;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.Gender;
-import com.vaadin.flow.component.details.Details;
-import com.vaadin.flow.component.details.DetailsVariant;
-import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.theme.lumo.LumoUtility;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  *
@@ -26,8 +28,8 @@ public class Generation {
     private Generation father;
     private Generation mother;
     private Generation child;
-    private Details details = new Details();
-    private Layout header = new Layout();
+    private final Details details = new Details();
+    private final Layout header = new Layout();
     private Stock stock; //optional
 
     //pedigree fields
@@ -215,18 +217,18 @@ public class Generation {
     private void createPedigreeItem(){
         if(stock==null){
             if(name==null){ //use defaults
-                name = Utility.emptyValue;
-                prefix = Utility.emptyValue;
-                tattoo = Utility.emptyValue;
+                name = Utility.EMPTY_VALUE;
+                prefix = Utility.EMPTY_VALUE;
+                tattoo = Utility.EMPTY_VALUE;
                 doB = null;
-                color = Utility.emptyValue;
+                color = Utility.EMPTY_VALUE;
                 weight = null;
-                legs = Utility.emptyValue;
-                champNo = Utility.emptyValue;
-                regNo = Utility.emptyValue;
+                legs = Utility.EMPTY_VALUE;
+                champNo = Utility.EMPTY_VALUE;
+                regNo = Utility.EMPTY_VALUE;
                 sex = Gender.NA;
-                breed = Utility.emptyValue;
-                genotype = Utility.emptyValue;
+                breed = Utility.EMPTY_VALUE;
+                genotype = Utility.EMPTY_VALUE;
             }else{ //use entity
                 //prefilled
             }

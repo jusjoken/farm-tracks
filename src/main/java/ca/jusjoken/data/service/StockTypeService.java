@@ -4,10 +4,12 @@
  */
 package ca.jusjoken.data.service;
 
-import ca.jusjoken.data.entity.StockType;
 import java.util.List;
+
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+
+import ca.jusjoken.data.entity.StockType;
 
 /**
  *
@@ -15,7 +17,7 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class StockTypeService {
-    private StockTypeRepository typeRepository;
+    private final StockTypeRepository typeRepository;
 
     public StockTypeService(StockTypeRepository typeRepository) {
         this.typeRepository = typeRepository;
@@ -26,7 +28,7 @@ public class StockTypeService {
     }
     
     public StockType findById(Integer id){
-        return typeRepository.findById(id);
+        return typeRepository.findById(id).get();
     }
     
     public StockType findRabbits(){

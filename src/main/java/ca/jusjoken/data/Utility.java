@@ -4,20 +4,21 @@
  */
 package ca.jusjoken.data;
 
-import ca.jusjoken.data.service.ColumnNameComparator;
-import ca.jusjoken.data.service.StockStatus;
-import ca.jusjoken.data.service.StockStatusComparator;
-import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
+
+import ca.jusjoken.data.service.ColumnNameComparator;
+import ca.jusjoken.data.service.StockStatus;
+import ca.jusjoken.data.service.StockStatusComparator;
 
 /**
  *
@@ -35,8 +36,8 @@ public class Utility {
         return Utility.instance;
     }
     
-    private static final Map<String, StockStatus> stockStatusList = new HashMap();
-    private static final Map<String, ColumnName> stockColumnNameList = new HashMap();
+    private static final Map<String, StockStatus> stockStatusList = new HashMap<>();
+    private static final Map<String, ColumnName> stockColumnNameList = new HashMap<>();
     
     public static final LocalDateTime nullDate = LocalDateTime.of(1970, 1, 1, 0, 0);
 
@@ -56,20 +57,23 @@ public class Utility {
         
         public static Gender fromShortName(String shortName){
             switch (shortName){
-                case "M":
+                case "M" -> {
                     return Gender.MALE;
-                case "F":
+                }
+                case "F" -> {
                     return Gender.FEMALE;
-                case "NA":
+                }
+                case "NA" -> {
                     return Gender.NA;
-                default:
-                    throw new IllegalArgumentException("ShortName [" + shortName + "] not supported.");
+                }
+                default -> throw new IllegalArgumentException("ShortName [" + shortName + "] not supported.");
             }
         }
     }
 
     public static enum BreederFilter{
-        BREEDER(Boolean.TRUE), NONBREEDER(Boolean.FALSE), ALL(null);
+        BREEDER(Boolean.TRUE), NONBREEDER(Boolean.FALSE), @SuppressWarnings("null")
+        ALL(null);
 
         private final Boolean isBreeder;
         
@@ -80,6 +84,7 @@ public class Utility {
             return isBreeder;
         }
         
+        @SuppressWarnings("unused")
         public static BreederFilter fromIsBreeder(Boolean isBreeder){
             if(isBreeder==null){
                 return BreederFilter.ALL;
@@ -158,7 +163,7 @@ public class Utility {
         }
     }
     
-    public static final String emptyValue = "--";
+    public static final String EMPTY_VALUE = "--";
     
     private static void createStockColumnNameList(){
         stockColumnNameList.clear();
@@ -178,7 +183,7 @@ public class Utility {
     }
 
     public Collection<ColumnName> getStockColumnNameList() {
-        List<ColumnName> list = new ArrayList<ColumnName>(stockColumnNameList.values());
+        List<ColumnName> list = new ArrayList<>(stockColumnNameList.values());
         Collections.sort(list, new ColumnNameComparator());
         return list;
     }
@@ -187,6 +192,7 @@ public class Utility {
         return stockColumnNameList.containsKey(name);
     }
     
+    @SuppressWarnings("null")
     public ColumnName getColumnName(String name){
         if(name==null || name.isEmpty()){
             return stockColumnNameList.get("name");
@@ -218,6 +224,7 @@ public class Utility {
         return stockStatusList.containsKey(name);
     }
     
+    @SuppressWarnings("null")
     public StockStatus getStockStatus(String name){
         if(name==null || name.isEmpty()){
             return stockStatusList.get("active");
@@ -230,7 +237,7 @@ public class Utility {
     }
 
     public Collection<StockStatus> getStockStatusList(Boolean includeSummaryItems) {
-        List<StockStatus> list = new ArrayList<StockStatus>(stockStatusList.values());
+        List<StockStatus> list = new ArrayList<>(stockStatusList.values());
         if(!includeSummaryItems){
             //remove the general items not needed here (all, active, inactive)
             list.remove(getStockStatus("all"));

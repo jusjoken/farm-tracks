@@ -6,7 +6,6 @@ package ca.jusjoken.component;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.entity.Stock;
-import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockWeightHistory;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockWeightHistoryService;
@@ -24,7 +23,6 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -41,6 +39,7 @@ public class WeightEditor {
     
     private DialogMode dialogMode = DialogMode.CREATE;
     
+    @SuppressWarnings("unused")
     private Logger log = LoggerFactory.getLogger(WeightEditor.class);
     private Dialog dialog = new Dialog();
     private StockWeightHistory weight;

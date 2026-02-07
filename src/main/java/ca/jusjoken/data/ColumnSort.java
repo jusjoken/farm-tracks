@@ -38,6 +38,7 @@ private Sort.Direction columnSortDirection = Sort.Direction.ASC;
         this.columnSortDirection = columnSortDirection;
     }
     
+    @SuppressWarnings("null")
     public Sort.Order getSortOrder(){
         if(columnName==null) return null;
         return new Sort.Order(columnSortDirection, columnName);

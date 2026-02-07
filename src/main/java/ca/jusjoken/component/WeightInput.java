@@ -6,12 +6,10 @@ package ca.jusjoken.component;
 
 import ca.jusjoken.data.Utility;
 import com.vaadin.flow.component.AbstractCompositeField;
-import com.vaadin.flow.component.AbstractField;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.textfield.NumberField;
-import com.vaadin.flow.shared.Registration;
 
 /**
  *

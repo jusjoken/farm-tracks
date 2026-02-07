@@ -1,5 +1,41 @@
 package ca.jusjoken.views;
 
+import java.util.List;
+
+import org.springframework.security.core.userdetails.UserDetails;
+
+import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
+import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.ComponentUtil;
+import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.applayout.AppLayout;
+import com.vaadin.flow.component.applayout.DrawerToggle;
+import com.vaadin.flow.component.avatar.Avatar;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.contextmenu.ContextMenu;
+import com.vaadin.flow.component.contextmenu.MenuItem;
+import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.Footer;
+import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.html.Header;
+import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
+import static com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.END;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.Scroller;
+import com.vaadin.flow.component.page.ColorScheme;
+import com.vaadin.flow.component.page.ColorScheme.Value;
+import com.vaadin.flow.component.sidenav.SideNav;
+import com.vaadin.flow.component.sidenav.SideNavItem;
+import com.vaadin.flow.router.AfterNavigationEvent;
+import com.vaadin.flow.router.AfterNavigationObserver;
+import com.vaadin.flow.router.Layout;
+import com.vaadin.flow.server.auth.AccessAnnotationChecker;
+import com.vaadin.flow.server.auth.AnonymousAllowed;
+import com.vaadin.flow.server.menu.MenuConfiguration;
+import com.vaadin.flow.spring.security.AuthenticationContext;
+import com.vaadin.flow.theme.lumo.LumoUtility;
+
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.ComponentConfirmEvent;
 import ca.jusjoken.component.DialogCommon;
@@ -14,37 +50,6 @@ import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.views.stock.StockPedigreeEditor;
 import ca.jusjoken.views.stock.StockView;
 import ca.jusjoken.views.utility.MaintenanceView;
-import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
-import com.vaadin.flow.component.AttachEvent;
-import com.vaadin.flow.component.ComponentUtil;
-import com.vaadin.flow.component.UI;
-import com.vaadin.flow.component.applayout.AppLayout;
-import com.vaadin.flow.component.applayout.DrawerToggle;
-import com.vaadin.flow.component.avatar.Avatar;
-import com.vaadin.flow.component.contextmenu.ContextMenu;
-import com.vaadin.flow.component.contextmenu.MenuItem;
-import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.component.html.Footer;
-import com.vaadin.flow.component.html.H1;
-import com.vaadin.flow.component.html.Header;
-import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
-import com.vaadin.flow.component.orderedlayout.Scroller;
-import com.vaadin.flow.component.page.ColorScheme;
-import com.vaadin.flow.component.page.ColorScheme.Value;
-import com.vaadin.flow.component.sidenav.SideNav;
-import com.vaadin.flow.component.sidenav.SideNavItem;
-import com.vaadin.flow.router.AfterNavigationEvent;
-import com.vaadin.flow.router.AfterNavigationObserver;
-import com.vaadin.flow.router.Layout;
-import com.vaadin.flow.server.auth.AccessAnnotationChecker;
-import com.vaadin.flow.server.auth.AnonymousAllowed;
-import com.vaadin.flow.server.menu.MenuConfiguration;
-import com.vaadin.flow.shared.Registration;
-import com.vaadin.flow.spring.security.AuthenticationContext;
-import com.vaadin.flow.theme.lumo.LumoUtility;
-import java.util.List;
-import org.springframework.security.core.userdetails.UserDetails;
 
 /**
  * The main view is a top-level placeholder for other views.
@@ -57,10 +62,9 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     private final StockSavedQueryService queryService;
     private final StockTypeService typeService;
     
-    private Registration registration;
-    private SideNav nav = new SideNav();
-    private AccessAnnotationChecker accessChecker;
-    private DialogCommon dialogCommon;
+    private final SideNav nav = new SideNav();
+    private final AccessAnnotationChecker accessChecker;
+    private final DialogCommon dialogCommon;
 
     private H1 viewTitle;
 
@@ -70,12 +74,16 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         this.authContext = authContext;
         this.accessChecker = accessChecker;
         this.dialogCommon = new DialogCommon();
-        dialogCommon.addListener(this);
+        setupListeners();
         
         //StockView.class.addListener(this);
         setPrimarySection(Section.DRAWER);
         addDrawerContent();
         addHeaderContent();
+    }
+
+    private void setupListeners(){
+        dialogCommon.addListener(this);
     }
 
     private void addHeaderContent() {
@@ -95,8 +103,11 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         if(authContext.isAuthenticated()){
             userName = authContext.getAuthenticatedUser(UserDetails.class).get().getUsername();
         }
+
+        //TODO: add Button that show Avatar when not authenticated - add Paw icon to avatar
         
-        Avatar avatar = new Avatar(userName);
+        Avatar avatar = new Avatar();
+        avatar.setAbbreviation("FT");
         avatar.addClassNames(LumoUtility.Margin.Horizontal.SMALL);
         avatar.setTooltipEnabled(true);
         avatar.addClassNames(LumoUtility.Position.ABSOLUTE, LumoUtility.Position.End.XSMALL, LumoUtility.Position.Top.XSMALL);
@@ -104,23 +115,25 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         avatar.getStyle().set("cursor","pointer");
         avatar.getElement().setAttribute("tabindex", "-1");
         
-        ContextMenu menu = new ContextMenu(avatar);
-        menu.setOpenOnClick(true);
-
-        Div heading = new Div();
-        heading.setText(userName);
-        heading.getStyle().set("text-align", "center");
-        heading.getStyle().set("font-weight", "bold");
-        heading.getStyle().set("padding", "8px");
-        
         if(authContext.isAuthenticated()){
+            ContextMenu menu = new ContextMenu(avatar);
+            avatar.setName("Farm Tracks Menu");
+        
+            menu.setOpenOnClick(true);
+
+            Div heading = new Div();
+            heading.setText(userName);
+            heading.getStyle().set("text-align", "center");
+            heading.getStyle().set("font-weight", "bold");
+            heading.getStyle().set("padding", "8px");
+        
             menu.addComponent(heading);
             menu.addSeparator();
             //add new stock item for each StockType
             
             List<StockType> stockTypes = typeService.findAllStockTypes();
             for(StockType type: stockTypes){
-                MenuItem addNew = menu.addItem("Add new " + type.getNameSingular(), event -> {
+                menu.addItem("Add new " + type.getNameSingular(), event -> {
                     //open stock edit dialog
                     Stock newStock = new Stock();
                     newStock.setExternal(false);
@@ -149,15 +162,21 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
             menu.addItem("Sign out", event -> {
                 authContext.logout();
             });
+            userMenu.add(avatar);  
+            return userMenu;
         }else{
-            menu.addItem("Sign in", event -> {
-                menu.getUI().ifPresent(ui -> ui.navigate("/login"));
+            avatar.setName("Farm Tracks Signin");
+            Button ftSignin = new Button(avatar);
+            ftSignin.addClickListener(click -> {
+                click.getSource().getUI().ifPresent(ui -> ui.navigate("/login"));
             });
+            userMenu.add(ftSignin);
+            userMenu.setAlignItems(END);
+            userMenu.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+            avatar.setTooltipEnabled(true);
+            return userMenu;
         }
 
-        //userMenu.add(button, popover);  
-        userMenu.add(avatar);  
-        return userMenu;
     }
     
     private void setModeText(MenuItem mode){
@@ -191,7 +210,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
                 SideNavItem stockGroupItem = new SideNavItem(type.getName());
                 stockGroupItem.setExpanded(true);
                 List<StockSavedQuery> stockQueryList = queryService.getSavedQueryListByType(type);
-                if(stockQueryList.size()>0){
+                if(!stockQueryList.isEmpty()){
                     nav.addItem(stockGroupItem);
                 }
                 for(StockSavedQuery query: stockQueryList){
@@ -234,7 +253,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent); 
         System.out.println("MainLayout: onAttach");
-        registration = ComponentUtil.addListener(attachEvent.getUI(), ComponentConfirmEvent.class, event ->{
+        ComponentUtil.addListener(attachEvent.getUI(), ComponentConfirmEvent.class, event ->{
             createNavigation();
             if(event.getSource().getId().isPresent()){
                 String currentId = event.getSource().getId().get();

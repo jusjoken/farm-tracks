@@ -4,6 +4,18 @@
  */
 package ca.jusjoken.data;
 
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.springframework.scheduling.annotation.Async;
+
+import com.opencsv.bean.CsvToBeanBuilder;
+
 import ca.jusjoken.component.ProgressBarUpdateListener;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
@@ -14,20 +26,10 @@ import ca.jusjoken.data.service.LitterRepository;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockRepository;
-import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeRepository;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.data.service.StockWeightHistoryService;
-import com.opencsv.bean.CsvToBeanBuilder;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.springframework.scheduling.annotation.Async;
 
 
 /**
@@ -36,7 +38,6 @@ import org.springframework.scheduling.annotation.Async;
  */
 public class Import {
     StockRepository stockRepository;
-    StockService stockService;
     StockTypeRepository stockTypeRepository;
     StockTypeService typeService;
     LitterRepository litterRepository;
@@ -46,11 +47,10 @@ public class Import {
     private List<Stock> breederImportList = new ArrayList<>();
     private List<Stock> kitImportList = new ArrayList<>();
     private List<Litter> litterImportList = new ArrayList<>();
-    private List<ProgressBarUpdateListener> listProgressListeners = new ArrayList<>();
+    private final List<ProgressBarUpdateListener> listProgressListeners = new ArrayList<>();
 
     public Import() {
         this.stockRepository = Registry.getBean(StockRepository.class);
-        this.stockService = Registry.getBean(StockService.class);
         this.stockTypeRepository = Registry.getBean(StockTypeRepository.class);
         this.typeService = Registry.getBean(StockTypeService.class);
         this.litterRepository = Registry.getBean(LitterRepository.class);
@@ -61,7 +61,7 @@ public class Import {
     
     public void importBreederFromEverbreed(String filePath){
         try {
-            breederImportList = new CsvToBeanBuilder(new FileReader(filePath))
+            breederImportList = new CsvToBeanBuilder<Stock>(new FileReader(filePath))
                     .withType(Stock.class).build().parse();
         } catch (FileNotFoundException ex) {
             clearBreederList();
@@ -71,7 +71,7 @@ public class Import {
 
     public void importKitFromEverbreed(String filePath){
         try {
-            kitImportList = new CsvToBeanBuilder(new FileReader(filePath))
+            kitImportList = new CsvToBeanBuilder<Stock>(new FileReader(filePath))
                     .withType(Stock.class).build().parse();
         } catch (FileNotFoundException ex) {
             clearKitList();
@@ -81,7 +81,7 @@ public class Import {
 
     public void importLitterFromEverbreed(String filePath){
         try {
-            litterImportList = new CsvToBeanBuilder(new FileReader(filePath))
+            litterImportList = new CsvToBeanBuilder<Litter>(new FileReader(filePath))
                     .withType(Litter.class).build().parse();
         } catch (FileNotFoundException ex) {
             clearLitterList();
@@ -90,7 +90,7 @@ public class Import {
     }
     
     @Async
-    public CompletableFuture processAllImportsFromEverbreed(){
+    public CompletableFuture<String> processAllImportsFromEverbreed(){
         Boolean continueImport = Boolean.TRUE;
         StockType rabbitType = typeService.findRabbits();
         if(rabbitType==null){
@@ -109,7 +109,7 @@ public class Import {
                 //delete weight
                 weightService.deleteByStockId(rabbit.getId());
                 //delete litters
-                litterService.deleteByStockId(rabbit.getId());
+                //litterService.deleteByStockId(rabbit.getId());
                 counter++;
                 notifyProgressUpdate(counter);
             }
@@ -120,28 +120,6 @@ public class Import {
             notifyProgressUpdate(1.0);
         }
         
-        /*
-        notifyProgressMax(1.0);
-        notifyProgressStatus("Deleting all existing everbreed records prior to import.");
-        System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed stock records");
-        notifyProgressUpdate(0.2);
-        stockRepository.deleteAll();
-
-        System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed litter records");
-        notifyProgressUpdate(0.7);
-        litterRepository.deleteAllLittersNative();
-        
-        System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed status history records");
-        notifyProgressUpdate(0.8);
-        statusService.deleteAll();
-
-        System.out.println("processAllImportsFromEverbreed: deleting all existing everbreed weight history records");
-        notifyProgressUpdate(0.9);
-        weightService.deleteAll();
-
-        notifyProgressUpdate(1.0);
-        */
-
         if(continueImport){
             if(!kitImportList.isEmpty()){
                 System.out.println("processAllImportsFromEverbreed: processing kits");
@@ -198,10 +176,16 @@ public class Import {
         processLitterList(litterImportList);
         return Boolean.TRUE;
     }
-    
-    private void processStockList(List<Stock> importList, Boolean isBreeder) {
+
+    private StockType getRabbitStockType(){
         StockType stRabbit = stockTypeRepository.findByName("Rabbits");
         if(stRabbit==null) stRabbit = new StockType("Rabbits", "Rabbit", "Buck", "Doe", "Breeders", "Kits", Boolean.TRUE);
+        return stRabbit;
+    }
+    
+    private void processStockList(List<Stock> importList, Boolean isBreeder) {
+
+        StockType stRabbit = getRabbitStockType();
 
         notifyProgressMax(Double.valueOf(importList.size()));
         if(isBreeder){
@@ -273,8 +257,8 @@ public class Import {
         notifyProgressStatus("Processing all Parent records from everbreed.");
         for(Stock item: importList){
             //process the import
-            Integer fatherId = null;
-            Integer motherId = null;
+            Integer fatherId;
+            Integer motherId;
             item.setNeedsSaving(Boolean.FALSE);
             if(!item.getFatherName().isEmpty()){
                 System.out.println("processStockParents: FatherText:" + item.getFatherName() + " nameWithoutTattoo:" + item.getFatherNameWithoutTattoo() + " tattoo:" + item.getFatherTattoo());
@@ -311,15 +295,17 @@ public class Import {
     }
     
     private void processLitterList(List<Litter> importList) {
+        StockType stRabbit = getRabbitStockType();
         notifyProgressMax(Double.valueOf(importList.size()));
         Double counter = 0.0;
         notifyProgressStatus("Processing all Litter records from everbreed.");
         List<Litter> litterMissingKits = new ArrayList<>();
         for(Litter item: importList){
             System.out.println("processLitterList: processing item:" + item.toString());
-            item.setNeedsSaving(Boolean.FALSE);
-            Integer fatherId = null;
-            Integer motherId = null;
+            item.setStockType(stRabbit);
+            item.setNeedsSaving(Boolean.TRUE);
+            Integer fatherId;
+            Integer motherId;
             if(!item.getFatherName().isEmpty()){
                 System.out.println("processLitterList: FatherText:" + item.getFatherName() + " nameWithoutTattoo:" + item.getFatherNameWithoutTattoo() + " tattoo:" + item.getFatherTattoo());
                 Stock fatherStock = stockRepository.findByNameAndTattoo(item.getFatherNameWithoutTattoo(),item.getFatherTattoo());
@@ -332,7 +318,7 @@ public class Import {
                 }
             }
             if(!item.getMotherName().isEmpty()){
-                System.out.println("processLitterList: MotherText:" + item.getMotherName());
+                System.out.println("processLitterList: MotherText:" + item.getMotherName() + " nameWithoutTattoo:" + item.getMotherNameWithoutTattoo() + " tattoo:" + item.getMotherTattoo());
                 Stock motherStock = stockRepository.findByNameAndTattoo(item.getMotherNameWithoutTattoo(), item.getMotherTattoo());
                 System.out.println("processLitterList: MotherStock:" + motherStock);
                 if(motherStock!=null){

@@ -85,7 +85,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -108,41 +107,41 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     private StockType viewStockType;
     private Stock selectedParent;
     private Boolean hasStock;
-    private String name = Utility.emptyValue;
+    //private String name = Utility.EMPTY_VALUE;
     private List<Generation> genList;
     private TreeData<Generation> treeData = new TreeData<>();
-    private TreeGrid<Generation> tree = new TreeGrid();
+    private TreeGrid<Generation> tree = new TreeGrid<>();
     private Integer selectedGenerationIndex = null;
     private Generation selectedGeneration;
-    private MasterDetailLayout mdLayout = new MasterDetailLayout();
-    private File appPath = new File(System.getProperty("user.dir"));
-    private File outputDir = new File(appPath,"output");
-    private File pdfFile = null;
+    private final MasterDetailLayout mdLayout = new MasterDetailLayout();
+    private final File appPath = new File(System.getProperty("user.dir"));
+    private final File outputDir = new File(appPath,"output");
+    //private File pdfFile = null;
     private String pdfFileName = "";
     @Value("classpath:Pedigree_Template.docx")
-    private Resource resourcePedigreeTemplate;
+    private final Resource resourcePedigreeTemplate;
     @Value("classpath:Pedigree_Template_portrait.docx")
-    private Resource resourcePedigreeTemplatePortrait;
+    private final Resource resourcePedigreeTemplatePortrait;
     @Value("classpath:/META-INF/resources/images/gender_male.png")
-    private Resource resourceGenderMale;
+    private final Resource resourceGenderMale;
     @Value("classpath:/META-INF/resources/images/gender_female.png")
-    private Resource resourceGenderFemale;
-    private Logger log = LoggerFactory.getLogger(StockPedigreeEditor.class);
+    private final Resource resourceGenderFemale;
+    private final Logger log = LoggerFactory.getLogger(StockPedigreeEditor.class);
     //all include options
-    private FormLayout settingsForm = new FormLayout();
-    private DialogCommon dialogCommon;
+    private final FormLayout settingsForm = new FormLayout();
+    private final DialogCommon dialogCommon;
 
-    private Checkbox includeDob = new Checkbox();
-    private Checkbox includeColor = new Checkbox();
-    private Checkbox includeBreed = new Checkbox();
-    private Checkbox includeWeight = new Checkbox();
-    private Checkbox includeGeno = new Checkbox();
-    private Checkbox includeId = new Checkbox();
-    private Checkbox includeLegs = new Checkbox();
-    private Checkbox includeRegNo = new Checkbox();
-    private Checkbox includeChampNo = new Checkbox();
+    private final Checkbox includeDob = new Checkbox();
+    private final Checkbox includeColor = new Checkbox();
+    private final Checkbox includeBreed = new Checkbox();
+    private final Checkbox includeWeight = new Checkbox();
+    private final Checkbox includeGeno = new Checkbox();
+    private final Checkbox includeId = new Checkbox();
+    private final Checkbox includeLegs = new Checkbox();
+    private final Checkbox includeRegNo = new Checkbox();
+    private final Checkbox includeChampNo = new Checkbox();
 
-    private List<Integer> topLevelGenerations = new ArrayList<>();
+    private final List<Integer> topLevelGenerations = new ArrayList<>();
     private ParagraphStyle topLevelDetailsStyle;
     private ParagraphStyle allLevelDetailsStyle;
     private Integer rowCounter = 0;
@@ -257,11 +256,11 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         if(hasStock) headerForm.add(detailsButton);
         
         //tree design
-        Column treeColumn = tree.addComponentHierarchyColumn(gen -> {
+        Column<Generation> treeColumn = tree.addComponentHierarchyColumn(gen -> {
             return new Div("");
         }).setWidth("100px").setFlexGrow(0);
 
-        Column mainColumn = tree.addComponentColumn(Generation::getHeader).setHeader("").setWidth("400px").setFlexGrow(1);
+        Column<Generation> mainColumn = tree.addComponentColumn(Generation::getHeader).setHeader("").setWidth("400px").setFlexGrow(1);
         HeaderRow headerRow = tree.prependHeaderRow();
         headerRow.join(treeColumn,mainColumn).setComponent(headerForm);
 
@@ -508,7 +507,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         HorizontalLayout parentLayout = UIUtilities.getHorizontalLayout(false, true, false);
         parentLayout.setThemeVariants(HorizontalLayoutVariant.LUMO_SPACING_XS);
         parentLayout.setAlignItems(FlexComponent.Alignment.BASELINE);
-        Select<Stock> parentSelect = new Select();
+        Select<Stock> parentSelect = new Select<>();
         parentSelect.setWidthFull();
         //parentSelect.setItemLabelGenerator(Stock::getDisplayName);
         parentSelect.setItemLabelGenerator(labelItem -> {
@@ -611,7 +610,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
                     ((HasSize) formItemField).setWidthFull();
                     if(showDetailsReadOnly){
                         if(formItemField instanceof AbstractField){
-                            ((AbstractField) formItemField).setReadOnly(true);
+                            ((AbstractField<?, ?>) formItemField).setReadOnly(true);
                         }
                     }
                 }
@@ -669,7 +668,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     }
     
     private Stock createGenericStock(Utility.Gender sex){
-        Stock genStock = new Stock(Utility.emptyValue ,Boolean.TRUE, viewStockType);
+        Stock genStock = new Stock(Utility.EMPTY_VALUE ,Boolean.TRUE, viewStockType);
         genStock.setSex(sex);
         return genStock;
     }
@@ -685,12 +684,11 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
             System.err.println("Failed to create directory: " + e.getMessage());
         }        
         
-        File outputFile = new File(outputDir,pdfFileName);
-        pdfFile = outputFile;
+        //File outputFile = new File(outputDir,pdfFileName);
+        //pdfFile = outputFile;
         try {
             
             InputStream in = resourcePedigreeTemplate.getInputStream();
-            InputStream inP = resourcePedigreeTemplatePortrait.getInputStream();
             Document document = new Document();
             document.loadFromStream(in, FileFormat.Doc);
             //create a reduced font size style for name for top level
@@ -952,8 +950,9 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         return count;
     }
     
+    @SuppressWarnings("unchecked")
     private void replaceGenderImage(Document document, Gender sex){
-       ArrayList<DocumentObject> pictures = new ArrayList();
+       ArrayList<DocumentObject> pictures = new ArrayList<>();
 
         // Iterate through all section
         for (Section section : (Iterable<Section>) document.getSections()) {
@@ -1007,10 +1006,6 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         para.getFormat().setBeforeSpacing(0);
         para.getFormat().setAfterSpacing(0);
         return para;
-    }
-    
-    private void addParagraph(Document document, Integer counter, TextBodyPart bp, String itemLabel, String itemValue){
-        addParagraph(document, counter, bp, itemLabel, itemValue, null);
     }
     
     private void addParagraph(Document document, Integer counter, TextBodyPart bp, String itemLabel, String itemValue, Checkbox itemInclude){
@@ -1092,7 +1087,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         }else{
             hasStock = Boolean.TRUE;
             viewStockType = stock.getStockType();
-            name = stock.getDisplayName();
+            //name = stock.getDisplayName();
         }
         removeAll();
         add(createContent());
@@ -1103,8 +1098,6 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         pdfViewerDialog.setResizable(true);
         pdfViewerDialog.setSizeFull();
         pdfViewerDialog.setHeaderTitle("Pedigree PDF Viewer:" + stock.getDisplayName());
-        VerticalLayout dialogLayout = UIUtilities.getVerticalLayout(true, true, false);
-        //pdfViewerDialog.add(dialogLayout);
         Button cancelButton = new Button(FontAwesome.Solid.X.create());
         cancelButton.setTooltipText("Close");
         cancelButton.addClickListener(e -> {
@@ -1132,7 +1125,6 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
                 return DownloadResponse.error(500);
             }            
         }));
-        //dialogLayout.add(pdfViewer);
         pdfViewerDialog.open();
     }
     

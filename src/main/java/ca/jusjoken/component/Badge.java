@@ -1,15 +1,15 @@
 package ca.jusjoken.component;
 
-import ca.jusjoken.utility.BadgeVariant;
-import com.vaadin.flow.component.Component;
+import java.util.stream.Stream;
+
 import com.vaadin.flow.component.HasTheme;
 import com.vaadin.flow.component.html.Span;
 
-import java.util.stream.Stream;
+import ca.jusjoken.utility.BadgeVariant;
 
 public class Badge extends Span implements HasTheme {
 
-    private Component icon;
+    //private Component icon;
 
     public Badge() {
         addThemeName("badge");
@@ -25,7 +25,7 @@ public class Badge extends Span implements HasTheme {
         addThemeVariants(variants);
     }
 
-    public void addThemeVariants(BadgeVariant... variants) {
+    public final void addThemeVariants(BadgeVariant... variants) {
         getThemeNames().addAll(Stream.of(variants).map(BadgeVariant::getVariantName).toList());
     }
 }

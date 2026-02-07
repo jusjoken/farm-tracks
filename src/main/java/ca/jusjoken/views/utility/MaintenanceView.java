@@ -7,6 +7,7 @@ package ca.jusjoken.views.utility;
 import ca.jusjoken.component.ProgressBarUpdateListener;
 import ca.jusjoken.data.Import;
 import ca.jusjoken.data.Utility;
+import ca.jusjoken.data.Utility.ImportType;
 import ca.jusjoken.data.service.BackendService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -121,9 +122,9 @@ public class MaintenanceView extends Div implements ProgressBarUpdateListener{
         upload.setAcceptedFileTypes("text/csv");
         
         String buttonName;
-        if(importType.equals(importType.BREEDERS)){
+        if(importType.equals(ImportType.BREEDERS)){
             buttonName = "Select breeders file for import";
-        }else if(importType.equals(importType.KITS)){
+        }else if(importType.equals(ImportType.KITS)){
             buttonName = "Select kits file for import";
         }else{
             buttonName = "Select litters file for import";
@@ -166,19 +167,19 @@ public class MaintenanceView extends Div implements ProgressBarUpdateListener{
             FileData savedFileData = fileBuffer.getFileData();
             String filePath = savedFileData.getFile().getAbsolutePath();
             System.out.println("file:" + filePath);
-            if(importType.equals(importType.BREEDERS)){
+            if(importType.equals(ImportType.BREEDERS)){
                 breederUpload = upload;
                 importUtility.importBreederFromEverbreed(filePath);
                 if(importUtility.hasBreeders() && autoProcess){
                     importUtility.processBreedersFromEverbreed();
                 }
-            }else if(importType.equals(importType.KITS)){
+            }else if(importType.equals(ImportType.KITS)){
                 kitUpload = upload;
                 importUtility.importKitFromEverbreed(filePath);
                 if(importUtility.hasKits() && autoProcess){
                     importUtility.processKitsFromEverbreed();
                 }
-            }else if(importType.equals(importType.LITTERS)){
+            }else if(importType.equals(ImportType.LITTERS)){
                 litterUpload = upload;
                 importUtility.importLitterFromEverbreed(filePath);
                 if(importUtility.hasLitters()&& autoProcess){

@@ -4,12 +4,13 @@
  */
 package ca.jusjoken.data.service;
 
-import ca.jusjoken.data.entity.StockSavedQuery;
-import ca.jusjoken.data.entity.StockType;
 import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import ca.jusjoken.data.entity.StockSavedQuery;
 
 /**
  *

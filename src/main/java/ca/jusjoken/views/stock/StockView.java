@@ -1,5 +1,73 @@
 package ca.jusjoken.views.stock;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.NoSuchElementException;
+
+import org.springframework.data.domain.Sort;
+
+import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
+import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.ComponentUtil;
+import com.vaadin.flow.component.Html;
+import com.vaadin.flow.component.Text;
+import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.Unit;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
+import com.vaadin.flow.component.contextmenu.ContextMenu;
+import com.vaadin.flow.component.contextmenu.MenuItem;
+import com.vaadin.flow.component.details.Details;
+import com.vaadin.flow.component.details.DetailsVariant;
+import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.grid.GridVariant;
+import com.vaadin.flow.component.grid.dataview.GridLazyDataView;
+import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.Hr;
+import com.vaadin.flow.component.html.Main;
+import com.vaadin.flow.component.html.NativeLabel;
+import com.vaadin.flow.component.html.Section;
+import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.menubar.MenuBar;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
+import com.vaadin.flow.component.select.Select;
+import com.vaadin.flow.component.tabs.Tab;
+import com.vaadin.flow.component.tabs.TabSheet;
+import com.vaadin.flow.component.textfield.TextArea;
+import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.data.renderer.ComponentRenderer;
+import com.vaadin.flow.data.renderer.LocalDateRenderer;
+import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
+import com.vaadin.flow.data.renderer.TextRenderer;
+import com.vaadin.flow.data.value.ValueChangeMode;
+import com.vaadin.flow.router.BeforeEvent;
+import com.vaadin.flow.router.HasDynamicTitle;
+import com.vaadin.flow.router.HasUrlParameter;
+import com.vaadin.flow.router.OptionalParameter;
+import com.vaadin.flow.router.Route;
+import com.vaadin.flow.theme.lumo.LumoIcon;
+import com.vaadin.flow.theme.lumo.LumoUtility.AlignItems;
+import com.vaadin.flow.theme.lumo.LumoUtility.Border;
+import com.vaadin.flow.theme.lumo.LumoUtility.BorderRadius;
+import com.vaadin.flow.theme.lumo.LumoUtility.BoxShadow;
+import com.vaadin.flow.theme.lumo.LumoUtility.Display;
+import com.vaadin.flow.theme.lumo.LumoUtility.Flex;
+import com.vaadin.flow.theme.lumo.LumoUtility.FlexDirection;
+import com.vaadin.flow.theme.lumo.LumoUtility.FontSize;
+import com.vaadin.flow.theme.lumo.LumoUtility.FontWeight;
+import com.vaadin.flow.theme.lumo.LumoUtility.Height;
+import com.vaadin.flow.theme.lumo.LumoUtility.Margin;
+import com.vaadin.flow.theme.lumo.LumoUtility.MinWidth;
+import com.vaadin.flow.theme.lumo.LumoUtility.Overflow;
+import com.vaadin.flow.theme.lumo.LumoUtility.Padding;
+import com.vaadin.flow.theme.lumo.LumoUtility.Position;
+
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.AvatarDiv;
 import ca.jusjoken.component.ComponentConfirmEvent;
@@ -24,64 +92,15 @@ import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.entity.StockWeightHistory;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.StockRepository;
-import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockSavedQueryService;
+import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeRepository;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.data.service.StockWeightHistoryService;
 import ca.jusjoken.views.MainLayout;
-
-import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
-import com.vaadin.flow.component.AttachEvent;
-import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.ComponentUtil;
-import com.vaadin.flow.component.Html;
-import com.vaadin.flow.component.Text;
-import com.vaadin.flow.component.UI;
-import com.vaadin.flow.component.Unit;
-import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
-import com.vaadin.flow.component.contextmenu.ContextMenu;
-import com.vaadin.flow.component.contextmenu.MenuItem;
-import com.vaadin.flow.component.details.Details;
-import com.vaadin.flow.component.details.DetailsVariant;
-import com.vaadin.flow.component.html.*;
-import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
-import com.vaadin.flow.component.select.Select;
-import com.vaadin.flow.component.tabs.Tab;
-import com.vaadin.flow.component.tabs.TabSheet;
-import com.vaadin.flow.component.textfield.TextArea;
-import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.grid.GridVariant;
-import com.vaadin.flow.component.grid.dataview.GridLazyDataView;
-import com.vaadin.flow.component.icon.Icon;
-import com.vaadin.flow.component.menubar.MenuBar;
-import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
-import com.vaadin.flow.data.renderer.ComponentRenderer;
-import com.vaadin.flow.data.renderer.LocalDateRenderer;
-import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
-import com.vaadin.flow.data.renderer.TextRenderer;
-import com.vaadin.flow.data.value.ValueChangeMode;
-import com.vaadin.flow.function.SerializableConsumer;
-import com.vaadin.flow.router.BeforeEvent;
-import com.vaadin.flow.router.HasDynamicTitle;
-import com.vaadin.flow.router.HasUrlParameter;
-import com.vaadin.flow.router.OptionalParameter;
-import com.vaadin.flow.router.Route;
-import com.vaadin.flow.theme.lumo.LumoIcon;
-import com.vaadin.flow.theme.lumo.LumoUtility.*;
-
 import jakarta.annotation.security.PermitAll;
-
-import java.util.Collection;
-import java.util.List;
-import java.util.NoSuchElementException;
-import org.springframework.data.domain.Sort;
 
 @Route(value = "stock", layout = MainLayout.class)
 @PermitAll
@@ -272,7 +291,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         sort1Direction.setLabel("Sort Direction");
         sort1Direction.setTooltipText("Sort Direction");
         sort1Direction.addValueChangeListener(event -> {
-            currentStockSavedQuery.setSort1Direction(event.getValue().toString());
+            currentStockSavedQuery.setSort1Direction(event.getValue());
             sidebarChanged(Boolean.TRUE);
         });
 
@@ -302,7 +321,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         sort2Direction.setLabel("Sort Direction");
         sort2Direction.setTooltipText("Sort Direction");
         sort2Direction.addValueChangeListener(event -> {
-            currentStockSavedQuery.setSort2Direction(event.getValue().toString());
+            currentStockSavedQuery.setSort2Direction(event.getValue());
             sidebarChanged(Boolean.TRUE);
         });
 
@@ -319,10 +338,11 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         return this.sidebar;
     }
     
+    @SuppressWarnings("unused")
     private void sidebarSetValues(){
         skipSidebarUpdates = Boolean.TRUE;
         stockTypeChoice.setValue(currentStockSavedQuery.getStockType());
-        breederFilter.setRenderer(new TextRenderer<BreederFilter>(filter -> {
+        breederFilter.setRenderer(new TextRenderer<>(filter -> {
             if(filter.equals(BreederFilter.BREEDER)) {
                 return currentStockSavedQuery.getStockType().getBreederName();
             }else if(filter.equals(BreederFilter.NONBREEDER)) {
@@ -539,7 +559,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         System.out.println("loadFilters: currentSavedQueryId:" + currentSavedQueryId + " saveQuery:" + currentStockSavedQuery );
         if(currentSavedQueryId==null){
             currentStockSavedQuery = queryService.getSavedQueryList().get(0);
-        }else if(Long.valueOf(currentSavedQueryId) < 0){
+        }else if(Long.parseLong(currentSavedQueryId) < 0){
             //negative query ids are defaults created by the service so get them by the stocktype with the same id
             currentStockSavedQuery = queryService.getDefaultSaveQueryByType(stockTypeService.findById(Integer.valueOf(currentSavedQueryId)));
         }else{
@@ -584,10 +604,10 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         sidebarSetValues();
     }
     
-    private void runBeforeClientResponse(SerializableConsumer<UI> command) {
+/*     private void runBeforeClientResponse(SerializableConsumer<UI> command) {
         getElement().getNode().runWhenAttached(ui -> ui.beforeClientResponse(this, context -> command.accept(ui)));
     }        
-    
+ */    
     private Component createContent() {
         Layout content = new Layout(createToolbar(), createList());
         content.addClassNames(Flex.GROW);
@@ -810,6 +830,11 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             if(stockService.checkInUse(stockEntity)){ //if in use then do not delete and WARN
                 warnStockInUse(stockEntity);
             }else{
+                //delete status
+                statusService.deleteByStockId(stockEntity.getId());
+                //delete weight
+                weightService.deleteByStockId(stockEntity.getId());
+                //delete stock
                 stockService.delete(stockEntity.getId());
                 listRefreshNeeded();
             }
@@ -841,9 +866,8 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         tabs.add(createTab("Litters", TabType.COUNT, litterService.getLitterCountForParent(stock).toString()), createTabLitters(stock));
         tabs.add(createTab(stock.getStockType().getNonBreederName(), TabType.COUNT, stockService.getKitCountForParent(stock).toString()),createTabKits(stock));
         tabs.add(createTab("Notes", TabType.HASDATA, stock.getNotes()),createTabNotes(stock));
-        tabs.add(createTab("Status'", TabType.NONE, Utility.emptyValue),createTabStatuses(stock));
-        tabs.add(createTab("Weights'", TabType.NONE, Utility.emptyValue),createTabWeights(stock));
-        //TODO:: add list of weights
+        tabs.add(createTab("Status'", TabType.NONE, Utility.EMPTY_VALUE),createTabStatuses(stock));
+        tabs.add(createTab("Weights'", TabType.NONE, Utility.EMPTY_VALUE),createTabWeights(stock));
         
         content.add(tabs);
         return content;
@@ -851,7 +875,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     
     private Tab createTab(String labelText, TabType tabType, String itemData){
         Span label = new Span(labelText);
-        if(tabType.equals(TabType.COUNT) && !itemData.equals(Utility.emptyValue)){
+        if(tabType.equals(TabType.COUNT) && !itemData.equals(Utility.EMPTY_VALUE)){
             Span counter = new Span(itemData);
             counter.getElement().getThemeList().add("badge pill small contrast");
             counter.getStyle().set("margin-inline-start", "var(--lumo-space-s)");
