@@ -36,8 +36,8 @@ public interface StockRepository extends JpaRepository<Stock, Long>  {
     @Query("select s from Stock s where s.motherId = :motherId and s.fatherId = :fatherId and s.doB = :doB")
     List<Stock> findAllKitsByMotherFatherDoB(@Param("motherId") Integer motherId, @Param("fatherId") Integer fatherId, @Param("doB") LocalDate doB);
 
-    @Query("select s from Stock s where s.breeder = true")
-    List<Stock> findAllBreeders();
+    @Query("select s from Stock s where s.breeder = true and s.stockType.id = :stock_type_id")
+    List<Stock> findAllBreeders(@Param("stock_type_id") Integer stockTypeId);
 
     public Long countByMotherId(Integer id);
 

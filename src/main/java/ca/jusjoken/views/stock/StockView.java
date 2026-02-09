@@ -3,6 +3,8 @@ package ca.jusjoken.views.stock;
 import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.data.domain.Sort;
 
@@ -17,12 +19,13 @@ import com.vaadin.flow.component.Unit;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
-import com.vaadin.flow.component.contextmenu.ContextMenu;
 import com.vaadin.flow.component.contextmenu.MenuItem;
 import com.vaadin.flow.component.details.Details;
 import com.vaadin.flow.component.details.DetailsVariant;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
+import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
+import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
 import com.vaadin.flow.component.grid.dataview.GridLazyDataView;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
@@ -90,6 +93,7 @@ import ca.jusjoken.data.entity.StockSavedQuery;
 import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.entity.StockWeightHistory;
+import ca.jusjoken.data.entity.StockSavedQuery.StockViewStyle;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.StockRepository;
 import ca.jusjoken.data.service.StockSavedQueryService;
@@ -142,6 +146,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private RadioButtonGroup<String> sort1Direction = new RadioButtonGroup<>();
     private Select<ColumnName> stockSort2Column = new Select<>();
     private RadioButtonGroup<String> sort2Direction = new RadioButtonGroup<>();
+    private Select<StockViewStyle> stockViewStyleChoice = new Select<>();
     private Boolean skipSidebarUpdates = Boolean.FALSE;
 
     public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockTypeService stockTypeService, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService, StockWeightHistoryService weightService) {
@@ -196,7 +201,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         resetOptionsButton.addClickListener(click -> {
             resetOptions();
         });
-        
+
         saveOptionsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         saveOptionsButton.setAriaLabel("Save current options");
         saveOptionsButton.setTooltipText("Save current options");
@@ -240,7 +245,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         if(currentStockSavedQuery!=null){
             stockTypeChoice.setValue(currentStockSavedQuery.getStockType());
         }
-        
+
         breederFilter.setItems(BreederFilter.filterList());
         breederFilter.setValue(BreederFilter.BREEDER);
         breederFilter.setLabel("Breeder Filter");
@@ -329,8 +334,27 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
         sortForm.addClassNames(Padding.Horizontal.LARGE);
         sortForm.setFlexDirection(Layout.FlexDirection.COLUMN);
+
+        stockViewStyleChoice.setAriaLabel("View Style");
+        stockViewStyleChoice.setLabel("View Style");
+        stockViewStyleChoice.addClassNames(MinWidth.NONE, Padding.Top.MEDIUM);
+        stockViewStyleChoice.setItemLabelGenerator(StockViewStyle::getShortName);
+        stockViewStyleChoice.addValueChangeListener(event -> {
+            currentStockSavedQuery.setViewStyle(event.getValue());
+            sidebarChanged(Boolean.TRUE);
+        });
+        List<StockViewStyle> styleList = Stream.of(StockViewStyle.values()).collect(Collectors.toList());
+        stockViewStyleChoice.setItems(styleList);
+        if(currentStockSavedQuery!=null){
+            stockViewStyleChoice.setValue(currentStockSavedQuery.getViewStyle());
+        }
+
+        Layout styleForm = new Layout(stockViewStyleChoice);
+
+        styleForm.addClassNames(Padding.Horizontal.LARGE);
+        styleForm.setFlexDirection(Layout.FlexDirection.COLUMN);
         
-        this.sidebar = new Section(header, createSectionHeader("Filter options", false), filterForm, createSectionHeader("Sort options", true), sortForm);
+        this.sidebar = new Section(header, createSectionHeader("Filter options", false), filterForm, createSectionHeader("Sort options", true), sortForm, styleForm);
         this.sidebar.addClassNames("backdrop-blur-3xl", "var(--lumo-tint-90pct)", Border.RIGHT,
                 Display.FLEX, FlexDirection.COLUMN, Position.ABSOLUTE, "lg:static", "bottom-1", "top-0",
                 "transition-all", "z-10");
@@ -364,6 +388,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         if(currentStockSavedQuery.getSort2()!=null){
             sort2Direction.setValue(currentStockSavedQuery.getSort2Direction());
         }
+        stockViewStyleChoice.setValue(currentStockSavedQuery.getViewStyle());
         skipSidebarUpdates = Boolean.FALSE;
     }
     
@@ -597,6 +622,27 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             //runBeforeClientResponse(ui -> list.scrollToItem(selectedStock));
             listDataView.refreshItem(selectedStock);
         }
+
+        list.removeAllColumns();
+        if(currentStockSavedQuery==null){
+            list.addColumn(stockCardRenderer);
+        }else{
+            if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.QUICK)){
+                list.addColumn(Stock::getDisplayName).setHeader("Name");
+                list.addColumn(Stock::getBreed).setHeader("Breed");
+
+                //ContextMenu menu = createContextMenu(selectedStock);
+                //menu.setTarget(list);
+                //menu.setOpenOnClick(false);
+            }else if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.VALUE)){
+                list.addColumn(Stock::getDisplayName).setHeader("Name");
+                list.addColumn(Stock::getBreed).setHeader("Breed");
+                list.addColumn(Stock::getStatus).setHeader("Status");
+                list.addColumn(Stock::getStockValue).setHeader("Value");
+            }else{
+                list.addColumn(stockCardRenderer);
+            }
+        }
         
         applyOptionsButton.setEnabled(false);
         currentStockSavedQuery.setDirty(Boolean.FALSE);
@@ -636,7 +682,28 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             System.out.println("createList: setItemIndexProvider: index:" + index + " looking for item:" + item);
             return index >= 0 ? index : null;            
         });        
-        list.addColumn(stockCardRenderer);
+
+        if(currentStockSavedQuery==null){
+            list.addColumn(stockCardRenderer);
+        }else{
+            if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.QUICK)){
+                list.addColumn(Stock::getDisplayName).setHeader("Name");
+                list.addColumn(Stock::getBreed).setHeader("Breed");
+
+                //ContextMenu menu = createContextMenu(selectedStock);
+                //menu.setTarget(list);
+                //menu.setOpenOnClick(false);
+            }else if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.VALUE)){
+                list.addColumn(Stock::getDisplayName).setHeader("Name");
+                list.addColumn(Stock::getBreed).setHeader("Breed");
+                list.addColumn(Stock::getStatus).setHeader("Status");
+                list.addColumn(Stock::getStockValue).setHeader("Value");
+            }else{
+                list.addColumn(stockCardRenderer);
+            }
+        }
+        createContextMenu(list);
+
         list.setWidthFull();
         list.asSingleSelect().addValueChangeListener(event -> {
             Stock selected = event.getValue();
@@ -734,81 +801,94 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         detailsPanel.addClassNames(Border.ALL,BorderRadius.LARGE, BoxShadow.SMALL);
         detailsPanel.addThemeVariants(DetailsVariant.LUMO_REVERSE);
         
-        ContextMenu menu = createContextMenu(stock);
-        menu.setTarget(detailsPanel);
-        menu.setOpenOnClick(false);
+        //ContextMenu menu = createContextMenu(stock);
+        //menu.setTarget(detailsPanel);
+        //menu.setOpenOnClick(false);
         
         return detailsPanel;
     }
 
-    private ContextMenu createContextMenu(Stock stockEntity) {
-        String stockName = stockEntity.getDisplayName();
-        Div heading = new Div();
-        heading.setText(stockName);
-        heading.getStyle().set("text-align", "center");
-        heading.getStyle().set("font-weight", "bold");
-        heading.getStyle().set("padding", "8px");
-        ContextMenu menu = new ContextMenu();
-        menu.setOpenOnClick(true);
-        
-        //add a label at the top with the stock name
-        menu.addComponent(heading);
-        menu.addSeparator();
+    private GridContextMenu<Stock> createContextMenu(Grid<Stock> grid) {
+        GridContextMenu<Stock> menu = new GridContextMenu<>(grid);
 
-        MenuItem addNewMenu = menu.addItem(new Item("Add new", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
-        addNewMenu.addClickListener(click -> {
-            //open stock edit dialog
-            Stock newStock = new Stock();
-            newStock.setExternal(false);
-            newStock.setBreeder(true);
-            newStock.setStockType(stockEntity.getStockType());
-            newStock.setWeight(0);
-            //newStock.setStatus("active");
-            //newStock.setStatusDate(LocalDateTime.now());
+        menu.setDynamicContentHandler(stockEntity -> {
+            if(stockEntity==null) return false;
+            menu.removeAll();
+            String stockName = stockEntity.getDisplayName();
+            Div heading = new Div();
+            heading.setText(stockName);
+            heading.getStyle().set("text-align", "center");
+            heading.getStyle().set("font-weight", "bold");
+            heading.getStyle().set("padding", "8px");
+            //menu.setOpenOnClick(true);
             
-            dialogCommon.setDialogTitle("Create new");
-            dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
-            
-        });
-        MenuItem editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
-        editMenu.addClickListener(click -> {
-            //open stock edit dialog
-            dialogCommon.setDialogTitle("Edit Stock");
-            dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.STOCK_DETAILS);
-        });
-        menu.addItem(new Item("Breed", Utility.ICONS.TYPE_BREEDER.getIconSource()));
-        menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
-        createStatusMenuItem(menu, stockEntity, "sold");
-        createStatusMenuItem(menu, stockEntity, "forsale");
-        createStatusMenuItem(menu, stockEntity, "deposit");
-        createStatusMenuItem(menu, stockEntity, "butchered");
-        createStatusMenuItem(menu, stockEntity, "died");
-        createStatusMenuItem(menu, stockEntity, "archived");
-        createStatusMenuItem(menu, stockEntity, "culled");
-        createStatusMenuItem(menu, stockEntity, "active");
-        MenuItem weighMenu = menu.addItem(new Item("Weigh", Utility.ICONS.ACTION_WEIGH.getIconSource()));
-        weighMenu.addClickListener(click -> {
-            weightEditor.dialogOpen(stockEntity);
-        });
-        menu.addSeparator();
-        MenuItem pedigreeEditorMenu = menu.addItem(new Item("Pedigree", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
-        pedigreeEditorMenu.addClickListener(click -> {
-            UI.getCurrent().navigate(StockPedigreeEditor.class, stockEntity.getId().toString());
-        });
-        menu.addSeparator();
-        MenuItem deleteMenu = menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
-        deleteMenu.addClickListener(click -> {
-            deleteStockEntityWithConfirm(stockEntity);
+            //add a label at the top with the stock name
+            menu.addComponentAsFirst(heading);
+            menu.addSeparator();
+
+            GridMenuItem<Stock> addNewMenu = menu.addItem(new Item("Add new", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+            addNewMenu.addMenuItemClickListener(click -> {
+                //open stock edit dialog
+                Stock newStock = new Stock();
+                newStock.setExternal(false);
+                newStock.setBreeder(true);
+                newStock.setStockType(stockEntity.getStockType());
+                newStock.setWeight(0);
+                //newStock.setStatus("active");
+                //newStock.setStatusDate(LocalDateTime.now());
+                
+                dialogCommon.setDialogTitle("Create new");
+                dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
+                
+            });
+            GridMenuItem<Stock> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
+            editMenu.addMenuItemClickListener(click -> {
+                //open stock edit dialog
+                dialogCommon.setDialogTitle("Edit Stock");
+                dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.STOCK_DETAILS);
+            });
+            GridMenuItem<Stock> editImageMenu = menu.addItem(new Item("Edit Image", Utility.ICONS.ACTION_EDIT_IMAGE.getIconSource()));
+            editImageMenu.addMenuItemClickListener(click -> {
+            //open image dialog
+            dialogCommon.setDialogTitle("Edit Profile Image");
+            dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.PROFILE_IMAGE);
+            });
+            menu.addItem(new Item("Breed", Utility.ICONS.TYPE_BREEDER.getIconSource()));
+            menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
+            createStatusMenuItem(menu, stockEntity, "sold");
+            createStatusMenuItem(menu, stockEntity, "forsale");
+            createStatusMenuItem(menu, stockEntity, "deposit");
+            createStatusMenuItem(menu, stockEntity, "butchered");
+            createStatusMenuItem(menu, stockEntity, "died");
+            createStatusMenuItem(menu, stockEntity, "archived");
+            createStatusMenuItem(menu, stockEntity, "culled");
+            createStatusMenuItem(menu, stockEntity, "active");
+            GridMenuItem<Stock> weighMenu = menu.addItem(new Item("Weigh", Utility.ICONS.ACTION_WEIGH.getIconSource()));
+            weighMenu.addMenuItemClickListener(click -> {
+                weightEditor.dialogOpen(stockEntity);
+            });
+            menu.addSeparator();
+            GridMenuItem<Stock> pedigreeEditorMenu = menu.addItem(new Item("Pedigree", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
+            pedigreeEditorMenu.addMenuItemClickListener(click -> {
+                UI.getCurrent().navigate(StockPedigreeEditor.class, stockEntity.getId().toString());
+            });
+            menu.addSeparator();
+            GridMenuItem<Stock> deleteMenu = menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
+            deleteMenu.addMenuItemClickListener(click -> {
+                deleteStockEntityWithConfirm(stockEntity);
+            });
+
+            return true;
         });
 
         return menu;
     }
     
-    private void createStatusMenuItem(ContextMenu menu, Stock stockEntity, String statusToEdit){
+    private void createStatusMenuItem(GridContextMenu<Stock> menu, Stock stockEntity, String statusToEdit){
         if(!stockEntity.getStatus().equals(statusToEdit)){
             StockStatus status = Utility.getInstance().getStockStatus(statusToEdit);
-            MenuItem item = menu.addItem(new Item(status.getActionName(), status.getIcon().getIconSource()));
-            item.addClickListener(click -> {
+            GridMenuItem<Stock> item = menu.addItem(new Item(status.getActionName(), status.getIcon().getIconSource()));
+            item.addMenuItemClickListener(click -> {
                 //open status editor
                 statusEditor.dialogOpen(stockEntity, statusToEdit);
             });

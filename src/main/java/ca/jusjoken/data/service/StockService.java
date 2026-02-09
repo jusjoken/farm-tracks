@@ -220,8 +220,8 @@ public class StockService {
         return new Stock(name, Boolean.FALSE, stockType);
     }
     
-    public List<Stock> findAllBreeders(){
-        List<Stock> stockList = stockRepository.findAllBreeders();
+    public List<Stock> findAllBreeders(StockType type){
+        List<Stock> stockList = stockRepository.findAllBreeders(type.getId());
         Collections.sort(stockList, new StockComparator());
         return stockList;
     }

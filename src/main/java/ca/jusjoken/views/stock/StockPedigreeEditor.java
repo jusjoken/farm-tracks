@@ -4,17 +4,24 @@
  */
 package ca.jusjoken.views.stock;
 
-import ca.jusjoken.UIUtilities;
-import ca.jusjoken.component.DialogCommon;
-import ca.jusjoken.component.ListRefreshNeededListener;
-import ca.jusjoken.component.WeightInput;
-import ca.jusjoken.data.Utility;
-import ca.jusjoken.data.Utility.Gender;
-import ca.jusjoken.data.entity.Generation;
-import ca.jusjoken.data.entity.Stock;
-import ca.jusjoken.data.entity.StockType;
-import ca.jusjoken.data.service.StockService;
-import ca.jusjoken.views.MainLayout;
+import java.awt.Color;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+
 import com.flowingcode.vaadin.addons.badgelist.Badge;
 import com.flowingcode.vaadin.addons.badgelist.BadgeList;
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
@@ -77,22 +84,22 @@ import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.streams.DownloadHandler;
 import com.vaadin.flow.server.streams.DownloadResponse;
 import com.vaadin.flow.theme.lumo.LumoUtility;
+import com.vaadin.flow.theme.lumo.LumoUtility.MinWidth;
+import com.vaadin.flow.theme.lumo.LumoUtility.Padding;
+
+import ca.jusjoken.UIUtilities;
+import ca.jusjoken.component.DialogCommon;
+import ca.jusjoken.component.ListRefreshNeededListener;
+import ca.jusjoken.component.WeightInput;
+import ca.jusjoken.data.Utility;
+import ca.jusjoken.data.Utility.Gender;
+import ca.jusjoken.data.entity.Generation;
+import ca.jusjoken.data.entity.Stock;
+import ca.jusjoken.data.entity.StockType;
+import ca.jusjoken.data.service.StockService;
+import ca.jusjoken.data.service.StockTypeService;
+import ca.jusjoken.views.MainLayout;
 import jakarta.annotation.security.PermitAll;
-import java.awt.Color;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
 
 /**
  *
@@ -107,7 +114,8 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     private StockType viewStockType;
     private Stock selectedParent;
     private Boolean hasStock;
-    //private String name = Utility.EMPTY_VALUE;
+    private List<Stock> breedersList = new ArrayList<>();
+    private List<StockType> stockTypeList = new ArrayList<>();
     private List<Generation> genList;
     private TreeData<Generation> treeData = new TreeData<>();
     private TreeGrid<Generation> tree = new TreeGrid<>();
@@ -120,8 +128,6 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     private String pdfFileName = "";
     @Value("classpath:Pedigree_Template.docx")
     private final Resource resourcePedigreeTemplate;
-    @Value("classpath:Pedigree_Template_portrait.docx")
-    private final Resource resourcePedigreeTemplatePortrait;
     @Value("classpath:/META-INF/resources/images/gender_male.png")
     private final Resource resourceGenderMale;
     @Value("classpath:/META-INF/resources/images/gender_female.png")
@@ -130,6 +136,8 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     //all include options
     private final FormLayout settingsForm = new FormLayout();
     private final DialogCommon dialogCommon;
+    private final Select<Stock> stockSelect = new Select<>();
+    private final Select<StockType> stockTypeChoice = new Select<>();
 
     private final Checkbox includeDob = new Checkbox();
     private final Checkbox includeColor = new Checkbox();
@@ -148,17 +156,29 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     private Integer colCounter = 0;
     private Integer tableRows = 5;
 
-    public StockPedigreeEditor(StockService stockService) {
+    public StockPedigreeEditor(StockService stockService, StockTypeService typeService) {
         this.stockService = stockService;
         this.resourcePedigreeTemplate = new ClassPathResource("Pedigree_Template.docx");
-        this.resourcePedigreeTemplatePortrait = new ClassPathResource("Pedigree_Template_portrait.docx");
         this.resourceGenderMale = new ClassPathResource("/META-INF/resources/images/gender_male.png");
         this.resourceGenderFemale = new ClassPathResource("/META-INF/resources/images/gender_female.png");
         this.dialogCommon = new DialogCommon();
-        dialogCommon.addListener(this);
+        setupListeners();
         addClassNames(LumoUtility.Display.FLEX, LumoUtility.Height.FULL, LumoUtility.Overflow.HIDDEN);
+        System.out.println("Constructor: loading typeList");
+        stockTypeList = typeService.findAllStockTypes();
+        stockTypeChoice.setItems(stockTypeList);
+        if(viewStockType==null){
+            System.out.println("Constructor: setting viewStockType to default:" + viewStockType);
+            viewStockType = typeService.findRabbits();
+        }
+        stockTypeChoice.setValue(viewStockType);
+        refreshBreederList();
         createTopLevelList();
         //NOTE: setParameter is called NEXT and is used to create the view layout etc.
+    }
+
+    private void setupListeners(){
+        dialogCommon.addListener(this);
     }
     
     private void createTopLevelList(){
@@ -175,7 +195,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     }
 
     private Component createContent() {
-        System.out.println("StockPedigreeEditor createContent: hasStock:" + hasStock);
+        System.out.println("StockPedigreeEditor createContent: hasStock:" + hasStock + " stock:" + stock);
         mdLayout.setSizeFull();
         //mdLayout.setMasterMinSize("600px");
         mdLayout.setDetailSize("450px");
@@ -222,27 +242,36 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
             mdLayout.setDetail(null);
         }else{
             Generation selected = genList.get(selectedGenerationIndex);
-            //mdLayout.setDetail(createItemEditor(selected));
             tree.select(selected);
-            //System.out.println("SCROLLING to selected:" + selected.getName());
             runBeforeClientResponse(ui -> tree.scrollToItem(selected));   
         }
         
         FormLayout headerForm = new FormLayout();
         headerForm.setLabelSpacing("0px");
         headerForm.setColumnWidth(50, Unit.EM);
-        Select<Stock> stockSelect = new Select<>();
-        
-        stockSelect.setItems(stockService.findAllBreeders());
+
         stockSelect.setItemLabelGenerator(Stock::getDisplayNameWithStatus);
-        stockSelect.setValue(stock);
         stockSelect.addValueChangeListener(item -> {
+            System.out.println("addValueChangeListener: stock:" + item.getValue());
             stock = item.getValue();
             selectedGeneration = null;
             selectedGenerationIndex = null;
             buildView(stock);
         });
+
+        stockTypeChoice.setAriaLabel("Stock type");
+        stockTypeChoice.addClassNames(MinWidth.NONE, Padding.Top.MEDIUM);
+        stockTypeChoice.setItemLabelGenerator(StockType::getName);
+        stockTypeChoice.addValueChangeListener(event -> {
+            System.out.println("addValueChangeListener: type:" + event.getValue());
+            if(!viewStockType.equals(event.getValue())){
+                viewStockType = event.getValue();
+                refreshBreederList();
+            }
+        });
+        
         headerForm.addFormItem(stockSelect, "Pedigree for:");
+        headerForm.addFormItem(stockTypeChoice,"Stock Type");
         
         //open details button
         Button detailsButton = new Button("Details/PDF Options");
@@ -274,6 +303,15 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
 
         return layout;
     }
+
+    private void refreshBreederList(){
+        if(viewStockType==null){
+            breedersList = new ArrayList<>();
+        }else{
+            breedersList = stockService.findAllBreeders(viewStockType);
+        }
+        stockSelect.setItems(breedersList);
+    }
     
     private void runBeforeClientResponse(SerializableConsumer<UI> command) {
         getElement().getNode().runWhenAttached(ui -> ui.beforeClientResponse(this, context -> command.accept(ui)));
@@ -295,7 +333,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         header.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
         
         //PDF output settings
-        FormLayout settingsForm = getFormLayout();
+        getFormLayout();
 
         //pdf button
         Button pdfButton = new Button("PDF", FontAwesome.Solid.FILE_PDF.create());
@@ -372,13 +410,13 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         
         //show parent selection for the child record
         Stock childStock = null;
-        String parentTypeAction = "";
+        String parentTypeAction;
         Boolean showParentSelect = Boolean.FALSE;
         Boolean showDetails = Boolean.FALSE;
         Boolean showDetailsReadOnly = Boolean.FALSE;
 
-        String parentType = "";
-        String parentStockTypeName = "";
+        String parentType;
+        String parentStockTypeName;
         if(item.getSex().equals(Gender.MALE)){
             parentType = "Father";
             parentStockTypeName = viewStockType.getMaleName();
@@ -393,7 +431,6 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
             editor.add(noOptions);
         }else{
             //provide edit options
-            parentTypeAction = "Select existing";
             if(item.getChild()!=null) childStock = item.getChild().getStock();
 
             if(childStock==null){
@@ -420,8 +457,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         return editorLayout;
     }
     
-    private FormLayout getFormLayout(){
-        //FormLayout settingsForm = new FormLayout();
+    private void getFormLayout(){
         settingsForm.removeAll();
 
         settingsForm.setWidthFull();
@@ -442,19 +478,18 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
 
         settingsForm.add("Include the following optional fields:");
         
-        addIncludeField(settingsForm, includeGeno, "includeGeno", "Geno");
-        addIncludeField(settingsForm, includeId, "includeTattoo", "ID");
-        addIncludeField(settingsForm, includeDob, "includeDob", "DOB");
-        addIncludeField(settingsForm, includeColor, "includeColour", "Colour");
-        addIncludeField(settingsForm, includeBreed, "includeBreed", "Breed");
-        addIncludeField(settingsForm, includeWeight, "includeWeight", "Weight");
-        addIncludeField(settingsForm, includeLegs, "includeLegs", "Legs");
-        addIncludeField(settingsForm, includeChampNo, "includeChampNo", "ChampNo");
-        addIncludeField(settingsForm, includeRegNo, "includeRegNo", "RegNo");
-        return settingsForm;
+        addIncludeField(includeGeno, "includeGeno", "Geno");
+        addIncludeField(includeId, "includeTattoo", "ID");
+        addIncludeField(includeDob, "includeDob", "DOB");
+        addIncludeField(includeColor, "includeColour", "Colour");
+        addIncludeField(includeBreed, "includeBreed", "Breed");
+        addIncludeField(includeWeight, "includeWeight", "Weight");
+        addIncludeField(includeLegs, "includeLegs", "Legs");
+        addIncludeField(includeChampNo, "includeChampNo", "ChampNo");
+        addIncludeField(includeRegNo, "includeRegNo", "RegNo");
     }
     
-    private void addIncludeField(FormLayout settingsForm, Checkbox includeBox, String includeId, String label){
+    private void addIncludeField(Checkbox includeBox, String includeId, String label){
         includeBox.setId(includeId);
         includeBox.addValueChangeListener(event -> {
             saveLocalSetting(event.getSource().getId().get(), event.getValue());
@@ -489,9 +524,9 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         }
     }
     
-    private void removeParent(Stock stockToSave, Gender sex){
+    private void removeSelectedParent(Stock stockToSave, Gender sex){
         if(stockToSave==null){
-            System.out.println("removeParent: Could not remove parent as stock was NULL: stock:" + stockToSave);
+            System.out.println("removeSelectedParent: Could not remove parent as stock was NULL: stock:" + stockToSave);
         }else{
             if(sex.equals(Gender.MALE)){
                 stockToSave.setFatherId(null);
@@ -534,8 +569,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         Button removeParent = new Button(removeIcon);
         removeParent.addClickListener(event -> {
             System.out.println("createParentSelect: remove button clicked:" + event);
-            //TODO: confirm delete then remove and save the parent
-            removeParent(item.getChild().getStock(),item.getSex());
+            removeSelectedParent(item.getChild().getStock(),item.getSex());
             buildView(stock);
         });
         if(item.getStock().isTemp()){
@@ -606,8 +640,8 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         //set width on all formFields
         for(Component formItem: formLayout.getChildren().toList()){
             for(Component formItemField: formItem.getChildren().toList()){
-                if(formItemField instanceof HasSize){
-                    ((HasSize) formItemField).setWidthFull();
+                if(formItemField instanceof HasSize hasSize){
+                    hasSize.setWidthFull();
                     if(showDetailsReadOnly){
                         if(formItemField instanceof AbstractField){
                             ((AbstractField<?, ?>) formItemField).setReadOnly(true);
@@ -713,60 +747,60 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
             
             //change font size for TOP level based on number of include fields
             Integer includeCount = getCountIncludeFields();
-            float topLevelNameSize = 7;
-            float topLevelDetailsSize = 6;
+            float topLevelNameSize;
+            float topLevelDetailsSize;
             float col1Width = 87;
             float col2Width = 87;
             tableRows = 4;
             switch(includeCount){
-                case 0:
+                case 0 -> {
                     topLevelNameSize = 12;
                     topLevelDetailsSize = 10;
-                    break;
-                case 1:
+                }
+                case 1 -> {
                     topLevelNameSize = 12;
                     topLevelDetailsSize = 10;
                     col1Width = 174;
                     col2Width = 0;
                     tableRows = 1;
-                    break;
-                case 2:
+                }
+                case 2 -> {
                     topLevelNameSize = 12;
                     topLevelDetailsSize = 10;
                     col1Width = 174;
                     col2Width = 0;
                     tableRows = 2;
-                    break;
-                case 3:
+                }
+                case 3 -> {
                     topLevelNameSize = 12;
                     topLevelDetailsSize = 10;
                     col1Width = 174;
                     col2Width = 0;
                     tableRows = 3;
-                    break;
-                case 4:
+                }
+                case 4 -> {
                     topLevelNameSize = 11;
                     topLevelDetailsSize = 9;
                     col1Width = 174;
                     col2Width = 0;
                     tableRows = 4;
-                    break;
-                case 5:
+                }
+                case 5 -> {
                     topLevelNameSize = 11;
                     topLevelDetailsSize = 9;
-                    break;
-                case 6:
+                }
+                case 6 -> {
                     topLevelNameSize = 11;
                     topLevelDetailsSize = 9;
-                    break;
-                case 7:
+                }
+                case 7 -> {
                     topLevelNameSize = 11;
                     topLevelDetailsSize = 9;
-                    break;
-                default:
+                }
+                default -> {
                     topLevelNameSize = 11;//7
                     topLevelDetailsSize = 9;//6
-                    break;
+                }
             }
             topLevelNameStyleMale.getCharacterFormat().setFontSize(topLevelNameSize);
             topLevelNameStyleFemale.getCharacterFormat().setFontSize(topLevelNameSize);
@@ -867,7 +901,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
                 //add detail to table if toplevel otherwise add directly to bodypart
                 if(topLevelGenerations.contains(counter)){
                     Table table = new Table(document, true);
-                    table.resetCells(tableRows, 2);  //TODO: change rows dependent on numer of includes
+                    table.resetCells(tableRows, 2);
                     bp.getBodyItems().add(table);
                     try {
                         table.setColumnWidth(0, col1Width, CellWidthType.Point);
@@ -878,18 +912,18 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
                     table.getTableFormat().getBorders().setBorderType(BorderStyle.None);
                     rowCounter = 0;
                     colCounter = 0;
-                    addParagraphToTable(document, table, "ID", item.getTattoo(), includeId);
+                    addParagraphToTable(table, "ID", item.getTattoo(), includeId);
                     if(item.getDoB()==null){
-                        addParagraphToTable(document, table, "DOB:", "",includeDob);
+                        addParagraphToTable(table, "DOB:", "",includeDob);
                     }else{
-                        addParagraphToTable(document, table, "DOB:", item.getDoB().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),includeDob);
+                        addParagraphToTable(table, "DOB:", item.getDoB().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),includeDob);
                     }
-                    addParagraphToTable(document, table, "Colour:", item.getColor(),includeColor);
-                    addParagraphToTable(document, table, "Breed:", item.getBreed(),includeBreed);
-                    addParagraphToTable(document, table, "Weight:", item.getWeightInLbsOz(),includeWeight);
-                    addParagraphToTable(document, table, "Legs:", item.getLegs(),includeLegs);
-                    addParagraphToTable(document, table, "ChampNo:", item.getChampNo(),includeChampNo);
-                    addParagraphToTable(document, table, "RegNo:", item.getRegNo(),includeRegNo);
+                    addParagraphToTable(table, "Colour:", item.getColor(),includeColor);
+                    addParagraphToTable(table, "Breed:", item.getBreed(),includeBreed);
+                    addParagraphToTable(table, "Weight:", item.getWeightInLbsOz(),includeWeight);
+                    addParagraphToTable(table, "Legs:", item.getLegs(),includeLegs);
+                    addParagraphToTable(table, "ChampNo:", item.getChampNo(),includeChampNo);
+                    addParagraphToTable(table, "RegNo:", item.getRegNo(),includeRegNo);
                     
                     for(int w = 0; w < table.getRows().getCount(); w++){
                         //table.getRows().get(w).setHeight(10f);
@@ -932,7 +966,6 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
             
         } catch (IOException e) {
             log.info("createPedigreePDF: FAILED:" + " ERROR:" + e.toString());
-            e.printStackTrace();
         }
         
     }
@@ -1010,7 +1043,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     
     private void addParagraph(Document document, Integer counter, TextBodyPart bp, String itemLabel, String itemValue, Checkbox itemInclude){
         
-        if(itemInclude==null || (itemInclude!=null && itemInclude.getValue())){
+        if(itemInclude==null || (itemInclude.getValue())){
             Paragraph para = new Paragraph(document);
             para.setText(itemLabel + ":" + itemValue);
             bp.getBodyItems().add(para);
@@ -1026,9 +1059,9 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         
     }
     
-    private void addParagraphToTable(Document document, Table table, String itemLabel, String itemValue, Checkbox itemInclude){
+    private void addParagraphToTable(Table table, String itemLabel, String itemValue, Checkbox itemInclude){
         //System.out.println("addParagraphToTable: row:" + rowCounter + " col:" + colCounter + " label:" + itemLabel);
-        if(itemInclude==null || (itemInclude!=null && itemInclude.getValue())){
+        if(itemInclude==null || (itemInclude.getValue())){
             Paragraph para = table.get(rowCounter, colCounter).addParagraph();
             para.getFormat().setBeforeAutoSpacing(false);
             para.getFormat().setAfterAutoSpacing(false);
@@ -1037,7 +1070,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
             para.setText(itemLabel + ":" + itemValue);
             para.applyStyle(topLevelDetailsStyle);
             rowCounter++;
-            if(rowCounter==tableRows){
+            if(Objects.equals(rowCounter, tableRows)){
                 rowCounter=0;
                 colCounter++;
             }
@@ -1074,6 +1107,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         System.out.println("setParameter: called with:" + parameter);
         if(parameter!=null){
             stock = stockService.findById(Integer.valueOf(parameter));
+            stockSelect.setValue(stock);
         }else{
             stock = null;
         }

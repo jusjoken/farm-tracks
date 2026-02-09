@@ -48,6 +48,39 @@ public class StockSavedQuery {
     @Transient
     private Boolean needsSaving = false;
 
+    //Note: StockViewStyleConverter class is used to convert these so the shortname is stored in the database
+    public static enum StockViewStyle{
+        FULL("Full"), QUICK("Quick"), VALUE("Value");
+
+        private final String shortName;
+        
+        private StockViewStyle(String shortName) {
+            this.shortName = shortName;
+        }
+        
+        public String getShortName(){
+            return shortName;
+        }
+        
+        public static StockViewStyle fromShortName(String shortName){
+            switch (shortName){
+                case "Full" -> {
+                    return StockViewStyle.FULL;
+                }
+                case "Quick" -> {
+                    return StockViewStyle.QUICK;
+                }
+                case "Value" -> {
+                    return StockViewStyle.VALUE;
+                }
+                default -> throw new IllegalArgumentException("ShortName [" + shortName + "] not supported.");
+            }
+        }
+    }
+
+    private StockViewStyle viewStyle = StockViewStyle.FULL;
+
+
     public StockSavedQuery() {
     }
 
@@ -192,7 +225,19 @@ public class StockSavedQuery {
 
     @Override
     public String toString() {
-        return "StockSavedQuery{" + "id=" + id + ", savedQueryName=" + savedQueryName + ", breeder=" + breeder + ", stockType=" + stockType + ", stockStatusName=" + stockStatusName + ", sort1Column=" + sort1Column + ", sort1Direction=" + sort1Direction + ", sort2Column=" + sort2Column + ", sort2Direction=" + sort2Direction + ", defaultQuery=" + defaultQuery + ", dirty=" + dirty + ", needsSaving=" + needsSaving + '}';
+        return "StockSavedQuery [id=" + id + ", savedQueryName=" + savedQueryName + ", breeder=" + breeder
+                + ", stockType=" + stockType + ", stockStatusName=" + stockStatusName + ", sort1Column=" + sort1Column
+                + ", sort1Direction=" + sort1Direction + ", sort2Column=" + sort2Column + ", sort2Direction="
+                + sort2Direction + ", defaultQuery=" + defaultQuery + ", dirty=" + dirty + ", needsSaving="
+                + needsSaving + ", viewStyle=" + viewStyle + "]";
+    }
+
+    public StockViewStyle getViewStyle() {
+        return viewStyle;
+    }
+
+    public void setViewStyle(StockViewStyle viewStyle) {
+        this.viewStyle = viewStyle;
     }
 
 }
