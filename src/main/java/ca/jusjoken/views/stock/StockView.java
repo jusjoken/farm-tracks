@@ -1,5 +1,6 @@
 package ca.jusjoken.views.stock;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -153,6 +154,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private RadioButtonGroup<String> sort2Direction = new RadioButtonGroup<>();
     private Select<StockViewStyle> stockViewStyleChoice = new Select<>();
     private Boolean skipSidebarUpdates = Boolean.FALSE;
+    private Integer selectedTabIndex = 0;
 
     public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockTypeService stockTypeService, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService, StockWeightHistoryService weightService) {
         this.stockRepository = stockRepository;
@@ -702,25 +704,6 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             return index >= 0 ? index : null;            
         });        
 
-        if(currentStockSavedQuery==null){
-            list.addColumn(stockCardRenderer);
-        }else{
-            if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.QUICK)){
-                list.addColumn(Stock::getDisplayName).setHeader("Name");
-                list.addColumn(Stock::getBreed).setHeader("Breed");
-
-                //ContextMenu menu = createContextMenu(selectedStock);
-                //menu.setTarget(list);
-                //menu.setOpenOnClick(false);
-            }else if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.VALUE)){
-                list.addColumn(Stock::getDisplayName).setHeader("Name");
-                list.addColumn(Stock::getBreed).setHeader("Breed");
-                list.addColumn(Stock::getStatus).setHeader("Status");
-                list.addColumn(Stock::getStockValue).setHeader("Value");
-            }else{
-                list.addColumn(stockCardRenderer);
-            }
-        }
         createContextMenu(list);
 
         list.setWidthFull();
@@ -986,14 +969,21 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         header.addToStart(nameAndPrefix);
 
         tabs.setWidthFull();
-        //tabs.setHeightFull();
-        tabs.add("Overview", createTabOverview(stock));
-        tabs.add(createTab("Litters", TabType.COUNT, litterService.getLitterCountForParent(stock).toString()), createTabLitters(stock));
-        tabs.add(createTab(stock.getStockType().getNonBreederName(), TabType.COUNT, stockService.getKitCountForParent(stock).toString()),createTabKits(stock));
-        tabs.add(createTab("Notes", TabType.HASDATA, stock.getNotes()),createTabNotes(stock));
-        tabs.add(createTab("Status'", TabType.NONE, Utility.EMPTY_VALUE),createTabStatuses(stock));
-        tabs.add(createTab("Weights'", TabType.NONE, Utility.EMPTY_VALUE),createTabWeights(stock));
+
+        List<Tab> tabList = new ArrayList<>();
+        tabList.add(tabs.add("Overview", createTabOverview(stock)));
+        tabList.add(tabs.add(createTab("Litters", TabType.COUNT, litterService.getLitterCountForParent(stock).toString()), createTabLitters(stock)));
+        tabList.add(tabs.add(createTab(stock.getStockType().getNonBreederName(), TabType.COUNT, stockService.getKitCountForParent(stock).toString()),createTabKits(stock)));
+        tabList.add(tabs.add(createTab("Notes", TabType.HASDATA, stock.getNotes()),createTabNotes(stock)));
+        tabList.add(tabs.add(createTab("Status'", TabType.NONE, Utility.EMPTY_VALUE),createTabStatuses(stock)));
+        tabList.add(tabs.add(createTab("Weights'", TabType.NONE, Utility.EMPTY_VALUE),createTabWeights(stock)));
+
+        tabs.setSelectedIndex(selectedTabIndex);
         
+        tabs.addSelectedChangeListener(selected -> {
+            selectedTabIndex = tabList.indexOf(selected.getSelectedTab());
+        });
+
         content.add(header,tabs);
         return content;
     }
