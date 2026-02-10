@@ -20,8 +20,6 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.contextmenu.MenuItem;
-import com.vaadin.flow.component.details.Details;
-import com.vaadin.flow.component.details.DetailsVariant;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
@@ -35,13 +33,17 @@ import com.vaadin.flow.component.html.NativeLabel;
 import com.vaadin.flow.component.html.Section;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout;
+import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout.Orientation;
 import com.vaadin.flow.component.menubar.MenuBar;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.TabSheet;
+import com.vaadin.flow.component.tabs.TabSheetVariant;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
@@ -58,7 +60,6 @@ import com.vaadin.flow.theme.lumo.LumoIcon;
 import com.vaadin.flow.theme.lumo.LumoUtility.AlignItems;
 import com.vaadin.flow.theme.lumo.LumoUtility.Border;
 import com.vaadin.flow.theme.lumo.LumoUtility.BorderRadius;
-import com.vaadin.flow.theme.lumo.LumoUtility.BoxShadow;
 import com.vaadin.flow.theme.lumo.LumoUtility.Display;
 import com.vaadin.flow.theme.lumo.LumoUtility.Flex;
 import com.vaadin.flow.theme.lumo.LumoUtility.FlexDirection;
@@ -73,6 +74,7 @@ import com.vaadin.flow.theme.lumo.LumoUtility.Position;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.AvatarDiv;
+import ca.jusjoken.component.Badge;
 import ca.jusjoken.component.ComponentConfirmEvent;
 import ca.jusjoken.component.DialogCommon;
 import ca.jusjoken.component.DialogCommonEvent;
@@ -83,6 +85,7 @@ import ca.jusjoken.component.ListRefreshNeededListener;
 import ca.jusjoken.component.StatusEditor;
 import ca.jusjoken.component.StockDetailsFormLayout;
 import ca.jusjoken.component.WeightEditor;
+import ca.jusjoken.component.Layout.Gap;
 import ca.jusjoken.data.ColumnName;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.BreederFilter;
@@ -103,6 +106,7 @@ import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeRepository;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.data.service.StockWeightHistoryService;
+import ca.jusjoken.utility.BadgeVariant;
 import ca.jusjoken.views.MainLayout;
 import jakarta.annotation.security.PermitAll;
 
@@ -118,6 +122,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private final StockSavedQueryService queryService;
     private final StockStatusHistoryService statusService;
     private final StockWeightHistoryService weightService;
+    private final MasterDetailLayout mdLayout = new MasterDetailLayout();
     private String currentSearchName = "";
     private StockSavedQuery currentStockSavedQuery;
     private String currentSavedQueryId = null;
@@ -655,11 +660,25 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     }        
  */    
     private Component createContent() {
-        Layout content = new Layout(createToolbar(), createList());
-        content.addClassNames(Flex.GROW);
-        content.setFlexDirection(Layout.FlexDirection.COLUMN);
-        content.setOverflow(Layout.Overflow.HIDDEN);
-        return content;
+        mdLayout.setSizeFull();
+        mdLayout.setOrientation(Orientation.VERTICAL);
+        mdLayout.setHeightFull();
+        mdLayout.addBackdropClickListener(event -> {
+            mdLayout.setDetail(null);
+        });
+        mdLayout.addDetailEscapePressListener(event -> {
+            mdLayout.setDetail(null);
+        });
+
+        VerticalLayout content = new VerticalLayout(createToolbar(), createList());
+        //content.addClassNames(Flex.GROW);
+        content.setSizeFull();
+
+        mdLayout.setDetailSize("400px");
+        mdLayout.setMaster(content);
+        mdLayout.setDetail(null);
+        return mdLayout;
+
     }
     
     private Component createList(){
@@ -705,12 +724,15 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         createContextMenu(list);
 
         list.setWidthFull();
+        list.setHeightFull();
         list.asSingleSelect().addValueChangeListener(event -> {
             Stock selected = event.getValue();
             if(selected==null){
                 selectedStock = null;
+                mdLayout.setDetail(null);
             }else{
                 selectedStock = selected;
+                mdLayout.setDetail(createTabbedContentArea(selectedStock));
             }
         });
         return list;        
@@ -721,7 +743,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
                 return createListItemLayout(stock);
             });    
 
-    private Details createListItemLayout(Stock stock) {
+    private Layout createListItemLayout(Stock stock) {
         // Image and favourite button
 //        Avatar avatar = new Avatar();
 //        Div avatarDiv = new Div(avatar);
@@ -793,19 +815,8 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         layout.setSizeUndefined();
         layout.addClassNames(Margin.NONE);
 
-        //Main layout as a Details panel - summary visible all times and details content EXTRA info
-        Details detailsPanel = new Details(layout);
-        detailsPanel.add(createTabbedContentArea(stock));
-        detailsPanel.addClassNames(Padding.NONE,Margin.Left.MEDIUM,Margin.Right.MEDIUM);
-        UIUtilities.setBorders(detailsPanel, stock, UIUtilities.BorderSize.SMALL);
-        detailsPanel.addClassNames(Border.ALL,BorderRadius.LARGE, BoxShadow.SMALL);
-        detailsPanel.addThemeVariants(DetailsVariant.LUMO_REVERSE);
-        
-        //ContextMenu menu = createContextMenu(stock);
-        //menu.setTarget(detailsPanel);
-        //menu.setOpenOnClick(false);
-        
-        return detailsPanel;
+        UIUtilities.setBorders(layout, stock, UIUtilities.BorderSize.SMALL);
+        return layout;
     }
 
     private GridContextMenu<Stock> createContextMenu(Grid<Stock> grid) {
@@ -937,11 +948,45 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     }
 
     
-    private Layout createTabbedContentArea(Stock stock){
-        Layout content = new Layout();
+    private VerticalLayout createTabbedContentArea(Stock stock){
+        VerticalLayout content = UIUtilities.getVerticalLayout(true, false, false);
         content.addClassNames(Padding.Top.NONE, Padding.Right.MEDIUM, Padding.Left.MEDIUM,Padding.Bottom.MEDIUM);
+        content.setSizeFull();
         TabSheet tabs = new TabSheet();
+        HorizontalLayout header = UIUtilities.getHorizontalLayout(false, true, false);
+
+        tabs.addThemeVariants(TabSheetVariant.LUMO_TABS_SMALL);
+
+        Layout nameAndPrefix = new Layout();
+        nameAndPrefix.setFlexDirection(Layout.FlexDirection.ROW);
+        nameAndPrefix.setAlignItems(Layout.AlignItems.CENTER);
+
+        if(!stock.getPrefix().isEmpty()){
+            Badge newBadge = new Badge(stock.getPrefix());
+            UIUtilities.setBorders(newBadge, stock, UIUtilities.BorderSize.XSMALL);
+            newBadge.addThemeVariants(BadgeVariant.PILL, BadgeVariant.SMALL);
+            nameAndPrefix.add(newBadge);
+        }
+        Span stockName = new Span(stock.getDisplayName());
+        stockName.addClassNames("stock-name-responsive");
+        nameAndPrefix.add(stockName);
+        nameAndPrefix.setGap(Gap.SMALL);
+
+        //tabs.setPrefixComponent(newBadge);
+
+        //close button
+        Button closeButton = new Button(FontAwesome.Solid.X.create());
+        closeButton.setTooltipText("Close details");
+        closeButton.getElement().addEventListener("click", click -> {
+            mdLayout.setDetail(null);
+        }).addEventData("event.stopPropagation()");
+        //tabs.setSuffixComponent(closeButton);
+
+        header.addToEnd(closeButton);
+        header.addToStart(nameAndPrefix);
+
         tabs.setWidthFull();
+        //tabs.setHeightFull();
         tabs.add("Overview", createTabOverview(stock));
         tabs.add(createTab("Litters", TabType.COUNT, litterService.getLitterCountForParent(stock).toString()), createTabLitters(stock));
         tabs.add(createTab(stock.getStockType().getNonBreederName(), TabType.COUNT, stockService.getKitCountForParent(stock).toString()),createTabKits(stock));
@@ -949,7 +994,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         tabs.add(createTab("Status'", TabType.NONE, Utility.EMPTY_VALUE),createTabStatuses(stock));
         tabs.add(createTab("Weights'", TabType.NONE, Utility.EMPTY_VALUE),createTabWeights(stock));
         
-        content.add(tabs);
+        content.add(header,tabs);
         return content;
     }
     
@@ -974,13 +1019,14 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         }
     }
 
-    private LazyComponent createTabOverview(Stock stock) {
-        Layout layout = new Layout();
-        //DialogCommon overviewDialog = new DialogCommon(DialogCommon.DisplayMode.STOCK_DETAILS);
-        //overviewDialog.setDialogMode(DialogCommon.DialogMode.VIEW);
-        //layout.add(overviewDialog.showItem(stock, DialogCommon.DisplayMode.STOCK_DETAILS,true,false));
-        layout.add(new StockDetailsFormLayout(stock));
-        return new LazyComponent(() -> layout);
+    private VerticalLayout createTabOverview(Stock stock) {
+        VerticalLayout overviewLayout = UIUtilities.getVerticalLayout(Boolean.TRUE, Boolean.TRUE, Boolean.FALSE);
+        Scroller scroll = new Scroller(new StockDetailsFormLayout(stock));
+        scroll.setSizeFull();
+        scroll.setMaxHeight(270,Unit.PIXELS);
+        overviewLayout.setSizeUndefined();
+        overviewLayout.add(scroll);
+        return overviewLayout;
     }
     
     private LazyComponent createTabLitters(Stock stock) {

@@ -55,6 +55,7 @@ public class StockDetailsFormLayout extends FormLayout{
     private TextField fieldFosterName = new TextField();
 
     public StockDetailsFormLayout(Stock stock) {
+        setSizeFull();
         this.stockEntity = stock;
         binder = new Binder<Stock>(Stock.class);
         createForm();
