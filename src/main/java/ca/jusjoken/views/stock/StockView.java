@@ -1,9 +1,13 @@
 package ca.jusjoken.views.stock;
 
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -19,9 +23,14 @@ import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
+import com.vaadin.flow.component.checkbox.CheckboxGroup;
+import com.vaadin.flow.component.checkbox.CheckboxGroupVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.contextmenu.MenuItem;
+import com.vaadin.flow.component.grid.ColumnTextAlign;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.grid.Grid.Column;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
@@ -37,9 +46,11 @@ import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout;
 import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout.Orientation;
 import com.vaadin.flow.component.menubar.MenuBar;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.tabs.Tab;
@@ -50,6 +61,7 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
+import com.vaadin.flow.data.renderer.NumberRenderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.BeforeEvent;
@@ -75,7 +87,6 @@ import com.vaadin.flow.theme.lumo.LumoUtility.Position;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.AvatarDiv;
-import ca.jusjoken.component.Badge;
 import ca.jusjoken.component.ComponentConfirmEvent;
 import ca.jusjoken.component.DialogCommon;
 import ca.jusjoken.component.DialogCommonEvent;
@@ -86,7 +97,6 @@ import ca.jusjoken.component.ListRefreshNeededListener;
 import ca.jusjoken.component.StatusEditor;
 import ca.jusjoken.component.StockDetailsFormLayout;
 import ca.jusjoken.component.WeightEditor;
-import ca.jusjoken.component.Layout.Gap;
 import ca.jusjoken.data.ColumnName;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.BreederFilter;
@@ -107,7 +117,6 @@ import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeRepository;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.data.service.StockWeightHistoryService;
-import ca.jusjoken.utility.BadgeVariant;
 import ca.jusjoken.views.MainLayout;
 import jakarta.annotation.security.PermitAll;
 
@@ -130,6 +139,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Long stockListCountAll = 0L;
     private Long stockListCount = 0L;
     private Grid<Stock> list = new Grid<>();
+    private List<Column<Stock>> columnList;
     private GridLazyDataView<Stock> listDataView;
     private Stock selectedStock;
     private Section sidebar;
@@ -436,6 +446,9 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         saveQueryDialog.addConfirmListener(event -> {
             //save the item
             if(currentStockSavedQuery.getSavedQueryName().equals(saveQueryName.getValue())){
+                //set the visiblecolumns for the saved query
+                currentStockSavedQuery.setVisibleColumns(String.join(",", getVisibleColumnKeys()));
+
                 UIUtilities.showNotification("Saving current query overwritting:id:" + currentStockSavedQuery.getId() + " :" + currentStockSavedQuery.getSavedQueryName());
                 //save the currentStockSavedQuery to the database
                 currentSavedQueryId = queryService.saveQuery(currentStockSavedQuery).toString();
@@ -630,24 +643,80 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             listDataView.refreshItem(selectedStock);
         }
 
+        //build all views including column layouts
         list.removeAllColumns();
         if(currentStockSavedQuery==null){
             list.addColumn(stockCardRenderer);
         }else{
-            if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.QUICK)){
-                list.addColumn(Stock::getDisplayName).setHeader("Name");
-                list.addColumn(Stock::getBreed).setHeader("Breed");
+            if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.LIST)){
+                list.setColumnReorderingAllowed(true);
+                list.addComponentColumn(stock -> {
+                    return stock.getnameAndPrefix(false,true, true);
+                }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name");
+                list.addComponentColumn(stock -> {
+                    if (stock.getBreeder()) {
+                        return new Icon(Utility.ICONS.TYPE_BREEDER.getIconSource());
+                    } else {
+                        return null;
+                    }
+                }).setHeader("Breeder").setResizable(true).setAutoWidth(true).setKey("breeder");   
 
-                //ContextMenu menu = createContextMenu(selectedStock);
-                //menu.setTarget(list);
-                //menu.setOpenOnClick(false);
+                list.addColumn(Stock::getBreed).setHeader("Breed").setResizable(true).setAutoWidth(true).setKey("breed");
+                list.addColumn(Stock::getChampNo).setHeader("ChampNo").setResizable(true).setAutoWidth(true).setKey("champno");
+                list.addColumn(Stock::getColor).setHeader("Colour").setResizable(true).setAutoWidth(true).setKey("color");
+                list.addColumn(Stock::getGenotype).setHeader("Genotype").setResizable(true).setAutoWidth(true).setKey("genotype");
+                list.addColumn(Stock::getLegs).setHeader("Legs").setResizable(true).setAutoWidth(true).setKey("legs");
+                list.addColumn(Stock::getNotes).setHeader("Notes").setResizable(true).setAutoWidth(true).setKey("notes");
+                list.addColumn(Stock::getRegNo).setHeader("RegNo").setResizable(true).setAutoWidth(true).setKey("regno");
+                list.addColumn(Stock::getStatus).setHeader("Status").setResizable(true).setAutoWidth(true).setKey("status");
+                list.addColumn(new LocalDateTimeRenderer<>(Stock::getStatusDate,"MM-dd-YYYY HHmm")).setHeader("Status Date").setResizable(true).setAutoWidth(true).setKey("statusdate");
+                list.addColumn(Stock::getTattoo).setHeader("Tattoo").setResizable(true).setAutoWidth(true).setKey("tattoo");
+                list.addColumn(Stock::getWeightInLbsOzAsString).setHeader("Weight").setResizable(true).setAutoWidth(true).setKey("weight");
+                list.addColumn(new LocalDateRenderer<>(Stock::getAcquired,"MM-dd-YYYY")).setHeader("Aquired").setResizable(true).setAutoWidth(true).setKey("aquired");
+                list.addColumn(new LocalDateRenderer<>(Stock::getDoB,"MM-dd-YYYY")).setHeader("DOB").setResizable(true).setAutoWidth(true).setKey("dob");
+                list.addColumn(stock -> {
+                    return stock.getAge().getAgeFormattedString();
+                }).setHeader("Age").setResizable(true).setAutoWidth(true).setKey("age");
+                list.addColumn(stock -> {
+                    Stock parent = stockService.getFather(stock);
+                    if(parent==null) return null;
+                    return parent.getDisplayName();
+                }).setHeader("Father").setResizable(true).setAutoWidth(true).setKey("father");
+                list.addColumn(stock -> {
+                    Stock parent = stockService.getMother(stock);
+                    if(parent==null) return null;
+                    return parent.getDisplayName();
+                }).setHeader("Mother").setResizable(true).setAutoWidth(true).setKey("mother");
+                list.addColumn(stock -> {return stockTypeService.getGenderForType(stock.getSex(), stock.getStockType());}).setHeader("Gender").setResizable(true).setAutoWidth(true).setKey("gender");
+                list.addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value");
+
+
+
             }else if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.VALUE)){
-                list.addColumn(Stock::getDisplayName).setHeader("Name");
-                list.addColumn(Stock::getBreed).setHeader("Breed");
-                list.addColumn(Stock::getStatus).setHeader("Status");
-                list.addColumn(Stock::getStockValue).setHeader("Value");
+                List<Stock> currentStockList = stockService.listByExample(currentSearchName, currentStockSavedQuery);
+
+                list.setColumnReorderingAllowed(true);
+                list.addComponentColumn(stock -> {
+                    return stock.getnameAndPrefix(false,true, true);
+                }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name");
+                list.addColumn(Stock::getBreed).setHeader("Breed").setResizable(true).setAutoWidth(true).setKey("breed");
+                list.addColumn(Stock::getStatus).setHeader("Status").setResizable(true).setAutoWidth(true).setKey("status");
+                list.addColumn(new LocalDateTimeRenderer<>(Stock::getStatusDate,"MM-dd-YYYY HHmm")).setHeader("Status Date").setResizable(true).setAutoWidth(true).setKey("statusdate");
+                list.addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value").setFooter(getValueFooter(currentStockList)).setTextAlign(ColumnTextAlign.END);
+                //list.addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value");
+
+
+                //TODO: need invoice column and a Footer that totals Value column
             }else{
                 list.addColumn(stockCardRenderer);
+            }
+        }
+
+        columnList = getCleanColumnList(list.getColumns());
+        //retreive the visible columns and set them
+        if(!currentStockSavedQuery.getVisibleColumnKeyList().isEmpty()){
+            for(Column<Stock> column: columnList){
+                list.getColumnByKey(column.getKey()).setVisible(currentStockSavedQuery.getVisibleColumnKeyList().contains(column.getKey()));
             }
         }
         
@@ -657,6 +726,17 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         sidebarSetValues();
     }
     
+    private String getValueFooter(List<Stock> currentStockList) {
+        // TODO Auto-generated method stub
+        System.out.println("getValueFooter: count:" + currentStockList.size());
+        Double totalValue = 0.0;
+        for (Stock item: currentStockList) {
+            totalValue = totalValue + item.getStockValue();
+        }
+        NumberFormat usFormat = NumberFormat.getCurrencyInstance(Locale.US);
+        return "Total value: " + usFormat.format(totalValue);
+    }
+
 /*     private void runBeforeClientResponse(SerializableConsumer<UI> command) {
         getElement().getNode().runWhenAttached(ui -> ui.beforeClientResponse(this, context -> command.accept(ui)));
     }        
@@ -702,7 +782,12 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             int index = items.indexOf(item);
             System.out.println("createList: setItemIndexProvider: index:" + index + " looking for item:" + item);
             return index >= 0 ? index : null;            
-        });        
+        });   
+        
+        list.addColumnReorderListener(event -> {
+            columnList = getCleanColumnList(event.getColumns());
+            sidebarChanged(true);
+        });
 
         createContextMenu(list);
 
@@ -802,80 +887,189 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         return layout;
     }
 
+    private VerticalLayout createColumnSelector(){
+        Set<String> resetColumnList = getVisibleColumnNames();
+        VerticalLayout columnSelector = UIUtilities.getVerticalLayout(true, true, false);
+        Div heading = new Div("Configure columns");
+        heading.getStyle().set("font-weight", "600");
+        heading.getStyle().set("padding", "var(--lumo-space-xs)");        
+
+        Checkbox selectAllCheckbox = new Checkbox("Select All");
+        if(getVisibleColumnKeys().size() == getColumnNames().size()){
+            selectAllCheckbox.setValue(true);
+            selectAllCheckbox.setIndeterminate(false);
+        }else if(getVisibleColumnKeys().isEmpty()){
+            selectAllCheckbox.setValue(false);
+            selectAllCheckbox.setIndeterminate(false);
+        }else{
+            selectAllCheckbox.setIndeterminate(true);
+        }
+
+
+        CheckboxGroup<String> group = new CheckboxGroup<>();
+        group.addThemeVariants(CheckboxGroupVariant.LUMO_VERTICAL);
+        group.setItems(getColumnNames());
+        group.setValue(getVisibleColumnNames());
+
+        group.addValueChangeListener((e) -> {
+            if (e.getValue().size() == getColumnNames().size()) {
+                selectAllCheckbox.setValue(true);
+                selectAllCheckbox.setIndeterminate(false);
+            } else if (e.getValue().isEmpty()) {
+                selectAllCheckbox.setValue(false);
+                selectAllCheckbox.setIndeterminate(false);
+            } else {
+                selectAllCheckbox.setIndeterminate(true);
+            }            
+
+            for(Column<Stock> column: columnList){
+                list.getColumnByKey(column.getKey()).setVisible(e.getValue().contains(column.getHeaderText()));
+            }
+            sidebarChanged(true);
+        });
+
+        selectAllCheckbox.addValueChangeListener(event -> {
+            if (event.getValue()) {
+                group.setValue(new HashSet<>(getColumnNames()));
+            } else {
+                group.deselectAll();
+            }            
+        });
+
+        Button reset = new Button("Reset", (e) -> {
+            group.setValue(resetColumnList);
+        });
+        reset.addThemeVariants(ButtonVariant.LUMO_SMALL);
+
+        HorizontalLayout options = new HorizontalLayout(selectAllCheckbox, reset);
+        options.setSpacing(false);
+        options.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        options.setAlignItems(Alignment.BASELINE);
+
+        columnSelector.add(heading,options,group);
+
+        return columnSelector;
+    }
+
     private GridContextMenu<Stock> createContextMenu(Grid<Stock> grid) {
         GridContextMenu<Stock> menu = new GridContextMenu<>(grid);
 
         menu.setDynamicContentHandler(stockEntity -> {
-            if(stockEntity==null) return false;
-            menu.removeAll();
-            String stockName = stockEntity.getDisplayName();
-            Div heading = new Div();
-            heading.setText(stockName);
-            heading.getStyle().set("text-align", "center");
-            heading.getStyle().set("font-weight", "bold");
-            heading.getStyle().set("padding", "8px");
-            //menu.setOpenOnClick(true);
-            
-            //add a label at the top with the stock name
-            menu.addComponentAsFirst(heading);
-            menu.addSeparator();
+            if(stockEntity==null){
+                if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.TILE)){
+                    return false;
+                }else{
+                    menu.removeAll();
+                    menu.addComponent(createColumnSelector());
+                    
+                    return true;
+                }
 
-            GridMenuItem<Stock> addNewMenu = menu.addItem(new Item("Add new", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
-            addNewMenu.addMenuItemClickListener(click -> {
-                //open stock edit dialog
-                Stock newStock = new Stock();
-                newStock.setExternal(false);
-                newStock.setBreeder(true);
-                newStock.setStockType(stockEntity.getStockType());
-                newStock.setWeight(0);
-                //newStock.setStatus("active");
-                //newStock.setStatusDate(LocalDateTime.now());
+            }else{
+                menu.removeAll();
+                String stockName = stockEntity.getDisplayName();
+                Div heading = new Div();
+                heading.setText(stockName);
+                heading.getStyle().set("text-align", "center");
+                heading.getStyle().set("font-weight", "bold");
+                heading.getStyle().set("padding", "8px");
+                //menu.setOpenOnClick(true);
                 
-                dialogCommon.setDialogTitle("Create new");
-                dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
-                
-            });
-            GridMenuItem<Stock> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
-            editMenu.addMenuItemClickListener(click -> {
-                //open stock edit dialog
-                dialogCommon.setDialogTitle("Edit Stock");
-                dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.STOCK_DETAILS);
-            });
-            GridMenuItem<Stock> editImageMenu = menu.addItem(new Item("Edit Image", Utility.ICONS.ACTION_EDIT_IMAGE.getIconSource()));
-            editImageMenu.addMenuItemClickListener(click -> {
-            //open image dialog
-            dialogCommon.setDialogTitle("Edit Profile Image");
-            dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.PROFILE_IMAGE);
-            });
-            menu.addItem(new Item("Breed", Utility.ICONS.TYPE_BREEDER.getIconSource()));
-            menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
-            createStatusMenuItem(menu, stockEntity, "sold");
-            createStatusMenuItem(menu, stockEntity, "forsale");
-            createStatusMenuItem(menu, stockEntity, "deposit");
-            createStatusMenuItem(menu, stockEntity, "butchered");
-            createStatusMenuItem(menu, stockEntity, "died");
-            createStatusMenuItem(menu, stockEntity, "archived");
-            createStatusMenuItem(menu, stockEntity, "culled");
-            createStatusMenuItem(menu, stockEntity, "active");
-            GridMenuItem<Stock> weighMenu = menu.addItem(new Item("Weigh", Utility.ICONS.ACTION_WEIGH.getIconSource()));
-            weighMenu.addMenuItemClickListener(click -> {
-                weightEditor.dialogOpen(stockEntity);
-            });
-            menu.addSeparator();
-            GridMenuItem<Stock> pedigreeEditorMenu = menu.addItem(new Item("Pedigree", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
-            pedigreeEditorMenu.addMenuItemClickListener(click -> {
-                UI.getCurrent().navigate(StockPedigreeEditor.class, stockEntity.getId().toString());
-            });
-            menu.addSeparator();
-            GridMenuItem<Stock> deleteMenu = menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
-            deleteMenu.addMenuItemClickListener(click -> {
-                deleteStockEntityWithConfirm(stockEntity);
-            });
+                //add a label at the top with the stock name
+                menu.addComponentAsFirst(heading);
+                menu.addSeparator();
 
-            return true;
+                GridMenuItem<Stock> addNewMenu = menu.addItem(new Item("Add new", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+                addNewMenu.addMenuItemClickListener(click -> {
+                    //open stock edit dialog
+                    Stock newStock = new Stock();
+                    newStock.setExternal(false);
+                    newStock.setBreeder(true);
+                    newStock.setStockType(stockEntity.getStockType());
+                    newStock.setWeight(0);
+                    //newStock.setStatus("active");
+                    //newStock.setStatusDate(LocalDateTime.now());
+                    
+                    dialogCommon.setDialogTitle("Create new");
+                    dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
+                    
+                });
+                GridMenuItem<Stock> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
+                editMenu.addMenuItemClickListener(click -> {
+                    //open stock edit dialog
+                    dialogCommon.setDialogTitle("Edit Stock");
+                    dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.STOCK_DETAILS);
+                });
+                GridMenuItem<Stock> editImageMenu = menu.addItem(new Item("Edit Image", Utility.ICONS.ACTION_EDIT_IMAGE.getIconSource()));
+                editImageMenu.addMenuItemClickListener(click -> {
+                //open image dialog
+                dialogCommon.setDialogTitle("Edit Profile Image");
+                dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.PROFILE_IMAGE);
+                });
+                menu.addItem(new Item("Breed", Utility.ICONS.TYPE_BREEDER.getIconSource()));
+                menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
+                createStatusMenuItem(menu, stockEntity, "sold");
+                createStatusMenuItem(menu, stockEntity, "forsale");
+                createStatusMenuItem(menu, stockEntity, "deposit");
+                createStatusMenuItem(menu, stockEntity, "butchered");
+                createStatusMenuItem(menu, stockEntity, "died");
+                createStatusMenuItem(menu, stockEntity, "archived");
+                createStatusMenuItem(menu, stockEntity, "culled");
+                createStatusMenuItem(menu, stockEntity, "active");
+                GridMenuItem<Stock> weighMenu = menu.addItem(new Item("Weigh", Utility.ICONS.ACTION_WEIGH.getIconSource()));
+                weighMenu.addMenuItemClickListener(click -> {
+                    weightEditor.dialogOpen(stockEntity);
+                });
+                menu.addSeparator();
+                GridMenuItem<Stock> pedigreeEditorMenu = menu.addItem(new Item("Pedigree", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
+                pedigreeEditorMenu.addMenuItemClickListener(click -> {
+                    UI.getCurrent().navigate(StockPedigreeEditor.class, stockEntity.getId().toString());
+                });
+                menu.addSeparator();
+                GridMenuItem<Stock> deleteMenu = menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
+                deleteMenu.addMenuItemClickListener(click -> {
+                    deleteStockEntityWithConfirm(stockEntity);
+                });
+
+                return true;
+            }
         });
 
         return menu;
+    }
+
+    private List<Column<Stock>> getCleanColumnList(List<Column<Stock>> originalList){
+        List<Column<Stock>> returnList = new ArrayList<>(originalList);
+        returnList.remove(0);
+        return returnList;
+    }
+
+    private List<String> getColumnNames(){
+        List<String> columnNames = new ArrayList<>();
+        for (Column<Stock> column : columnList) {
+            columnNames.add(column.getHeaderText());
+        }
+        return columnNames;
+    }
+    
+    private Set<String> getVisibleColumnNames(){
+        List<String> columnNames = new ArrayList<>();
+        for (Column<Stock> column : columnList) {
+            if(column.isVisible()){
+                columnNames.add(column.getHeaderText());
+            }
+        }
+        return new HashSet<>(columnNames);
+    }
+    
+    private Set<String> getVisibleColumnKeys(){
+        List<String> columnNames = new ArrayList<>();
+        for (Column<Stock> column : columnList) {
+            if(column.isVisible()){
+                columnNames.add(column.getKey());
+            }
+        }
+        return new HashSet<>(columnNames);
     }
     
     private void createStatusMenuItem(GridContextMenu<Stock> menu, Stock stockEntity, String statusToEdit){
@@ -940,23 +1134,6 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
         tabs.addThemeVariants(TabSheetVariant.LUMO_TABS_SMALL);
 
-        Layout nameAndPrefix = new Layout();
-        nameAndPrefix.setFlexDirection(Layout.FlexDirection.ROW);
-        nameAndPrefix.setAlignItems(Layout.AlignItems.CENTER);
-
-        if(!stock.getPrefix().isEmpty()){
-            Badge newBadge = new Badge(stock.getPrefix());
-            UIUtilities.setBorders(newBadge, stock, UIUtilities.BorderSize.XSMALL);
-            newBadge.addThemeVariants(BadgeVariant.PILL, BadgeVariant.SMALL);
-            nameAndPrefix.add(newBadge);
-        }
-        Span stockName = new Span(stock.getDisplayName());
-        stockName.addClassNames("stock-name-responsive");
-        nameAndPrefix.add(stockName);
-        nameAndPrefix.setGap(Gap.SMALL);
-
-        //tabs.setPrefixComponent(newBadge);
-
         //close button
         Button closeButton = new Button(FontAwesome.Solid.X.create());
         closeButton.setTooltipText("Close details");
@@ -966,7 +1143,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         //tabs.setSuffixComponent(closeButton);
 
         header.addToEnd(closeButton);
-        header.addToStart(nameAndPrefix);
+        header.addToStart(stock.getnameAndPrefix(false,true, false));
 
         tabs.setWidthFull();
 

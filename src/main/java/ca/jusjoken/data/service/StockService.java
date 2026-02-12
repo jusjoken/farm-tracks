@@ -82,7 +82,7 @@ public class StockService {
     
     @SuppressWarnings({"ConvertToStringSwitch", "CollectionsToArray"})
     private Example<Stock> getExample(String name, StockSavedQuery savedQuery){
-        String[] ignoreFields = {"needsSaving","profileImage","defaultImageSource","sexText","sex","prefix","tattoo","fatherName","motherName","fatherId","motherId","color","breed","weightText","weight","doB","acquired","regNo","champNo","legs","genotype","kitsCount","notes","litter","fosterLitter","ageInDays","litterCount","kitCount","createdDate","lastModifiedDate","external"};   
+        String[] ignoreFields = {"needsSaving","profileImage","defaultImageSource","sexText","sex","prefix","tattoo","fatherName","motherName","fatherId","motherId","color","breed","weightText","weight","doB","acquired","regNo","champNo","legs","genotype","kitsCount","notes","litter","fosterLitter","ageInDays","litterCount","kitCount","createdDate","lastModifiedDate","external","stockValue"};   
         Stock stock = new Stock();
         stock.setName(name);
         stock.setStockType(savedQuery.getStockType());

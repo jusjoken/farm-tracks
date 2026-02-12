@@ -65,5 +65,5 @@ public interface StockRepository extends JpaRepository<Stock, Long>  {
     @Modifying
     @Query(value = "DELETE FROM stock WHERE stock_type_id = :stock_type_id", nativeQuery = true)
     public int deleteByStockType(@Param("stock_type_id") Integer stockTypeId);
-    
+
 }

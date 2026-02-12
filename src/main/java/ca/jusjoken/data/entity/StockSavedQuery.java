@@ -14,6 +14,11 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Transient;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import org.springframework.data.domain.Sort.Direction;
 
 /**
@@ -42,6 +47,7 @@ public class StockSavedQuery {
     private String sort2Column = null;  
     private String sort2Direction = Direction.ASC.name();
     private Boolean defaultQuery = false;
+    private String visibleColumns = null;
     
     @Transient
     private Boolean dirty = false;
@@ -50,7 +56,7 @@ public class StockSavedQuery {
 
     //Note: StockViewStyleConverter class is used to convert these so the shortname is stored in the database
     public static enum StockViewStyle{
-        FULL("Full"), QUICK("Quick"), VALUE("Value");
+        TILE("Tile"), LIST("List"), VALUE("Value");
 
         private final String shortName;
         
@@ -64,11 +70,11 @@ public class StockSavedQuery {
         
         public static StockViewStyle fromShortName(String shortName){
             switch (shortName){
-                case "Full" -> {
-                    return StockViewStyle.FULL;
+                case "Tile" -> {
+                    return StockViewStyle.TILE;
                 }
-                case "Quick" -> {
-                    return StockViewStyle.QUICK;
+                case "List" -> {
+                    return StockViewStyle.LIST;
                 }
                 case "Value" -> {
                     return StockViewStyle.VALUE;
@@ -78,7 +84,7 @@ public class StockSavedQuery {
         }
     }
 
-    private StockViewStyle viewStyle = StockViewStyle.FULL;
+    private StockViewStyle viewStyle = StockViewStyle.TILE;
 
 
     public StockSavedQuery() {
@@ -228,8 +234,8 @@ public class StockSavedQuery {
         return "StockSavedQuery [id=" + id + ", savedQueryName=" + savedQueryName + ", breeder=" + breeder
                 + ", stockType=" + stockType + ", stockStatusName=" + stockStatusName + ", sort1Column=" + sort1Column
                 + ", sort1Direction=" + sort1Direction + ", sort2Column=" + sort2Column + ", sort2Direction="
-                + sort2Direction + ", defaultQuery=" + defaultQuery + ", dirty=" + dirty + ", needsSaving="
-                + needsSaving + ", viewStyle=" + viewStyle + "]";
+                + sort2Direction + ", defaultQuery=" + defaultQuery + ", visibleColumns=" + visibleColumns + ", dirty="
+                + dirty + ", needsSaving=" + needsSaving + ", viewStyle=" + viewStyle + "]";
     }
 
     public StockViewStyle getViewStyle() {
@@ -238,6 +244,21 @@ public class StockSavedQuery {
 
     public void setViewStyle(StockViewStyle viewStyle) {
         this.viewStyle = viewStyle;
+    }
+
+    public String getVisibleColumns() {
+        return visibleColumns;
+    }
+
+    public void setVisibleColumns(String visibleColumns) {
+        this.visibleColumns = visibleColumns;
+    }
+
+    public List<String> getVisibleColumnKeyList(){
+        if(visibleColumns==null) return new ArrayList<>();
+        String[] elements = visibleColumns.split(",\\s*"); // Split and trim whitespace
+        List<String> fixedList = Arrays.asList(elements);
+        return fixedList;
     }
 
 }

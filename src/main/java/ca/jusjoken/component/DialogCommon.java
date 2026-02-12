@@ -55,6 +55,7 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.select.Select;
+import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.upload.Upload;
@@ -177,6 +178,9 @@ public class DialogCommon extends Component{
 
     @PropertyId("notes")
     private final TextArea fieldNotes = new TextArea();
+
+    @PropertyId("stockValue")
+    private final NumberField fieldValue = UIUtilities.getNumberField("",Boolean.FALSE,"$");
     
     //FormItems that may be hidden
     FormItem fieldFosterFormItem;
@@ -279,6 +283,7 @@ public class DialogCommon extends Component{
         fieldLegs.setWidthFull();
         fieldRegNo.setWidthFull();
         fieldNotes.setWidthFull();
+        fieldValue.setWidthFull();
 
         fieldFather.addCustomValueSetListener(item -> {
             //add the custom value to the list and set as value
@@ -702,6 +707,7 @@ public class DialogCommon extends Component{
             fieldAquiredFormItem = stockFormLayout.addFormItem(fieldAquiredDate,"Aquired");
             stockFormLayout.addFormItem(fieldBornDate,"Born");
             fieldFosterFormItem = stockFormLayout.addFormItem(fieldFoster,"Foster");
+            stockFormLayout.addFormItem(fieldValue, "Value");
             stockFormLayout.addFormItem(fieldNotes,"Notes");
             
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){

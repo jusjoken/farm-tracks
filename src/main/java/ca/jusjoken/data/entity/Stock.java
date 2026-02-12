@@ -788,8 +788,27 @@ public class Stock {
         header.setWidthFull();
         header.setFlexWrap(Layout.FlexWrap.WRAP);
         
+        header.add(getnameAndPrefix(forPedigree,forPedigree, false));
+        //add icons
+        if(getSex().equals(Gender.FEMALE)){
+            header.add(showIcon(getStockType().getFemaleName(),Utility.ICONS.GENDER_FEMALE.getIconSource(),true));
+        }else if(getSex().equals(Gender.MALE)){
+            header.add(showIcon(getStockType().getMaleName(),Utility.ICONS.GENDER_MALE.getIconSource(),true));
+        }
+        if(!forPedigree && getBreeder()){
+            header.add(showIcon(getStockType().getBreederName(),Utility.ICONS.TYPE_BREEDER.getIconSource(),false));
+        }
+        //System.out.println("getHeader: StockStatus:" + getStatus());
+        if(!forPedigree && Utility.getInstance().hasStockStatus(getStatus())){
+            StockStatus stockStatus = Utility.getInstance().getStockStatus(getStatus());
+            header.add(showIcon(stockStatus.getLongName(),stockStatus.getIcon().getIconSource(),false));
+        }
+        return header;
+    }
+
+    public Layout getnameAndPrefix(Boolean columnBased, Boolean includeEmptyPrefix, Boolean includeGenderIcon){
         Layout nameAndPrefix = new Layout();
-        if(forPedigree){
+        if(columnBased){
             nameAndPrefix.setFlexDirection(Layout.FlexDirection.COLUMN);
             nameAndPrefix.setAlignItems(Layout.AlignItems.START);
         }else{
@@ -797,7 +816,16 @@ public class Stock {
             nameAndPrefix.setAlignItems(Layout.AlignItems.CENTER);
         }
 
-        if(forPedigree){
+        //add icons
+        if(includeGenderIcon){
+            if(getSex().equals(Gender.FEMALE)){
+                nameAndPrefix.add(showIcon(getStockType().getFemaleName(),Utility.ICONS.GENDER_FEMALE.getIconSource(),true));
+            }else if(getSex().equals(Gender.MALE)){
+                nameAndPrefix.add(showIcon(getStockType().getMaleName(),Utility.ICONS.GENDER_MALE.getIconSource(),true));
+            }
+        }
+
+        if(includeEmptyPrefix){
             Badge badge = new Badge(Utility.EMPTY_VALUE);
             if(!getPrefix().isEmpty()){
                 badge.setText(getPrefix());
@@ -812,29 +840,13 @@ public class Stock {
             }
         }
         Span stockName = new Span(getDisplayName());
-        //stockName.addClassNames(LumoUtility.FontSize.LARGE, LumoUtility.FontWeight.MEDIUM);
         stockName.addClassNames("stock-name-responsive");
         
         nameAndPrefix.add(stockName);
-        header.add(nameAndPrefix);
-        //add icons
-        if(getSex().equals(Gender.FEMALE)){
-            header.add(showIcon(getStockType().getFemaleName(),Utility.ICONS.GENDER_FEMALE.getIconSource()));
-        }else if(getSex().equals(Gender.MALE)){
-            header.add(showIcon(getStockType().getMaleName(),Utility.ICONS.GENDER_MALE.getIconSource()));
-        }
-        if(!forPedigree && getBreeder()){
-            header.add(showIcon(getStockType().getBreederName(),Utility.ICONS.TYPE_BREEDER.getIconSource()));
-        }
-        //System.out.println("getHeader: StockStatus:" + getStatus());
-        if(!forPedigree && Utility.getInstance().hasStockStatus(getStatus())){
-            StockStatus stockStatus = Utility.getInstance().getStockStatus(getStatus());
-            header.add(showIcon(stockStatus.getLongName(),stockStatus.getIcon().getIconSource()));
-        }
-        return header;
+        return nameAndPrefix;
     }
 
-    private Layout showIcon(String text, String icon) {
+    private Layout showIcon(String text, String icon, Boolean colorByGender) {
         Layout layout = new Layout();
         layout.setAlignItems(Layout.AlignItems.CENTER);
         layout.setGap(Layout.Gap.SMALL);
@@ -842,9 +854,13 @@ public class Stock {
         Icon svgIcon = new Icon(icon);
         svgIcon.setTooltipText(text);
         svgIcon.addClassName("vaadin-icon-responsive");  //set in styles.css
-        //svgIcon.addClassNames(LumoUtility.IconSize.SMALL);
-        //svgIcon.getStyle().set("--vaadin-icon-visual-size", "1.0rem");
-        //svgIcon.getStyle().set("--vaadin-icon-size", "1.0rem");
+        if(colorByGender){
+            if(getSex().equals(Gender.MALE)){
+                svgIcon.setColor(UIUtilities.borderColorMale);
+            }else if(getSex().equals(Gender.FEMALE)){
+                svgIcon.setColor(UIUtilities.borderColorFemale);
+            }
+        }
         layout.add(svgIcon);
         return layout;
     }
@@ -912,6 +928,7 @@ public class Stock {
     }
     
     public Double getStockValue() {
+        if(stockValue==null) return 0.0;
         return stockValue;
     }
 

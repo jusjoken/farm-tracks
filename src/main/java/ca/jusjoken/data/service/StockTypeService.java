@@ -9,6 +9,7 @@ import java.util.List;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.entity.StockType;
 
 /**
@@ -33,5 +34,15 @@ public class StockTypeService {
     
     public StockType findRabbits(){
         return typeRepository.findByName("Rabbits");
+    }
+
+    public String getGenderForType(Gender gender, StockType type){
+        if(gender.equals(Gender.MALE)){
+            return type.getMaleName();
+        }else if(gender.equals(Gender.FEMALE)){
+            return type.getFemaleName();
+        }else{
+            return "NA";
+        }
     }
 }

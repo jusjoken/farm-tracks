@@ -15,7 +15,6 @@ div.tag-panel-value-responsive {
     font-weight: 500;
 }
 
-
 @media (min-width: 640px) { /* settings for larger screens */
     vaadin-icon.vaadin-icon-responsive {
         --vaadin-icon-visual-size: 1.2rem;
