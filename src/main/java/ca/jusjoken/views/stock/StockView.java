@@ -47,10 +47,10 @@ import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout;
 import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout.Orientation;
 import com.vaadin.flow.component.menubar.MenuBar;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
+import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.tabs.Tab;
@@ -90,6 +90,7 @@ import ca.jusjoken.component.AvatarDiv;
 import ca.jusjoken.component.ComponentConfirmEvent;
 import ca.jusjoken.component.DialogCommon;
 import ca.jusjoken.component.DialogCommonEvent;
+import ca.jusjoken.component.GenotypeEditor;
 import ca.jusjoken.component.Item;
 import ca.jusjoken.component.Layout;
 import ca.jusjoken.component.LazyComponent;
@@ -101,13 +102,14 @@ import ca.jusjoken.data.ColumnName;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.BreederFilter;
 import ca.jusjoken.data.Utility.TabType;
+import ca.jusjoken.data.entity.GenotypeSegment;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
+import ca.jusjoken.data.entity.StockSavedQuery.StockViewStyle;
 import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.entity.StockWeightHistory;
-import ca.jusjoken.data.entity.StockSavedQuery.StockViewStyle;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.StockRepository;
 import ca.jusjoken.data.service.StockSavedQueryService;
@@ -151,6 +153,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private final DialogCommon dialogCommon;
     private final StatusEditor statusEditor;
     private final WeightEditor weightEditor;
+    private final GenotypeEditor genotypeEditor;
     private ConfirmDialog saveQueryDialog = new ConfirmDialog();
     private ConfirmDialog deleteQueryDialog = new ConfirmDialog();
     private ConfirmDialog resetQueryDialog = new ConfirmDialog();
@@ -180,6 +183,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         this.dialogCommon = new DialogCommon();
         this.statusEditor = new StatusEditor();
         this.weightEditor = new WeightEditor();
+        this.genotypeEditor = new GenotypeEditor();
         setupListeners();  
         
         addClassNames(Display.FLEX, Height.FULL, Overflow.HIDDEN);
@@ -195,6 +199,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         dialogCommon.addListener(this);
         statusEditor.addListener(this);
         weightEditor.addListener(this);
+        genotypeEditor.addListener(this);
     }
 
     private Hr createHr() {
@@ -614,6 +619,11 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         selectedStock = null;
         sidebarChanged(Boolean.FALSE);
         updateStockTypeCount();
+        System.out.println("loadFilters: genotypes:" + currentStockSavedQuery.getStockType().getGenotypes());
+        System.out.println("loadFilters: genotypeSegments:");
+        for(GenotypeSegment segment: currentStockSavedQuery.getStockType().getGenotypeSegments()){
+            System.out.println("   segment:" + segment.toString());
+        }
     }
     
     private void applyFilters(){
@@ -1002,10 +1012,17 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
                 });
                 GridMenuItem<Stock> editImageMenu = menu.addItem(new Item("Edit Image", Utility.ICONS.ACTION_EDIT_IMAGE.getIconSource()));
                 editImageMenu.addMenuItemClickListener(click -> {
-                //open image dialog
-                dialogCommon.setDialogTitle("Edit Profile Image");
-                dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.PROFILE_IMAGE);
+                    //open image dialog
+                    dialogCommon.setDialogTitle("Edit Profile Image");
+                    dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.PROFILE_IMAGE);
                 });
+                if(stockEntity.getStockType().getGenotypes().size()>0){
+                    GridMenuItem<Stock> editGenotype = menu.addItem(new Item("Edit Genotype", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
+                    editGenotype.addMenuItemClickListener(click -> {
+                        //open genotypeEditor
+                        genotypeEditor.dialogOpen(stockEntity);
+                    });
+                }
                 menu.addItem(new Item("Breed", Utility.ICONS.TYPE_BREEDER.getIconSource()));
                 menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
                 createStatusMenuItem(menu, stockEntity, "sold");

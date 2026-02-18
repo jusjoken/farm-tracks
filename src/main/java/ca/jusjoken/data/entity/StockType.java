@@ -4,12 +4,20 @@
  */
 package ca.jusjoken.data.entity;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import java.util.Objects;
+import jakarta.persistence.JoinColumn;
 
 /**
  *
@@ -30,6 +38,11 @@ public class StockType {
     private String nonBreederName;  //name like kit for a rabbit if breeder is false
     private Boolean defaultType;
     private String imageFileName;
+    
+    @ElementCollection(targetClass = String.class, fetch = FetchType.EAGER)
+    @CollectionTable(name = "stock_genotypes", joinColumns = @JoinColumn(name = "id"))
+    @Column(name = "genotypes")
+    private List<String> genotypes = new ArrayList<>();
 
     public StockType() {
     }
@@ -141,9 +154,32 @@ public class StockType {
         this.imageFileName = imageFileName;
     }
 
-    @Override
-    public String toString() {
-        return "StockType{" + "id=" + id + ", name=" + name + ", nameSingular=" + nameSingular + ", maleName=" + maleName + ", femaleName=" + femaleName + ", breederName=" + breederName + ", nonBreederName=" + nonBreederName + ", defaultType=" + defaultType + '}';
+    public List<String> getGenotypes() {
+        return genotypes;
     }
 
+    public void setGenotypes(List<String> genotypes) {
+        this.genotypes = genotypes;
+    }
+
+    public List<GenotypeSegment> getGenotypeSegments(){
+        List<GenotypeSegment> genotypeSegments = new ArrayList<>();
+        for(String genotype: getGenotypes()){
+            List<String> genoValues = Arrays.asList(genotype.split(","));
+            String firstGenoValue = genoValues.get(0);
+            GenotypeSegment newSegment = new GenotypeSegment(firstGenoValue, genoValues, new GenotypeValuePair(firstGenoValue,firstGenoValue));
+            genotypeSegments.add(newSegment);
+        }
+        return genotypeSegments;
+    }
+
+    @Override
+    public String toString() {
+        return "StockType [id=" + id + ", name=" + name + ", nameSingular=" + nameSingular + ", maleName=" + maleName
+                + ", femaleName=" + femaleName + ", breederName=" + breederName + ", nonBreederName=" + nonBreederName
+                + ", defaultType=" + defaultType + ", imageFileName=" + imageFileName + ", genotypes=" + genotypes
+                + "]";
+    }
+
+    
 }

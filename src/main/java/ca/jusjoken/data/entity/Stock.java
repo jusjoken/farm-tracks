@@ -3,6 +3,9 @@ package ca.jusjoken.data.entity;
 import java.io.File;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 import org.springframework.data.annotation.CreatedDate;
@@ -115,17 +118,10 @@ public class Stock {
     private String champNo = "";
     @CsvBindByName(column = "Legs")
     private String legs = "";
-    @CsvBindByName(column = "Genotype")
-    private String genotype = "";  //TODO: needs a string builder for genotypes
-
-    //TODO:: removed as the service now retreives these counts
-    //private Integer littersCount;   // make a getter and return a count
-    //private Integer kitsCount;   // make a getter and return a count
 
     @CsvBindByName(column = "Notes")
     private String notes = "";
 
-    //TODO: needs to be a table of status and statusDate
     @CsvBindByName(column = "Status")
     private String status = ""; 
     @CsvCustomBindByName(column = "Status Date", converter = LocalDateCsvConverterDDMMYYYY.class)
@@ -238,7 +234,31 @@ public class Stock {
         this.lastModifiedDate = lastModifiedDate;
     }
     //END Common time stamps for records
-    
+
+    //Genotype fields
+    @CsvBindByName(column = "Genotype")
+    private String genotype = ""; 
+    // private String genoSegValue1A = "";
+    // private String genoSegValue2A = "";
+    // private String genoSegValue3A = "";
+    // private String genoSegValue4A = "";
+    // private String genoSegValue5A = "";
+    // private String genoSegValue6A = "";
+    // private String genoSegValue7A = "";
+    // private String genoSegValue8A = "";
+    // private String genoSegValue9A = "";
+    // private String genoSegValue10A = "";
+    // private String genoSegValue1B = "";
+    // private String genoSegValue2B = "";
+    // private String genoSegValue3B = "";
+    // private String genoSegValue4B = "";
+    // private String genoSegValue5B = "";
+    // private String genoSegValue6B = "";
+    // private String genoSegValue7B = "";
+    // private String genoSegValue8B = "";
+    // private String genoSegValue9B = "";
+    // private String genoSegValue10B = "";
+
     public Stock() {
         //this.active = getActive();
         
@@ -936,10 +956,44 @@ public class Stock {
         this.stockValue = stockValue;
     }
 
+
+
+    
     @Override
     public String toString() {
         return "Stock{" + "id=" + id + ", name=" + name + ", tattoo=" + tattoo  + ", breeder=" + breeder + ", sexText=" + sexText + ", sex=" + sex + ", prefix=" + prefix+ ", fatherName=" + fatherName + ", motherName=" + motherName + ", fatherId=" + fatherId + ", motherId=" + motherId + ", fatherExtName=" + fatherExtName + ", motherExtName=" + motherExtName + ", color=" + color + ", breed=" + breed + ", weightText=" + weightText + ", weight=" + weight + ", weightDate=" + weightDate + ", doB=" + doB + ", acquired=" + acquired + ", regNo=" + regNo + ", champNo=" + champNo + ", legs=" + legs + ", genotype=" + genotype + ", notes=" + notes + ", status=" + status + ", statusDate=" + statusDate + ", active=" + active + ", profileImage=" + profileImage + ", defaultImageSource=" + defaultImageSource + ", profileImagePath=" + profileImagePath + ", litter=" + litter + ", fosterLitter=" + fosterLitter + ", needsSaving=" + needsSaving + ", ageInDays=" + ageInDays + ", stockValue=" + stockValue + ", temp=" + temp + ", external=" + external + ", createdDate=" + createdDate + ", lastModifiedDate=" + lastModifiedDate + ", stockType=" + stockType  + '}';
     }
 
+    public List<GenotypeSegment> getGenoSegments(){
+        List<GenotypeSegment> genotypeSegments = new ArrayList<>();
+        List<GenotypeValuePair> genoPairs = getGenotypeValuePairs();
+        Integer counter = 0;
+        for(GenotypeSegment typeGenotypeSegment: stockType.getGenotypeSegments()){
+            String value1 = "_";
+            String value2 = "_";
+            //System.out.println("getGenoSegments: checking: type:" + typeGenotypeSegment.getName() + " counter:" + counter + " for:" + genoPairs.get(counter) + " values:" + typeGenotypeSegment.getValues().toString());
+            if(counter>genoPairs.size()) break;
+            value1 = genoPairs.get(counter).getValue1();
+            value2 = genoPairs.get(counter).getValue2();
+            genotypeSegments.add(new GenotypeSegment(typeGenotypeSegment.getName(), typeGenotypeSegment.getValues(), new GenotypeValuePair(value1,value2)));
+            counter++;
+        }
+        return genotypeSegments;
+    }
+
+    //TODO: need a way to save an edit to a genotype value of a segment
+
+    //build a list from the stored genotype string
+    public List<GenotypeValuePair> getGenotypeValuePairs(){
+        List<GenotypeValuePair> genotypeValuePairs = new ArrayList<>();
+        List<String> genoList = Arrays.asList(genotype.split(","));
+        //System.out.println("getGenotypeValuePairs: genoList size:" + genoList.size() + " genotype:" + genotype);
+        for(int i = 0; i < genoList.size(); i += 2){
+            //System.out.println("getGenotypeValuePairs: checking i:" + i + " and i+1:" + (i+1));
+            //System.out.println("getGenotypeValuePairs: adding:" + i + " value1:" + genoList.get(i) + " value2:" + genoList.get(i+1));
+            genotypeValuePairs.add(new GenotypeValuePair(genoList.get(i),genoList.get(i+1)));
+        }
+        return genotypeValuePairs;
+    }
 
 }

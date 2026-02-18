@@ -8,6 +8,7 @@ import java.util.List;
 
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.entity.StockType;
@@ -44,5 +45,11 @@ public class StockTypeService {
         }else{
             return "NA";
         }
+    }
+
+    @Transactional
+    public List<String> getGenotypeList(Integer id){
+        return typeRepository.findById(id).get().getGenotypes();
+
     }
 }

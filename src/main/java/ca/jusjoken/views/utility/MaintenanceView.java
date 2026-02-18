@@ -40,20 +40,20 @@ import java.text.NumberFormat;
 @PermitAll
 @Uses(Icon.class)
 public class MaintenanceView extends Div implements ProgressBarUpdateListener{
-    private Import importUtility = new Import();
-    private Button processButton = new Button("Process import");
-    private ProgressBar progress = new ProgressBar();
-    private NativeLabel progressBarLabelText = new NativeLabel();
-    private Span progressBarLabelValue = new Span();
+    private final Import importUtility = new Import();
+    private final Button processButton = new Button("Process import");
+    private final ProgressBar progress = new ProgressBar();
+    private final NativeLabel progressBarLabelText = new NativeLabel();
+    private final Span progressBarLabelValue = new Span();
 
     private Upload kitUpload;
     private Upload breederUpload;
     private Upload litterUpload;
-    private VaadinService vService = VaadinService.getCurrent();
+    private final VaadinService vService = VaadinService.getCurrent();
     private UI ui;
     
     public MaintenanceView() {
-        importUtility.addListener(this);
+        addProgressBarUpdateListener();
         setSizeFull();
         addClassNames("maintenance-view");
         
@@ -63,6 +63,11 @@ public class MaintenanceView extends Div implements ProgressBarUpdateListener{
         layout.setSpacing(false);
         add(layout);
 
+    }
+
+    // Add a method to set the progress bar update listener
+    private void addProgressBarUpdateListener() {
+        importUtility.addListener(this);
     }
 
     //this will be a controlled import that will remove all Everbreed data and reimport from breeders, kits and litters csv files
@@ -116,19 +121,19 @@ public class MaintenanceView extends Div implements ProgressBarUpdateListener{
         importItems.setWidthFull();
 
         FileBuffer fileBuffer = new FileBuffer();
+
+
         Upload upload = new Upload(fileBuffer);
         upload.setWidthFull();
         upload.setDropAllowed(false);
         upload.setAcceptedFileTypes("text/csv");
         
         String buttonName;
-        if(importType.equals(ImportType.BREEDERS)){
-            buttonName = "Select breeders file for import";
-        }else if(importType.equals(ImportType.KITS)){
-            buttonName = "Select kits file for import";
-        }else{
-            buttonName = "Select litters file for import";
-        }
+        buttonName = switch (importType) {
+            case BREEDERS -> "Select breeders file for import";
+            case KITS -> "Select kits file for import";
+            default -> "Select litters file for import";
+        };
         Button uploadButton = new Button(buttonName);
         uploadButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         upload.setUploadButton(uploadButton);
@@ -145,18 +150,15 @@ public class MaintenanceView extends Div implements ProgressBarUpdateListener{
             if(autoProcess){
                 importUtility.clearAllImportLists();
             }else{
-                switch (importType) {
-                    case BREEDERS:
-                        importUtility.clearBreederList();
-                        break;
-                    case KITS:
-                        importUtility.clearKitList();
-                        break;
-                    case LITTERS:
-                        importUtility.clearLitterList();
-                        break;
-                    default:
-                        break;
+                if (importUtility != null) {
+                    switch (importType) {
+                        case BREEDERS -> importUtility.clearBreederList();
+                        case KITS -> importUtility.clearKitList();
+                        case LITTERS -> importUtility.clearLitterList();
+                    }
+                } else {
+                    // Handle the case when importUtility is null, such as logging an error or displaying a message to the user.
+                    System.out.println("ImportUtility may not have been initialized");
                 }
             }
         });
@@ -167,26 +169,28 @@ public class MaintenanceView extends Div implements ProgressBarUpdateListener{
             FileData savedFileData = fileBuffer.getFileData();
             String filePath = savedFileData.getFile().getAbsolutePath();
             System.out.println("file:" + filePath);
-            if(importType.equals(ImportType.BREEDERS)){
-                breederUpload = upload;
-                importUtility.importBreederFromEverbreed(filePath);
-                if(importUtility.hasBreeders() && autoProcess){
-                    importUtility.processBreedersFromEverbreed();
+            switch (importType) {
+                case BREEDERS -> {
+                    breederUpload = upload;
+                    importUtility.importBreederFromEverbreed(filePath);
+                    if (importUtility.hasBreeders() && autoProcess) {
+                        importUtility.processBreedersFromEverbreed();
+                    }
                 }
-            }else if(importType.equals(ImportType.KITS)){
+                case KITS -> {
                 kitUpload = upload;
-                importUtility.importKitFromEverbreed(filePath);
-                if(importUtility.hasKits() && autoProcess){
-                    importUtility.processKitsFromEverbreed();
+                    importUtility.importKitFromEverbreed(filePath);
+                    if (importUtility.hasKits() && autoProcess) {
+                        importUtility.processKitsFromEverbreed();
+                    }
                 }
-            }else if(importType.equals(ImportType.LITTERS)){
-                litterUpload = upload;
-                importUtility.importLitterFromEverbreed(filePath);
-                if(importUtility.hasLitters()&& autoProcess){
-                    importUtility.processLittersFromEverbreed();
+                case LITTERS -> {
+                    litterUpload = upload;
+                    importUtility.importLitterFromEverbreed(filePath);
+                    if (importUtility.hasLitters() && autoProcess) {
+                        importUtility.processLittersFromEverbreed();
+                    }
                 }
-            }else{
-                
             }
             if(!autoProcess && importUtility.hasBreeders() && importUtility.hasKits() && importUtility.hasLitters()){
                 processButton.setEnabled(true);

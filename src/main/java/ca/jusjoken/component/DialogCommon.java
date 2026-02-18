@@ -209,11 +209,11 @@ public class DialogCommon extends Component{
         this.statusService = Registry.getBean(StockStatusHistoryService.class);
         this.weightService = Registry.getBean(StockWeightHistoryService.class);
         //profileImagePath = System.getenv("PATH_TO_PROFILE_IMAGE");
-        dialogConfigure(currentDisplayMode);
+        dialogConfigure();
     }
 
 
-    private void dialogConfigure(DisplayMode currentDisplayMode) {
+    private void dialogConfigure() {
 
         //configure the dialog internal layout for the form
         dialogLayout.setSpacing(false);
@@ -428,8 +428,7 @@ public class DialogCommon extends Component{
                 fieldProfileAvatar.setName(this.stockEntity.getProfileImage());
                 profileImageData = getByteArrayFromImageFile(this.stockEntity.getProfileFile().getAbsolutePath());
                 profileImageMimeType = "image/*";
-                //dialogLayout.add(getStockHeader(stockEntity, false), avatarDiv, createImageUploadLayout());
-                dialogLayout.add(showItem(this.stockEntity,currentDisplayMode), createImageUploadLayout(currentDisplayMode));
+                dialogLayout.add(showItem(this.stockEntity,currentDisplayMode), createImageUploadLayout());
             }
             default -> {
             }
@@ -458,7 +457,7 @@ public class DialogCommon extends Component{
         
     }
     
-    private VerticalLayout createImageUploadLayout(DisplayMode currentDisplayMode) {
+    private VerticalLayout createImageUploadLayout() {
         VerticalLayout uploadLayout = UIUtilities.getVerticalLayout();
 
         InMemoryUploadHandler inMemoryHandler = UploadHandler.inMemory(
@@ -530,7 +529,7 @@ public class DialogCommon extends Component{
         Button getCropButton = new Button("Crop Image");
 
         getCropButton.addClickListener(e -> {
-            openCropDialog(profileImageData, profileImageMimeType, currentDisplayMode);
+            openCropDialog(profileImageData, profileImageMimeType);
             //profileAvatarHasChanges = Boolean.TRUE;
         });
         
@@ -584,7 +583,7 @@ public class DialogCommon extends Component{
         }
     }
     
-    private void openCropDialog(byte[] outputStream, String mimeType, DisplayMode currentDisplayMode) {
+    private void openCropDialog(byte[] outputStream, String mimeType) {
       // Set up image crop dialog
       Dialog cropDialog = new Dialog();
       cropDialog.setCloseOnOutsideClick(false);
@@ -664,6 +663,7 @@ public class DialogCommon extends Component{
 
         //fields that are always ReadOnly
         fieldStatus.setReadOnly(true);
+        fieldGenotype.setReadOnly(true);
         
         if(isNewStock){
             fieldWeight.setReadOnly(false);
@@ -729,6 +729,8 @@ public class DialogCommon extends Component{
 
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
             
+            fieldGenotype.setTooltipText(currentStock.getGenotype());
+
             fieldGender.setRenderer(new TextRenderer<>(gender -> {
                 if(gender.equals(Gender.MALE)) return currentStock.getStockType().getMaleName();
                 else if(gender.equals(Gender.FEMALE)) return currentStock.getStockType().getFemaleName();
