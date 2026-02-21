@@ -10,17 +10,14 @@ import com.vaadin.flow.component.ComponentUtil;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
-import com.vaadin.flow.component.avatar.Avatar;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.contextmenu.ContextMenu;
 import com.vaadin.flow.component.contextmenu.MenuItem;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Footer;
 import com.vaadin.flow.component.html.H1;
-import com.vaadin.flow.component.html.Header;
-import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
-import static com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.END;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.page.ColorScheme;
@@ -33,6 +30,8 @@ import com.vaadin.flow.router.Layout;
 import com.vaadin.flow.server.auth.AccessAnnotationChecker;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 import com.vaadin.flow.server.menu.MenuConfiguration;
+import com.vaadin.flow.server.streams.DownloadHandler;
+import com.vaadin.flow.server.streams.DownloadResponse;
 import com.vaadin.flow.spring.security.AuthenticationContext;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 
@@ -81,6 +80,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         setPrimarySection(Section.DRAWER);
         addDrawerContent();
         addHeaderContent();
+        //createHeader();
     }
 
     private void setupListeners(){
@@ -99,26 +99,33 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     
     private HorizontalLayout getUserMenu(){
         HorizontalLayout userMenu = UIUtilities.getHorizontalLayout(false,false,false);
+        userMenu.setAlignItems(FlexComponent.Alignment.END);
         
         String userName = "None";
         if(authContext.isAuthenticated()){
             userName = authContext.getAuthenticatedUser(UserDetails.class).get().getUsername();
         }
 
-        //TODO: add Button that show Avatar when not authenticated - add Paw icon to avatar
-        
-        Avatar avatar = new Avatar();
-        avatar.setAbbreviation("FT");
-        avatar.addClassNames(LumoUtility.Margin.Horizontal.SMALL);
-        avatar.setTooltipEnabled(true);
-        avatar.addClassNames(LumoUtility.Position.ABSOLUTE, LumoUtility.Position.End.XSMALL, LumoUtility.Position.Top.XSMALL);
-        avatar.getStyle().set("display","block");
-        avatar.getStyle().set("cursor","pointer");
-        avatar.getElement().setAttribute("tabindex", "-1");
+        Image ftIcon = new Image(
+            DownloadHandler.fromInputStream(event -> {
+                return new DownloadResponse(
+                    getClass().getClassLoader()
+                    .getResourceAsStream("META-INF/resources/icons/logo-farm-tracks-icon.svg"),
+                    "logo-farm-tracks-icon.svg",
+                    "image/svg+xml",
+                    -1
+                );
+            }).inline(),
+            "Farm Tracks"
+        );           
+
+        ftIcon.getStyle().set("object-fit", "contain");
+        ftIcon.setWidth("40px");
         
         if(authContext.isAuthenticated()){
-            ContextMenu menu = new ContextMenu(avatar);
-            avatar.setName("Farm Tracks Menu");
+            Button ftSignin = new Button(ftIcon);
+            ContextMenu menu = new ContextMenu(ftSignin);
+            //avatar.setName("Farm Tracks Menu");
         
             menu.setOpenOnClick(true);
 
@@ -163,18 +170,18 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
             menu.addItem("Sign out", event -> {
                 authContext.logout();
             });
-            userMenu.add(avatar);  
+            userMenu.addToEnd(ftSignin);  
             return userMenu;
         }else{
-            avatar.setName("Farm Tracks Signin");
-            Button ftSignin = new Button(avatar);
+            //avatar.setName("Farm Tracks Signin");
+            Button ftSignin = new Button(ftIcon);
             ftSignin.addClickListener(click -> {
                 click.getSource().getUI().ifPresent(ui -> ui.navigate("/login"));
             });
-            userMenu.add(ftSignin);
-            userMenu.setAlignItems(END);
+            userMenu.addToEnd(ftSignin);
+            userMenu.setAlignItems(FlexComponent.Alignment.END);
             userMenu.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-            avatar.setTooltipEnabled(true);
+            //avatar.setTooltipEnabled(true);
             return userMenu;
         }
 
@@ -189,13 +196,9 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     }
 
     private void addDrawerContent() {
-        Span appName = new Span("Farm Tracks");
-        appName.addClassNames(LumoUtility.FontWeight.SEMIBOLD, LumoUtility.FontSize.LARGE, LumoUtility.Margin.SMALL);
-        Header header = new Header(appName);
-
         Scroller scroller = new Scroller(nav);
         createNavigation();
-        addToDrawer(header, scroller, createFooter());
+        addToDrawer(createBranding(),scroller, createFooter());
     }
 
     private void createNavigation() {
@@ -284,6 +287,26 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         }
     }
 
-    
-    
+    private HorizontalLayout createBranding() {
+        Image logo = new Image(
+            DownloadHandler.fromInputStream(event -> {
+                return new DownloadResponse(
+                    getClass().getClassLoader()
+                    .getResourceAsStream("META-INF/resources/images/logo-farm-tracks.svg"),
+                    "logo-farm-tracks.svg",
+                    "image/svg+xml",
+                    -1
+                );
+            }).inline(),
+            "Farm Tracks"
+        );           
+
+        logo.getStyle().set("object-fit", "contain");
+        HorizontalLayout branding = new HorizontalLayout(logo);
+        branding.setSpacing(true);
+        branding.setPadding(true);
+        //branding.setAlignItems(FlexComponent.Alignment.START);
+        return branding;
+    }
+
 }
