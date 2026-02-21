@@ -97,6 +97,7 @@ import ca.jusjoken.component.LazyComponent;
 import ca.jusjoken.component.ListRefreshNeededListener;
 import ca.jusjoken.component.StatusEditor;
 import ca.jusjoken.component.StockDetailsFormLayout;
+import ca.jusjoken.component.TaskEditor;
 import ca.jusjoken.component.WeightEditor;
 import ca.jusjoken.data.ColumnName;
 import ca.jusjoken.data.Utility;
@@ -110,6 +111,7 @@ import ca.jusjoken.data.entity.StockSavedQuery.StockViewStyle;
 import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.entity.StockWeightHistory;
+import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.StockRepository;
 import ca.jusjoken.data.service.StockSavedQueryService;
@@ -119,6 +121,7 @@ import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeRepository;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.data.service.StockWeightHistoryService;
+import ca.jusjoken.data.service.TaskService;
 import ca.jusjoken.views.MainLayout;
 import jakarta.annotation.security.PermitAll;
 
@@ -134,6 +137,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private final StockSavedQueryService queryService;
     private final StockStatusHistoryService statusService;
     private final StockWeightHistoryService weightService;
+    private final TaskService taskService;
     private final MasterDetailLayout mdLayout = new MasterDetailLayout();
     private String currentSearchName = "";
     private StockSavedQuery currentStockSavedQuery;
@@ -154,6 +158,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private final StatusEditor statusEditor;
     private final WeightEditor weightEditor;
     private final GenotypeEditor genotypeEditor;
+    private final TaskEditor taskEditor;
     private ConfirmDialog saveQueryDialog = new ConfirmDialog();
     private ConfirmDialog deleteQueryDialog = new ConfirmDialog();
     private ConfirmDialog resetQueryDialog = new ConfirmDialog();
@@ -169,7 +174,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Boolean skipSidebarUpdates = Boolean.FALSE;
     private Integer selectedTabIndex = 0;
 
-    public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockTypeService stockTypeService, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService, StockWeightHistoryService weightService) {
+    public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockTypeService stockTypeService, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService, StockWeightHistoryService weightService, TaskService taskService) {
         this.stockRepository = stockRepository;
         this.stockTypeRepository = stockTypeRepository;
         this.stockTypeService = stockTypeService;
@@ -178,13 +183,15 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         this.queryService = queryService;
         this.statusService = statusService;
         this.weightService = weightService;
+        this.taskService = taskService;
         
         //this.defaultStockSort.addOrder(new SortOrder(currentSortDirection.name(), "tattoo"));
         this.dialogCommon = new DialogCommon();
         this.statusEditor = new StatusEditor();
         this.weightEditor = new WeightEditor();
         this.genotypeEditor = new GenotypeEditor();
-        setupListeners();  
+        this.taskEditor = new TaskEditor();
+        setupListeners();
         
         addClassNames(Display.FLEX, Height.FULL, Overflow.HIDDEN);
         //loadFilters();
@@ -200,6 +207,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         statusEditor.addListener(this);
         weightEditor.addListener(this);
         genotypeEditor.addListener(this);
+        taskEditor.addListener(this);
     }
 
     private Hr createHr() {
@@ -389,15 +397,20 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         skipSidebarUpdates = Boolean.TRUE;
         stockTypeChoice.setValue(currentStockSavedQuery.getStockType());
         breederFilter.setRenderer(new TextRenderer<>(filter -> {
-            if(filter.equals(BreederFilter.BREEDER)) {
-                return currentStockSavedQuery.getStockType().getBreederName();
-            }else if(filter.equals(BreederFilter.NONBREEDER)) {
-                return currentStockSavedQuery.getStockType().getNonBreederName();
-            }else{
-                return "All";
-            }
+            return switch(filter){
+                case BreederFilter.BREEDER:
+                    yield currentStockSavedQuery.getStockType().getBreederName();
+                case BreederFilter.NONBREEDER:
+                    yield currentStockSavedQuery.getStockType().getNonBreederName();
+                default:
+                    yield "All";
+            };
         }));        
-        breederFilter.setValue(BreederFilter.fromIsBreeder(currentStockSavedQuery.getBreeder()));
+        if (currentStockSavedQuery != null && currentStockSavedQuery.getBreeder() != null) {
+            breederFilter.setValue(BreederFilter.fromIsBreeder(currentStockSavedQuery.getBreeder()));
+        } else {
+            breederFilter.setValue(BreederFilter.ALL);
+        }
 
         stockStatusFilter.setValue(currentStockSavedQuery.getStockStatus());
         stockSort1Column.setValue(Utility.getInstance().getColumnName(currentStockSavedQuery.getSort1().getColumnName()));
@@ -989,7 +1002,8 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
                 menu.addComponentAsFirst(heading);
                 menu.addSeparator();
 
-                GridMenuItem<Stock> addNewMenu = menu.addItem(new Item("Add new", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+                String addNewMenuTitle = "Add new " + stockEntity.getStockType().getNameSingular();
+                GridMenuItem<Stock> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));
                 addNewMenu.addMenuItemClickListener(click -> {
                     //open stock edit dialog
                     Stock newStock = new Stock();
@@ -1004,6 +1018,20 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
                     dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
                     
                 });
+
+                GridMenuItem<Stock> addTaskMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+                addTaskMenu.addMenuItemClickListener(click -> {
+                    //open task edit dialog
+                    //create a new task for this stock with default values
+                    Task newTask = new Task();
+                    newTask.setLinkType(Utility.TaskLinkType.BREEDER);
+                    newTask.setLinkBreederId(stockEntity.getId());
+
+                    taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, stockEntity.getStockType());
+                    
+                });
+                menu.addSeparator();
+
                 GridMenuItem<Stock> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
                 editMenu.addMenuItemClickListener(click -> {
                     //open stock edit dialog
@@ -1016,13 +1044,15 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
                     dialogCommon.setDialogTitle("Edit Profile Image");
                     dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.PROFILE_IMAGE);
                 });
-                if(stockEntity.getStockType().getGenotypes().size()>0){
+                if(!stockEntity.getStockType().getGenotypes().isEmpty()){
                     GridMenuItem<Stock> editGenotype = menu.addItem(new Item("Edit Genotype", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
                     editGenotype.addMenuItemClickListener(click -> {
                         //open genotypeEditor
                         genotypeEditor.dialogOpen(stockEntity);
                     });
                 }
+                menu.addSeparator();
+                //TODO: possible remove the Breed and Birth items as they are in Tasks
                 menu.addItem(new Item("Breed", Utility.ICONS.TYPE_BREEDER.getIconSource()));
                 menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
                 createStatusMenuItem(menu, stockEntity, "sold");
@@ -1166,6 +1196,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
         List<Tab> tabList = new ArrayList<>();
         tabList.add(tabs.add("Overview", createTabOverview(stock)));
+        tabList.add(tabs.add(createTab("Tasks'", TabType.COUNT, taskService.getTaskCountForStock(stock).toString()), createTabTasks(stock)));
         tabList.add(tabs.add(createTab("Litters", TabType.COUNT, litterService.getLitterCountForParent(stock).toString()), createTabLitters(stock)));
         tabList.add(tabs.add(createTab(stock.getStockType().getNonBreederName(), TabType.COUNT, stockService.getKitCountForParent(stock).toString()),createTabKits(stock)));
         tabList.add(tabs.add(createTab("Notes", TabType.HASDATA, stock.getNotes()),createTabNotes(stock)));
@@ -1184,7 +1215,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     
     private Tab createTab(String labelText, TabType tabType, String itemData){
         Span label = new Span(labelText);
-        if(tabType.equals(TabType.COUNT) && !itemData.equals(Utility.EMPTY_VALUE)){
+        if(tabType.equals(TabType.COUNT) && (!itemData.equals(Utility.EMPTY_VALUE) && !itemData.equals("0"))){
             Span counter = new Span(itemData);
             counter.getElement().getThemeList().add("badge pill small contrast");
             counter.getStyle().set("margin-inline-start", "var(--lumo-space-s)");
@@ -1500,6 +1531,30 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     public String getPageTitle() {
         if(currentStockSavedQuery==null) return "Stock List";
         return currentStockSavedQuery.getSavedQueryName();
+    }
+
+    private Component createTabTasks(Stock stock) {
+        Layout layout = new Layout();
+        List<Task> tasks = taskService.findByStockId(stock.getId());
+        Grid<Task> grid = new Grid<>(Task.class,false);
+        grid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
+        grid.setHeight("200px");
+
+        grid.addComponentColumn(item -> {
+            Icon editIcon = new Icon("lumo", "edit");
+            editIcon.addClickListener(e -> {
+                taskEditor.dialogOpen(item, TaskEditor.DialogMode.EDIT, stock.getStockType());
+            });
+            return editIcon;
+        }).setWidth("50px").setFlexGrow(0).setFrozen(true);
+
+        grid.addColumn(Task::getName).setHeader("Name");
+        grid.addColumn(task -> { return task.getLinkType().getShortName(); }).setHeader("Type");
+        grid.addColumn(new LocalDateRenderer<>(Task::getDate,"MM-dd-YYYY")).setHeader("Date");
+
+        grid.setItems(tasks);
+        layout.add(grid);
+        return new LazyComponent(() -> layout);
     }
 
 }

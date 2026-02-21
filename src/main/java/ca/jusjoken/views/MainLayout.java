@@ -48,6 +48,7 @@ import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.views.stock.StockPedigreeEditor;
+import ca.jusjoken.views.stock.StockTypeView;
 import ca.jusjoken.views.stock.StockView;
 import ca.jusjoken.views.utility.MaintenanceView;
 
@@ -234,6 +235,9 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         
         if(accessChecker.hasAccess(MaintenanceView.class)){
             nav.addItem(new SideNavItem("Maintenance", MaintenanceView.class, FontAwesome.Solid.COGS.create()));
+        }
+        if(accessChecker.hasAccess(StockTypeView.class)){
+            nav.addItem(new SideNavItem("Stock Types", StockTypeView.class, FontAwesome.Solid.COGS.create()));
         }
         
     }

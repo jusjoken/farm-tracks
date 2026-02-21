@@ -748,7 +748,9 @@ public class Stock {
         stockName.setColorIndex(5);
         stockName.addThemeVariants(AvatarVariant.LUMO_LARGE);
         
-        stockName.setImageHandler(DownloadHandler.forFile(getProfileFile()));
+        if(getProfileFile()!=null){
+            stockName.setImageHandler(DownloadHandler.forFile(getProfileFile()));
+        }
 
         VerticalLayout columnAvatars = new VerticalLayout(stockName);
 
@@ -889,7 +891,9 @@ public class Stock {
         Avatar avatar = new Avatar();
         AvatarDiv avatarDiv = new AvatarDiv(avatar);
         avatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
-        avatar.setImageHandler(DownloadHandler.forFile(getProfileFile()));
+        if(getProfileFile()!=null){
+            avatar.setImageHandler(DownloadHandler.forFile(getProfileFile()));
+        }
         UIUtilities.setBorders(avatar, this, UIUtilities.BorderSize.LARGE);
         return avatarDiv;
     }

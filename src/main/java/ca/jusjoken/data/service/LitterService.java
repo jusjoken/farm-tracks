@@ -58,4 +58,8 @@ public class LitterService {
         litterRepository.deleteByFatherId(stockId);
         litterRepository.deleteByMotherId(stockId);
     }
+
+    public Litter findById(Integer linkLitterId) {
+        return litterRepository.findById(linkLitterId).orElse(null);
+    }
 }

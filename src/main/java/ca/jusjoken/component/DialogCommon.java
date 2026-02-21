@@ -424,10 +424,12 @@ public class DialogCommon extends Component{
                 fieldProfileAvatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
                 fieldProfileAvatar.setHeight("12em");
                 fieldProfileAvatar.setWidth("12em");
-                fieldProfileAvatar.setImageHandler(DownloadHandler.forFile(this.stockEntity.getProfileFile()));
-                fieldProfileAvatar.setName(this.stockEntity.getProfileImage());
-                profileImageData = getByteArrayFromImageFile(this.stockEntity.getProfileFile().getAbsolutePath());
-                profileImageMimeType = "image/*";
+                if(this.stockEntity.getProfileFile()!=null){
+                    fieldProfileAvatar.setImageHandler(DownloadHandler.forFile(this.stockEntity.getProfileFile()));
+                    fieldProfileAvatar.setName(this.stockEntity.getProfileImage());
+                    profileImageData = getByteArrayFromImageFile(this.stockEntity.getProfileFile().getAbsolutePath());
+                    profileImageMimeType = "image/*";
+                }
                 dialogLayout.add(showItem(this.stockEntity,currentDisplayMode), createImageUploadLayout());
             }
             default -> {
@@ -799,6 +801,16 @@ public class DialogCommon extends Component{
             });
 
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
+            if(currentStock.getProfileFile()==null){
+                fieldProfileAvatar.setImage("images/default-profile.png");
+                fieldProfileAvatar.setName("default-profile.png");
+                profileImageData = null;
+                profileImageMimeType = null;
+                profileAvatarHasChanges = Boolean.FALSE;
+                validateProfileAvatar();
+                return;
+            }
+
             fieldProfileAvatar.setImageHandler(DownloadHandler.forFile(currentStock.getProfileFile()));
             fieldProfileAvatar.setName(currentStock.getProfileImage());
             profileImageData = getByteArrayFromImageFile(currentStock.getProfileFile().getAbsolutePath());
