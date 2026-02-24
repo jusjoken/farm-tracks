@@ -58,6 +58,7 @@ import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.component.tabs.TabSheetVariant;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
@@ -1535,10 +1536,14 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
     private Component createTabTasks(Stock stock) {
         Layout layout = new Layout();
-        List<Task> tasks = taskService.findByStockId(stock.getId());
+        List<Task> allTasks = taskService.findByStockId(stock.getId());
+
         Grid<Task> grid = new Grid<>(Task.class,false);
         grid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
         grid.setHeight("200px");
+
+        ListDataProvider<Task> dataProvider = new ListDataProvider<>(allTasks);
+        grid.setDataProvider(dataProvider);
 
         grid.addComponentColumn(item -> {
             Icon editIcon = new Icon("lumo", "edit");
@@ -1552,9 +1557,39 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         grid.addColumn(task -> { return task.getLinkType().getShortName(); }).setHeader("Type");
         grid.addColumn(new LocalDateRenderer<>(Task::getDate,"MM-dd-YYYY")).setHeader("Date");
 
-        grid.setItems(tasks);
+        Select<String> completionFilter = new Select<>();
+        completionFilter.setItems(Utility.TaskCompletionFilter.ALL.filterName, Utility.TaskCompletionFilter.COMPLETED.filterName, Utility.TaskCompletionFilter.ACTIVE.filterName);
+        completionFilter.setWidthFull();
+        completionFilter.setTooltipText("Filter by completion status");
+
+        completionFilter.addValueChangeListener(event -> {
+            dataProvider.clearFilters();
+            String value = event.getValue();
+            if (Utility.TaskCompletionFilter.COMPLETED.filterName.equals(value)) {
+                dataProvider.addFilter(Task::getCompleted);
+            } else if (Utility.TaskCompletionFilter.ACTIVE.filterName.equals(value)) {
+                dataProvider.addFilter(task -> !task.getCompleted());
+            }
+        });
+
+        completionFilter.setValue(Utility.TaskCompletionFilter.ACTIVE.filterName);
+
+        grid.addComponentColumn(item -> {
+            if(item.getCompleted()){
+                Icon completedIcon = new Icon(FontAwesome.Regular.SQUARE_CHECK.create().getIcon());
+                completedIcon.setColor("green");
+                completedIcon.setTooltipText("Completed");
+                HorizontalLayout statusLayout = new HorizontalLayout(completedIcon, new Span("Completed"));
+                return statusLayout;
+            }else{
+                Icon incompleteIcon = new Icon(FontAwesome.Regular.SQUARE.create().getIcon());
+                incompleteIcon.setTooltipText("Active");
+                HorizontalLayout statusLayout = new HorizontalLayout(incompleteIcon, new Span("Active"));
+                return statusLayout;
+            }
+        }).setHeader(completionFilter);
+
         layout.add(grid);
         return new LazyComponent(() -> layout);
     }
-
 }

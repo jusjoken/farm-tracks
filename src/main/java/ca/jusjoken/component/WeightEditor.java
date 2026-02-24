@@ -4,11 +4,12 @@
  */
 package ca.jusjoken.component;
 
-import ca.jusjoken.UIUtilities;
-import ca.jusjoken.data.entity.Stock;
-import ca.jusjoken.data.entity.StockWeightHistory;
-import ca.jusjoken.data.service.Registry;
-import ca.jusjoken.data.service.StockWeightHistoryService;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.ShortcutRegistration;
 import com.vaadin.flow.component.Shortcuts;
@@ -23,10 +24,12 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
-import java.util.ArrayList;
-import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import ca.jusjoken.UIUtilities;
+import ca.jusjoken.data.entity.Stock;
+import ca.jusjoken.data.entity.StockWeightHistory;
+import ca.jusjoken.data.service.Registry;
+import ca.jusjoken.data.service.StockWeightHistoryService;
 
 /**
  *
@@ -68,7 +71,7 @@ public class WeightEditor {
         dialogLayout.setSpacing(false);
         dialogLayout.setPadding(false);
         dialogLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        dialogLayout.getStyle().set("width", "300px").set("max-width", "100%");
+        dialogLayout.getStyle().set("width", "270px").set("max-width", "100%");
 
         dialog.add(dialogLayout);
         dialogCloseButton.addClickListener((e) -> dialogClose());
@@ -152,7 +155,7 @@ public class WeightEditor {
         dialogLayout.add(new Hr());
 
         //add the needed fields
-        VerticalLayout fieldsLayout = UIUtilities.getVerticalLayout(true, true, true);
+        VerticalLayout fieldsLayout = UIUtilities.getVerticalLayout(false, true, false);
 
         //set values here
         if(dialogMode.equals(DialogMode.CREATE)){

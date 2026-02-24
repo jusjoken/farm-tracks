@@ -81,7 +81,7 @@ public class TaskEditor {
         dialogLayout.setSpacing(false);
         dialogLayout.setPadding(false);
         dialogLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        dialogLayout.getStyle().set("width", "360px").set("max-width", "100%");
+        dialogLayout.getStyle().set("width", "270px").set("max-width", "100%");
 
         dialog.add(dialogLayout);
         dialogCloseButton.addClickListener((e) -> dialogClose());
@@ -163,7 +163,7 @@ public class TaskEditor {
         dialog.setDraggable(true);
         dialog.setResizable(true);
 
-        VerticalLayout fieldsLayout = UIUtilities.getVerticalLayout(true, true, true);
+        VerticalLayout fieldsLayout = UIUtilities.getVerticalLayout(false, true, false);
 
         //hide/show the id fields based on the current value of the linktype field
         linkType.addValueChangeListener(event -> {

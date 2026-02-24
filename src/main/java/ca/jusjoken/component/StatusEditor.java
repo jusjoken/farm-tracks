@@ -4,15 +4,12 @@
  */
 package ca.jusjoken.component;
 
-import ca.jusjoken.UIUtilities;
-import ca.jusjoken.data.Utility;
-import ca.jusjoken.data.entity.Stock;
-import ca.jusjoken.data.entity.StockStatusHistory;
-import ca.jusjoken.data.entity.StockWeightHistory;
-import ca.jusjoken.data.service.Registry;
-import ca.jusjoken.data.service.StockStatus;
-import ca.jusjoken.data.service.StockStatusHistoryService;
-import ca.jusjoken.data.service.StockWeightHistoryService;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.ShortcutRegistration;
 import com.vaadin.flow.component.Shortcuts;
@@ -30,10 +27,16 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.theme.lumo.LumoUtility;
-import java.util.ArrayList;
-import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import ca.jusjoken.UIUtilities;
+import ca.jusjoken.data.Utility;
+import ca.jusjoken.data.entity.Stock;
+import ca.jusjoken.data.entity.StockStatusHistory;
+import ca.jusjoken.data.entity.StockWeightHistory;
+import ca.jusjoken.data.service.Registry;
+import ca.jusjoken.data.service.StockStatus;
+import ca.jusjoken.data.service.StockStatusHistoryService;
+import ca.jusjoken.data.service.StockWeightHistoryService;
 
 /**
  *
@@ -83,7 +86,7 @@ public class StatusEditor {
         dialogLayout.setSpacing(false);
         dialogLayout.setPadding(false);
         dialogLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        dialogLayout.getStyle().set("width", "300px").set("max-width", "100%");
+        dialogLayout.getStyle().set("width", "270px").set("max-width", "100%");
 
         dialog.add(dialogLayout);
         dialogCloseButton.addClickListener((e) -> dialogClose());
@@ -184,7 +187,7 @@ public class StatusEditor {
         //add the needed fields
         if(isCustom){ //add custom fields based on specific status
             //butcher is the only custom so handle here
-            VerticalLayout promptLayout = UIUtilities.getVerticalLayout(true, true, true);
+            VerticalLayout promptLayout = UIUtilities.getVerticalLayout(false, true, false);
             if(dialogMode.equals(DialogMode.CREATE)){
                 promptLayout.add(preButcherWeight, butcheredWeight, butcheredValue);
             }else{ //edit
@@ -195,7 +198,7 @@ public class StatusEditor {
             //likely need to use showItem here for more complex forms
             //dialogLayout.add(showItem());
         }else{ //general form using prompt
-            VerticalLayout promptLayout = UIUtilities.getVerticalLayout(true, true, true);
+            VerticalLayout promptLayout = UIUtilities.getVerticalLayout(false, true, false);
             promptLayout.add(promptLabel, notes, statusDateTime, ageAsOf);
             dialogLayout.add(promptLayout);
         }

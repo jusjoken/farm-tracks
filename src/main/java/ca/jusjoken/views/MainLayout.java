@@ -50,6 +50,7 @@ import ca.jusjoken.views.stock.StockPedigreeEditor;
 import ca.jusjoken.views.stock.StockTypeView;
 import ca.jusjoken.views.stock.StockView;
 import ca.jusjoken.views.utility.MaintenanceView;
+import ca.jusjoken.views.utility.PlanTemplateView;
 
 /**
  * The main view is a top-level placeholder for other views.
@@ -71,6 +72,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     public MainLayout(AuthenticationContext authContext, AccessAnnotationChecker accessChecker) {
         this.queryService = Registry.getBean(StockSavedQueryService.class);
         this.typeService = Registry.getBean(StockTypeService.class);
+
         this.authContext = authContext;
         this.accessChecker = accessChecker;
         this.dialogCommon = new DialogCommon();
@@ -153,7 +155,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
                     dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
                 });
             }
-            
+
             menu.addSeparator();
             MenuItem mode = menu.addItem("Switch mode", event -> {
                 if(ColorScheme.Value.DARK==UI.getCurrentOrThrow().getPage().getColorScheme()){
@@ -235,12 +237,20 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
             nav.addItem(sn);
             sn.setPrefixComponent(FontAwesome.Solid.SITEMAP.create());
         }
-        
-        if(accessChecker.hasAccess(MaintenanceView.class)){
-            nav.addItem(new SideNavItem("Maintenance", MaintenanceView.class, FontAwesome.Solid.COGS.create()));
-        }
-        if(accessChecker.hasAccess(StockTypeView.class)){
-            nav.addItem(new SideNavItem("Stock Types", StockTypeView.class, FontAwesome.Solid.COGS.create()));
+
+        if(accessChecker.hasAccess(MaintenanceView.class) || accessChecker.hasAccess(StockTypeView.class) || accessChecker.hasAccess(PlanTemplateView.class)){
+            SideNavItem utilityItem = new SideNavItem("Utility");
+            utilityItem.setExpanded(true);
+            nav.addItem(utilityItem);
+            if(accessChecker.hasAccess(MaintenanceView.class)){
+                utilityItem.addItem(new SideNavItem("Import", MaintenanceView.class, FontAwesome.Solid.COGS.create()));
+            }
+            if(accessChecker.hasAccess(StockTypeView.class)){
+                utilityItem.addItem(new SideNavItem("Stock Types", StockTypeView.class, FontAwesome.Solid.COGS.create()));
+            }
+            if(accessChecker.hasAccess(PlanTemplateView.class)){
+                utilityItem.addItem(new SideNavItem("Plan Templates", PlanTemplateView.class, FontAwesome.Solid.COGS.create()));
+            }
         }
         
     }

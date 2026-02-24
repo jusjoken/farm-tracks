@@ -169,6 +169,15 @@ public class Utility {
             return list;
         }
     }
+
+    public enum TaskCompletionFilter {
+        ALL("All"), COMPLETED("Completed"), ACTIVE("Active");
+
+        public final String filterName;
+        TaskCompletionFilter(String filterName) {
+            this.filterName = filterName;
+        }
+    }
         
     public static enum ImportType{
         BREEDERS("Breeders"), KITS("Kits"), LITTERS("Litters");

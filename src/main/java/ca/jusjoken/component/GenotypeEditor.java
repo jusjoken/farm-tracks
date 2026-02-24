@@ -15,17 +15,16 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Hr;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.entity.GenotypeSegment;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
-
-import com.vaadin.flow.component.icon.Icon;
-import com.vaadin.flow.component.orderedlayout.FlexComponent;
-import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
-import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 
 public class GenotypeEditor {
     @SuppressWarnings("unused")
@@ -55,7 +54,7 @@ public class GenotypeEditor {
         dialogLayout.setPadding(false);
         dialogLayout.setMargin(false);
         dialogLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        dialogLayout.getStyle().set("width", "300px").set("max-width", "100%");
+        dialogLayout.getStyle().set("width", "270px").set("max-width", "100%");
 
         dialog.add(dialogLayout);
         dialogCloseButton.addClickListener((e) -> dialogClose());
@@ -111,7 +110,7 @@ public class GenotypeEditor {
         dialogLayout.add(stockEntity.getStockHeader(Boolean.FALSE));
         dialogLayout.add(new Hr());
 
-        fieldsLayout = UIUtilities.getVerticalLayout(true, true, false);
+        fieldsLayout = UIUtilities.getVerticalLayout(false, true, false);
         fieldsLayout.removeAll();
 
         //add the needed fields
