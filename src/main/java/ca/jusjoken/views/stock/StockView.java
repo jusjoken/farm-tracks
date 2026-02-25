@@ -88,6 +88,7 @@ import com.vaadin.flow.theme.lumo.LumoUtility.Position;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.AvatarDiv;
+import ca.jusjoken.component.PlanEditor;
 import ca.jusjoken.component.ComponentConfirmEvent;
 import ca.jusjoken.component.DialogCommon;
 import ca.jusjoken.component.DialogCommonEvent;
@@ -160,6 +161,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private final WeightEditor weightEditor;
     private final GenotypeEditor genotypeEditor;
     private final TaskEditor taskEditor;
+    private final PlanEditor planEditor;
     private ConfirmDialog saveQueryDialog = new ConfirmDialog();
     private ConfirmDialog deleteQueryDialog = new ConfirmDialog();
     private ConfirmDialog resetQueryDialog = new ConfirmDialog();
@@ -192,6 +194,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         this.weightEditor = new WeightEditor();
         this.genotypeEditor = new GenotypeEditor();
         this.taskEditor = new TaskEditor();
+        this.planEditor = new PlanEditor();
         setupListeners();
         
         addClassNames(Display.FLEX, Height.FULL, Overflow.HIDDEN);
@@ -209,6 +212,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         weightEditor.addListener(this);
         genotypeEditor.addListener(this);
         taskEditor.addListener(this);
+        planEditor.addListener(this);
     }
 
     private Hr createHr() {
@@ -1054,7 +1058,11 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
                 }
                 menu.addSeparator();
                 //TODO: possible remove the Breed and Birth items as they are in Tasks
-                menu.addItem(new Item("Breed", Utility.ICONS.TYPE_BREEDER.getIconSource()));
+                GridMenuItem<Stock> breedPlanMenu = menu.addItem(new Item("Breed Plan", Utility.ICONS.TYPE_BREEDER.getIconSource()));
+                    breedPlanMenu.addMenuItemClickListener(click -> {
+                        //open breed plan dialog
+                        planEditor.dialogOpen(Utility.TaskLinkType.BREEDER, stockEntity);
+                    });
                 menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
                 createStatusMenuItem(menu, stockEntity, "sold");
                 createStatusMenuItem(menu, stockEntity, "forsale");

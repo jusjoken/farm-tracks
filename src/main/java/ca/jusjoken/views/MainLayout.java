@@ -6,6 +6,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentUtil;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
@@ -32,6 +33,7 @@ import com.vaadin.flow.server.auth.AnonymousAllowed;
 import com.vaadin.flow.server.menu.MenuConfiguration;
 import com.vaadin.flow.server.streams.DownloadHandler;
 import com.vaadin.flow.server.streams.DownloadResponse;
+import com.vaadin.flow.shared.Registration;
 import com.vaadin.flow.spring.security.AuthenticationContext;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 
@@ -40,9 +42,13 @@ import ca.jusjoken.component.ComponentConfirmEvent;
 import ca.jusjoken.component.DialogCommon;
 import ca.jusjoken.component.DialogCommonEvent;
 import ca.jusjoken.component.ListRefreshNeededListener;
+import ca.jusjoken.component.PlanEditor;
+import ca.jusjoken.data.Utility;
+import ca.jusjoken.data.entity.PlanTemplate;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
 import ca.jusjoken.data.entity.StockType;
+import ca.jusjoken.data.service.PlanTemplateService;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockTypeService;
@@ -62,20 +68,27 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     private final transient AuthenticationContext authContext;
     private final StockSavedQueryService queryService;
     private final StockTypeService typeService;
+    private final PlanTemplateService planTemplateService;
     
+    private Registration planRefreshRegistration;
+    private ContextMenu menu;
+    private Button ftSignin;
+    private String userName;
     private final SideNav nav = new SideNav();
     private final AccessAnnotationChecker accessChecker;
     private final DialogCommon dialogCommon;
+    private final PlanEditor planEditor;
 
     private H1 viewTitle;
 
     public MainLayout(AuthenticationContext authContext, AccessAnnotationChecker accessChecker) {
         this.queryService = Registry.getBean(StockSavedQueryService.class);
         this.typeService = Registry.getBean(StockTypeService.class);
-
+        this.planTemplateService = Registry.getBean(PlanTemplateService.class);
         this.authContext = authContext;
         this.accessChecker = accessChecker;
         this.dialogCommon = new DialogCommon();
+        this.planEditor = new PlanEditor();
         setupListeners();
         
         //StockView.class.addListener(this);
@@ -87,6 +100,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
 
     private void setupListeners(){
         dialogCommon.addListener(this);
+        planEditor.addListener(this);
     }
 
     private void addHeaderContent() {
@@ -103,7 +117,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         HorizontalLayout userMenu = UIUtilities.getHorizontalLayout(false,false,false);
         userMenu.setAlignItems(FlexComponent.Alignment.END);
         
-        String userName = "None";
+        userName = "None";
         if(authContext.isAuthenticated()){
             userName = authContext.getAuthenticatedUser(UserDetails.class).get().getUsername();
         }
@@ -125,58 +139,14 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         ftIcon.setWidth("40px");
         
         if(authContext.isAuthenticated()){
-            Button ftSignin = new Button(ftIcon);
-            ContextMenu menu = new ContextMenu(ftSignin);
-            //avatar.setName("Farm Tracks Menu");
-        
-            menu.setOpenOnClick(true);
-
-            Div heading = new Div();
-            heading.setText(userName);
-            heading.getStyle().set("text-align", "center");
-            heading.getStyle().set("font-weight", "bold");
-            heading.getStyle().set("padding", "8px");
-        
-            menu.addComponent(heading);
-            menu.addSeparator();
-            //add new stock item for each StockType
-            
-            List<StockType> stockTypes = typeService.findAllStockTypes();
-            for(StockType type: stockTypes){
-                menu.addItem("Add new " + type.getNameSingular(), event -> {
-                    //open stock edit dialog
-                    Stock newStock = new Stock();
-                    newStock.setExternal(false);
-                    newStock.setBreeder(true);
-                    newStock.setStockType(type);
-                    newStock.setWeight(0);
-
-                    dialogCommon.setDialogTitle("Create new " + type.getNameSingular());
-                    dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
-                });
-            }
-
-            menu.addSeparator();
-            MenuItem mode = menu.addItem("Switch mode", event -> {
-                if(ColorScheme.Value.DARK==UI.getCurrentOrThrow().getPage().getColorScheme()){
-                    UI.getCurrentOrThrow().getPage().setColorScheme(Value.LIGHT);
-                }else{
-                    UI.getCurrentOrThrow().getPage().setColorScheme(Value.DARK);
-                }
-            });
-            setModeText(mode);
-            mode.addClickListener(listener -> {
-                setModeText(mode);
-            });
-
-            menu.addItem("Sign out", event -> {
-                authContext.logout();
-            });
+            ftSignin = new Button(ftIcon);
+            menu = new ContextMenu(ftSignin);
+            buildContextMenu();
             userMenu.addToEnd(ftSignin);  
             return userMenu;
         }else{
             //avatar.setName("Farm Tracks Signin");
-            Button ftSignin = new Button(ftIcon);
+            ftSignin = new Button(ftIcon);
             ftSignin.addClickListener(click -> {
                 click.getSource().getUI().ifPresent(ui -> ui.navigate("/login"));
             });
@@ -187,6 +157,67 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
             return userMenu;
         }
 
+    }
+
+    private void buildContextMenu(){
+        //menu = new ContextMenu(ftSignin);
+        //avatar.setName("Farm Tracks Menu");
+        menu.removeAll();
+    
+        menu.setOpenOnClick(true);
+
+        Div heading = new Div();
+        heading.setText(userName);
+        heading.getStyle().set("text-align", "center");
+        heading.getStyle().set("font-weight", "bold");
+        heading.getStyle().set("padding", "8px");
+    
+        menu.addComponent(heading);
+        menu.addSeparator();
+        //add new stock item for each StockType
+        
+        List<StockType> stockTypes = typeService.findAllStockTypes();
+        for(StockType type: stockTypes){
+            menu.addItem("Add new " + type.getNameSingular(), event -> {
+                //open stock edit dialog
+                Stock newStock = new Stock();
+                newStock.setExternal(false);
+                newStock.setBreeder(true);
+                newStock.setStockType(type);
+                newStock.setWeight(0);
+
+                dialogCommon.setDialogTitle("Create new " + type.getNameSingular());
+                dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
+            });
+        }
+
+        List<PlanTemplate> planTemplates = planTemplateService.findAllGeneralPlanTemplates();
+        if (!planTemplates.isEmpty()) {
+            menu.addSeparator();
+        }
+        for(PlanTemplate template: planTemplates){
+            menu.addItem("Add new " + template.getName(), event -> {
+                //open plan template edit dialog
+                planEditor.dialogOpen(Utility.TaskLinkType.GENERAL);
+            });
+        }
+
+        menu.addSeparator();
+        MenuItem mode = menu.addItem("Switch mode", event -> {
+            if(ColorScheme.Value.DARK==UI.getCurrentOrThrow().getPage().getColorScheme()){
+                UI.getCurrentOrThrow().getPage().setColorScheme(Value.LIGHT);
+            }else{
+                UI.getCurrentOrThrow().getPage().setColorScheme(Value.DARK);
+            }
+        });
+        setModeText(mode);
+        mode.addClickListener(listener -> {
+            setModeText(mode);
+        });
+
+        menu.addItem("Sign out", event -> {
+            authContext.logout();
+        });
     }
     
     private void setModeText(MenuItem mode){
@@ -286,6 +317,21 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     public void afterNavigation(AfterNavigationEvent ane) {
         System.out.println("MainLayout: afterNavigation");
         viewTitle.setText(getCurrentPageTitle());
+        // avoid duplicate listeners after repeated navigation
+        if (planRefreshRegistration != null) {
+            planRefreshRegistration.remove();
+            planRefreshRegistration = null;
+        }
+
+        Component content = getContent();
+        if (content instanceof PlanTemplateView planTemplateView) {
+            planRefreshRegistration = planTemplateView.addListRefreshNeededListener(e -> {
+                // handle refresh event in layout
+                // e.g. rebuild menu / badges / header state
+                buildContextMenu();
+            });
+        }
+
     }
 
     @Override

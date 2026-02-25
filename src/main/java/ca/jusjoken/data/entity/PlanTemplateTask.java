@@ -24,6 +24,7 @@ public class PlanTemplateTask {
 
     private Integer daysFromStart;
     private Integer sequence;
+    private String customName = null;
 
     public PlanTemplateTask() {
     }
@@ -41,6 +42,13 @@ public class PlanTemplateTask {
 
     public void setType(Utility.TaskType type) {
         this.type = type;
+    }
+
+    public String getDisplayName() {
+        if (customName != null && !customName.isEmpty()) {
+            return customName;
+        }
+        return type != null ? type.getShortName() : "Unnamed Task";
     }
 
     public Integer getDaysFromStart() {
@@ -70,7 +78,7 @@ public class PlanTemplateTask {
     @Override
     public String toString() {
         return "PlanTemplateTask [id=" + id + ", type=" + type + ", planTemplate=" + planTemplate + ", daysFromStart="
-                + daysFromStart + ", sequence=" + sequence + "]";
+                + daysFromStart + ", sequence=" + sequence + ", customName=" + customName + "]";
     }
 
     public Integer getId() {
@@ -81,4 +89,12 @@ public class PlanTemplateTask {
         this.id = id;
     }
 
+    public String getCustomName() {
+        return customName;
+    }
+
+    public void setCustomName(String customName) {
+        this.customName = customName;
+    }
+    
 }

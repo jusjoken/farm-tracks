@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import com.vaadin.flow.component.ComponentEventListener;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.formlayout.FormLayout;
@@ -18,13 +19,16 @@ import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.shared.Registration;
 import com.vaadin.flow.theme.lumo.LumoUtility.MinWidth;
 import com.vaadin.flow.theme.lumo.LumoUtility.Padding;
 
+import ca.jusjoken.component.ListRefreshNeededListener;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.PlanTemplate;
 import ca.jusjoken.data.entity.PlanTemplateTask;
 import ca.jusjoken.data.entity.StockType;
+import ca.jusjoken.data.service.ListRefreshNeededEvent;
 import ca.jusjoken.data.service.PlanTemplateService;
 import ca.jusjoken.data.service.PlanTemplateTaskService;
 import ca.jusjoken.data.service.StockTypeService;
@@ -46,6 +50,7 @@ public class PlanTemplateView extends MasterDetailLayout{
     private final Select<StockType> templateStockTypeChoice = new Select<>();
 
     private final Select<Utility.TaskType> templateTaskTypeSelect = new Select<>();
+    private final TextField taskCustomNamField = new TextField();
     private final NumberField taskDaysFromStart = new NumberField();
     private final NumberField taskSequence = new NumberField();
 
@@ -59,6 +64,8 @@ public class PlanTemplateView extends MasterDetailLayout{
     private final StockTypeService stockTypeService;
 
     private final Grid<PlanTemplate> templateGrid = new Grid<>(PlanTemplate.class, false);;
+
+    private final List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
 
     public PlanTemplateView(PlanTemplateTaskService planTemplateTaskService, PlanTemplateService planTemplateService, StockTypeService stockTypeService) {
         this.planTemplateTaskService = planTemplateTaskService;
@@ -148,6 +155,7 @@ public class PlanTemplateView extends MasterDetailLayout{
     private void refreshTemplateGrid() {
         var dataProvider = planTemplateService.findAll();
         templateGrid.setItems(dataProvider);
+        fireListRefreshNeeded();
     }
 
     private void configureDetailLayout() {
@@ -159,6 +167,9 @@ public class PlanTemplateView extends MasterDetailLayout{
         });
         taskGrid.getEditor().addCloseListener(event ->{
             refreshTaskGrid();
+        });
+        templateTaskTypeSelect.addValueChangeListener(e -> {
+
         });
 
     }
@@ -193,6 +204,8 @@ public class PlanTemplateView extends MasterDetailLayout{
         templateLinkType.setRequired(true);
         templateLinkType.setWidthFull();
 
+        taskCustomNamField.setWidthFull();
+
         templateStockTypeChoice.setAriaLabel("Stock type");
         templateStockTypeChoice.setLabel("Stock type");
         templateStockTypeChoice.addClassNames(MinWidth.NONE, Padding.Top.MEDIUM);
@@ -216,6 +229,8 @@ public class PlanTemplateView extends MasterDetailLayout{
         taskBinder.forField(templateTaskTypeSelect)
                 .asRequired("Task type is required")
                 .bind(PlanTemplateTask::getType, PlanTemplateTask::setType);
+        taskBinder.forField(taskCustomNamField)
+                .bind(PlanTemplateTask::getCustomName, PlanTemplateTask::setCustomName);
         taskBinder.forField(taskDaysFromStart)
                 .withConverter(Double::intValue, Integer::doubleValue, "Must be an integer")
                 .bind(PlanTemplateTask::getDaysFromStart, PlanTemplateTask::setDaysFromStart);
@@ -250,6 +265,7 @@ public class PlanTemplateView extends MasterDetailLayout{
         }).setWidth("60px").setFlexGrow(0).setFrozen(true);
 
         taskGrid.addColumn(task -> task.getType().getShortName()).setHeader("Type").setAutoWidth(true).setEditorComponent(templateTaskTypeSelect);
+        taskGrid.addColumn(PlanTemplateTask::getDisplayName).setHeader("Name").setAutoWidth(true).setEditorComponent(taskCustomNamField);
         taskGrid.addColumn(task -> task.getDaysFromStart()).setHeader("Days From Start").setFlexGrow(1).setEditorComponent(taskDaysFromStart);
         taskGrid.addColumn(task -> task.getSequence()).setHeader("Sequence").setFlexGrow(1).setEditorComponent(taskSequence);
         taskGrid.setWidthFull();
@@ -333,9 +349,19 @@ public class PlanTemplateView extends MasterDetailLayout{
             planTemplate.setStockType(templateStockTypeChoice.getValue());
 
             PlanTemplate savedTemplate = planTemplateService.save(planTemplate);
+            //to handle deleted tasks, we will delete all existing tasks and re-add from the buffer.  This is simpler than trying to determine which tasks were deleted vs added/edited.
+            List<PlanTemplateTask> existingTasks = planTemplateTaskService.findAllByPlanTemplateId(savedTemplate.getId());
+            for(PlanTemplateTask task : existingTasks){
+                planTemplateTaskService.deleteById(task.getId());
+            }
             for (PlanTemplateTask task : taskBuffer) {
-                task.setPlanTemplate(savedTemplate);
-                planTemplateTaskService.save(task);
+                PlanTemplateTask newTask = new PlanTemplateTask();
+                newTask.setType(task.getType());
+                newTask.setDaysFromStart(task.getDaysFromStart());
+                newTask.setSequence(task.getSequence());
+                newTask.setPlanTemplate(savedTemplate);
+                newTask.setCustomName(task.getCustomName());
+                planTemplateTaskService.save(newTask); 
             }
         }else{
             //name has changed so save as a new template
@@ -344,6 +370,10 @@ public class PlanTemplateView extends MasterDetailLayout{
             newTemplate.setType(templateLinkType.getValue());
             newTemplate.setStockType(templateStockTypeChoice.getValue());
             PlanTemplate savedTemplate = planTemplateService.save(newTemplate);
+            List<PlanTemplateTask> existingTasks = planTemplateTaskService.findAllByPlanTemplateId(savedTemplate.getId());
+            for(PlanTemplateTask task : existingTasks){
+                planTemplateTaskService.deleteById(task.getId());
+            }
             for (PlanTemplateTask task : taskBuffer) {
                 //create a copy of the task for the new template
                 PlanTemplateTask newTask = new PlanTemplateTask();
@@ -351,6 +381,7 @@ public class PlanTemplateView extends MasterDetailLayout{
                 newTask.setDaysFromStart(task.getDaysFromStart());
                 newTask.setSequence(task.getSequence());
                 newTask.setPlanTemplate(savedTemplate);
+                newTask.setCustomName(task.getCustomName());
                 planTemplateTaskService.save(newTask); 
             }
         }
@@ -363,5 +394,23 @@ public class PlanTemplateView extends MasterDetailLayout{
         setDetail(null);
     }
 
+    public void addListener(ListRefreshNeededListener listener){
+        listRefreshNeededListeners.add(listener);
+    }
+
+    private void notifyRefreshNeeded(){
+        for (ListRefreshNeededListener listener: listRefreshNeededListeners) {
+            listener.listRefreshNeeded();
+        }
+    }
+
+    public Registration addListRefreshNeededListener(
+            ComponentEventListener<ListRefreshNeededEvent> listener) {
+        return addListener(ListRefreshNeededEvent.class, listener);
+    }
+
+    private void fireListRefreshNeeded() {
+        fireEvent(new ListRefreshNeededEvent(this, false));
+    }
 
 }

@@ -5,9 +5,12 @@ import java.time.LocalDate;
 import ca.jusjoken.data.Utility;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 
 @Entity
 public class Task {
@@ -22,7 +25,11 @@ public class Task {
     private Integer linkBreederId;
     private Integer linkLitterId;
     private Boolean completed = false;
-    //TODO: add a plan table and then the plan_id, plan_sequence, plan_days
+    //add a link to the taskplan table by adding a taskPlanId field and a @ManyToOne relationship to the TaskPlan entity
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "task_plan_id", nullable = true)
+    private TaskPlan taskPlan;
+    
 
     public Task() {
     }
@@ -99,6 +106,15 @@ public class Task {
     public void setCompleted(Boolean completed) {
         this.completed = completed;
     }
+
+    public TaskPlan getTaskPlan() {
+        return taskPlan;
+    }   
+
+    public void setTaskPlan(TaskPlan taskPlan) {
+        this.taskPlan = taskPlan;
+    }
+    
 
     @Override
     public String toString() {
