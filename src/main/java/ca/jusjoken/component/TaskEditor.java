@@ -194,7 +194,11 @@ public class TaskEditor {
         } else switch (newLinkType) {
             case BREEDER -> {
                 linkBreeder.setVisible(true);
-                linkBreeder.setItems(stockService.findAllBreeders(currentStockType));
+                if(currentStockType != null){
+                    linkBreeder.setItems(stockService.findAllBreeders(currentStockType));
+                } else {
+                    linkBreeder.setItems(stockService.findAllBreeders());
+                }
                 if(task.getLinkBreederId()!=null){
                     Stock breeder = stockService.findById(task.getLinkBreederId());
                     linkBreeder.setValue(breeder);
@@ -208,7 +212,11 @@ public class TaskEditor {
                 linkBreeder.setVisible(false);
                 linkBreeder.clear();
                 linkLitter.setVisible(true);
-                linkLitter.setItems(litterService.getActiveLitters(currentStockType));
+                if(currentStockType != null){
+                    linkLitter.setItems(litterService.getActiveLitters(currentStockType));
+                } else {
+                    linkLitter.setItems(litterService.getActiveLitters());
+                }
                 if(task.getLinkLitterId()!=null){
                     Litter litter = litterService.findById(task.getLinkLitterId());
                     linkLitter.setValue(litter);

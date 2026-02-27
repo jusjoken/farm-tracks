@@ -9,6 +9,7 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.editor.Editor;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout;
@@ -18,6 +19,7 @@ import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.binder.Binder;
+import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.shared.Registration;
 import com.vaadin.flow.theme.lumo.LumoUtility.MinWidth;
@@ -37,6 +39,7 @@ import jakarta.annotation.security.PermitAll;
 
 @Route(value = "plan_template", layout = MainLayout.class)
 @PermitAll
+@PageTitle("Plan Templates")
 public class PlanTemplateView extends MasterDetailLayout{
 
     private PlanTemplate planTemplate;
@@ -165,6 +168,8 @@ public class PlanTemplateView extends MasterDetailLayout{
         templateName.addValueChangeListener(listener ->{
             updateSaveEnabled();
         });
+        taskGrid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
+
         taskGrid.getEditor().addCloseListener(event ->{
             refreshTaskGrid();
         });
@@ -252,7 +257,7 @@ public class PlanTemplateView extends MasterDetailLayout{
                 templateTaskTypeSelect.focus();
             });
             return editIcon;
-        }).setWidth("60px").setFlexGrow(0).setFrozen(true);
+        }).setWidth("50px").setFlexGrow(0).setFrozen(true);
         taskGrid.addComponentColumn(item -> {
             Icon detailsDeleteIcon = new Icon("lumo", "cross");
             detailsDeleteIcon.setTooltipText("Delete task");
@@ -262,7 +267,7 @@ public class PlanTemplateView extends MasterDetailLayout{
                 refreshTaskGrid();
             });
             return detailsDeleteIcon;
-        }).setWidth("60px").setFlexGrow(0).setFrozen(true);
+        }).setWidth("50px").setFlexGrow(0).setFrozen(true);
 
         taskGrid.addColumn(task -> task.getType().getShortName()).setHeader("Type").setAutoWidth(true).setEditorComponent(templateTaskTypeSelect);
         taskGrid.addColumn(PlanTemplateTask::getDisplayName).setHeader("Name").setAutoWidth(true).setEditorComponent(taskCustomNamField);

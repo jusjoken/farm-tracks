@@ -53,6 +53,12 @@ public class LitterService {
         return litters;
     }
     
+    public List<Litter> getActiveLitters(){
+        List<Litter> litters = litterRepository.findNotArchived();
+        Collections.sort(litters, new LitterComparator().reversed());
+        return litters;
+    }
+    
     @Transactional
     public void deleteByStockId(Integer stockId){
         litterRepository.deleteByFatherId(stockId);

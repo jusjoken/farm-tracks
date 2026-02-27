@@ -34,6 +34,22 @@ public class TaskService {
                         && task.getLinkBreederId() != null && task.getLinkBreederId().equals(stock.getId()))
                 .count();
     }
+
+    public List<Task> findAll() {
+        return taskRepository.findAll();
+    }
+
+    public void deleteAllByTaskPlanId(Integer id) {
+        taskRepository.deleteAllByTaskPlanId(id);
+    }
+
+    public void deleteById(Integer id) {
+        taskRepository.deleteById(id);
+    }
+
+    public List<Task> findByPlanId(Integer taskPlanId) {
+        return taskRepository.findByTaskPlanId(taskPlanId);
+    }
     
 
 }

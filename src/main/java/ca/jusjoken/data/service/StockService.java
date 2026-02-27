@@ -226,6 +226,12 @@ public class StockService {
         return stockList;
     }
 
+    public List<Stock> findAllBreeders(){
+        List<Stock> stockList = stockRepository.findAllBreeders();
+        Collections.sort(stockList, new StockComparator());
+        return stockList;
+    }
+
     public List<Stock> list(Pageable pageable)   {
         return stockRepository.findAll(pageable).getContent();
     }

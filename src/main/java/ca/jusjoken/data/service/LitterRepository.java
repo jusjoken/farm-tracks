@@ -32,7 +32,11 @@ public interface LitterRepository extends JpaRepository<Litter, Integer>  {
     
     @Query("select l from Litter l where l.archived IS NULL and l.stockType = :stocktype")
     public List<Litter> findNotArchived(@Param("stocktype") StockType stockType);
+
+    @Query("select l from Litter l where l.archived IS NULL")
+    public List<Litter> findNotArchived();
     
+
     @Modifying
     @Query(value = "DELETE FROM litter", nativeQuery = true)
     public void deleteAllLittersNative();   

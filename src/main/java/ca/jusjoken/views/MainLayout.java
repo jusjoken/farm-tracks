@@ -57,6 +57,7 @@ import ca.jusjoken.views.stock.StockTypeView;
 import ca.jusjoken.views.stock.StockView;
 import ca.jusjoken.views.utility.MaintenanceView;
 import ca.jusjoken.views.utility.PlanTemplateView;
+import ca.jusjoken.views.utility.TaskListView;
 
 /**
  * The main view is a top-level placeholder for other views.
@@ -239,6 +240,13 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         nav.removeAll();
 
         nav.addItem(new SideNavItem("Welcome", WelcomeView.class, FontAwesome.Solid.HOME.create()));
+
+        if(accessChecker.hasAccess(TaskListView.class)){
+            SideNavItem sn = new SideNavItem("Tasks", TaskListView.class);
+            nav.addItem(sn);
+            sn.setPrefixComponent(FontAwesome.Solid.TASKS.create());
+        }
+
 
         //build nav items for each stock query from database
         if(accessChecker.hasAccess(StockView.class)){

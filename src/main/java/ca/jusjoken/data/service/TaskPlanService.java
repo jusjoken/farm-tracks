@@ -20,7 +20,7 @@ public class TaskPlanService {
         return taskPlanRepository.findAll();
     }
 
-    public Optional<TaskPlan> findById(Long id) {
+    public Optional<TaskPlan> findById(Integer id) {
         return taskPlanRepository.findById(id);
     }
 
@@ -28,7 +28,7 @@ public class TaskPlanService {
         return taskPlanRepository.save(taskPlan);
     }
 
-    public void deleteById(Long id) {
+    public void deleteById(Integer id) {
         taskPlanRepository.deleteById(id);
     }
 }

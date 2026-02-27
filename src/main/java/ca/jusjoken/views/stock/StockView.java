@@ -58,7 +58,6 @@ import com.vaadin.flow.component.tabs.TabSheet;
 import com.vaadin.flow.component.tabs.TabSheetVariant;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
@@ -88,7 +87,6 @@ import com.vaadin.flow.theme.lumo.LumoUtility.Position;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.AvatarDiv;
-import ca.jusjoken.component.PlanEditor;
 import ca.jusjoken.component.ComponentConfirmEvent;
 import ca.jusjoken.component.DialogCommon;
 import ca.jusjoken.component.DialogCommonEvent;
@@ -97,9 +95,11 @@ import ca.jusjoken.component.Item;
 import ca.jusjoken.component.Layout;
 import ca.jusjoken.component.LazyComponent;
 import ca.jusjoken.component.ListRefreshNeededListener;
+import ca.jusjoken.component.PlanEditor;
 import ca.jusjoken.component.StatusEditor;
 import ca.jusjoken.component.StockDetailsFormLayout;
 import ca.jusjoken.component.TaskEditor;
+import ca.jusjoken.component.TaskGrid;
 import ca.jusjoken.component.WeightEditor;
 import ca.jusjoken.data.ColumnName;
 import ca.jusjoken.data.Utility;
@@ -1202,6 +1202,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         header.addToStart(stock.getnameAndPrefix(false,true, false));
 
         tabs.setWidthFull();
+        //tabs.setHeight("200px");
 
         List<Tab> tabList = new ArrayList<>();
         tabList.add(tabs.add("Overview", createTabOverview(stock)));
@@ -1543,61 +1544,9 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     }
 
     private Component createTabTasks(Stock stock) {
-        Layout layout = new Layout();
-        List<Task> allTasks = taskService.findByStockId(stock.getId());
-
-        Grid<Task> grid = new Grid<>(Task.class,false);
-        grid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
-        grid.setHeight("200px");
-
-        ListDataProvider<Task> dataProvider = new ListDataProvider<>(allTasks);
-        grid.setDataProvider(dataProvider);
-
-        grid.addComponentColumn(item -> {
-            Icon editIcon = new Icon("lumo", "edit");
-            editIcon.addClickListener(e -> {
-                taskEditor.dialogOpen(item, TaskEditor.DialogMode.EDIT, stock.getStockType());
-            });
-            return editIcon;
-        }).setWidth("50px").setFlexGrow(0).setFrozen(true);
-
-        grid.addColumn(Task::getName).setHeader("Name");
-        grid.addColumn(task -> { return task.getLinkType().getShortName(); }).setHeader("Type");
-        grid.addColumn(new LocalDateRenderer<>(Task::getDate,"MM-dd-YYYY")).setHeader("Date");
-
-        Select<String> completionFilter = new Select<>();
-        completionFilter.setItems(Utility.TaskCompletionFilter.ALL.filterName, Utility.TaskCompletionFilter.COMPLETED.filterName, Utility.TaskCompletionFilter.ACTIVE.filterName);
-        completionFilter.setWidthFull();
-        completionFilter.setTooltipText("Filter by completion status");
-
-        completionFilter.addValueChangeListener(event -> {
-            dataProvider.clearFilters();
-            String value = event.getValue();
-            if (Utility.TaskCompletionFilter.COMPLETED.filterName.equals(value)) {
-                dataProvider.addFilter(Task::getCompleted);
-            } else if (Utility.TaskCompletionFilter.ACTIVE.filterName.equals(value)) {
-                dataProvider.addFilter(task -> !task.getCompleted());
-            }
-        });
-
-        completionFilter.setValue(Utility.TaskCompletionFilter.ACTIVE.filterName);
-
-        grid.addComponentColumn(item -> {
-            if(item.getCompleted()){
-                Icon completedIcon = new Icon(FontAwesome.Regular.SQUARE_CHECK.create().getIcon());
-                completedIcon.setColor("green");
-                completedIcon.setTooltipText("Completed");
-                HorizontalLayout statusLayout = new HorizontalLayout(completedIcon, new Span("Completed"));
-                return statusLayout;
-            }else{
-                Icon incompleteIcon = new Icon(FontAwesome.Regular.SQUARE.create().getIcon());
-                incompleteIcon.setTooltipText("Active");
-                HorizontalLayout statusLayout = new HorizontalLayout(incompleteIcon, new Span("Active"));
-                return statusLayout;
-            }
-        }).setHeader(completionFilter);
-
-        layout.add(grid);
-        return new LazyComponent(() -> layout);
+        TaskGrid taskGrid = new TaskGrid(stock.getId());
+        taskGrid.setHeight("270px");
+        return new LazyComponent(() -> taskGrid);
     }
+
 }

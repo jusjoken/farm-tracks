@@ -11,23 +11,23 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
+import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
-import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.grid.Grid;
 
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.Utility.TaskLinkType;
 import ca.jusjoken.data.entity.PlanTemplate;
+import ca.jusjoken.data.entity.PlanTemplateTask;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockType;
-import ca.jusjoken.data.entity.TaskPlan;
-import ca.jusjoken.data.entity.PlanTemplateTask;
 import ca.jusjoken.data.entity.Task;
+import ca.jusjoken.data.entity.TaskPlan;
 import ca.jusjoken.data.service.PlanTemplateService;
 import ca.jusjoken.data.service.PlanTemplateTaskService;
 import ca.jusjoken.data.service.Registry;
@@ -36,6 +36,7 @@ import ca.jusjoken.data.service.TaskPlanService;
 import ca.jusjoken.data.service.TaskService;
 
 public class PlanEditor {
+
     public enum DialogMode {
         EDIT, CREATE
     }
@@ -130,16 +131,14 @@ public class PlanEditor {
         planTemplateSelect.setLabel("Plan Template");
         planTemplateSelect.setWidthFull();
         planTemplateSelect.addValueChangeListener(e -> {
-            selectedPlanTemplate = e.getValue();
+            if(e.getValue() != null) {
+                selectedPlanTemplate = e.getValue();
+            } else {
+                selectedPlanTemplate = null;
+            }
             refreshGeneratedTasks();
             valuesChanged();
         });
-        if(filteredPlanTemplates != null && !filteredPlanTemplates.isEmpty()) {
-            selectedPlanTemplate = filteredPlanTemplates.get(0);
-            planTemplateSelect.setItems(filteredPlanTemplates);
-            planTemplateSelect.setValue(selectedPlanTemplate);
-            valuesChanged();
-        }
         femaleStockSelect.setWidthFull();
         maleStockSelect.setWidthFull();
         femaleStockSelect.addValueChangeListener(e -> {
@@ -206,11 +205,37 @@ public class PlanEditor {
     }
 
     public void dialogOpen(TaskLinkType taskLinkType, Stock stockEntity, DialogMode mode) {
+        dialogOpen(null, taskLinkType, stockEntity, mode);
+    }
+
+    public void dialogOpen(Integer taskPlanId, TaskLinkType taskLinkType, Stock stockEntity, DialogMode mode) {
+        System.out.println("Opening PlanEditor dialog with taskPlanId: " + taskPlanId + ", taskLinkType: " + taskLinkType + ", stockEntity: " + stockEntity + ", mode: " + mode);
+
+        clearAllFields();
+
         this.stockEntity = stockEntity;
         this.dialogMode = mode;
         selectedTaskLinkType = taskLinkType;
-        editingTaskPlan = new TaskPlan();
+        if(taskPlanId != null) {
+            editingTaskPlan = taskPlanService.findById(taskPlanId).get();
+        } else {
+            editingTaskPlan = new TaskPlan();
+        }
         filteredPlanTemplates = planTemplateService.findAllByTaskLinkType(selectedTaskLinkType);
+
+        planTemplateSelect.setItems(filteredPlanTemplates != null ? filteredPlanTemplates : List.of());
+
+        if(filteredPlanTemplates != null && !filteredPlanTemplates.isEmpty()) {
+            selectedPlanTemplate = filteredPlanTemplates.get(0);
+        } else {
+            selectedPlanTemplate = null;
+        }
+
+        if (selectedPlanTemplate != null) {
+            planTemplateSelect.setValue(selectedPlanTemplate);
+        } else {
+            planTemplateSelect.clear();
+        }
 
         dialogTitle = dialogMode == DialogMode.CREATE ? "Create plan" : "Edit plan";
 
@@ -228,7 +253,8 @@ public class PlanEditor {
         planTemplateSelect.setItemLabelGenerator(PlanTemplate::getName);
 
         //only add the mother father fields for Breeder and Litter plans
-        if(selectedTaskLinkType == TaskLinkType.BREEDER || selectedTaskLinkType == TaskLinkType.LITTER) {
+        if((selectedTaskLinkType == TaskLinkType.BREEDER || selectedTaskLinkType == TaskLinkType.LITTER)
+                && selectedPlanTemplate != null) {
             StockType stockType = selectedPlanTemplate.getStockType();
             femaleStockSelect.setLabel("Select "+ stockType.getFemaleName());
             maleStockSelect.setLabel("Select "+ stockType.getMaleName());
@@ -238,6 +264,18 @@ public class PlanEditor {
             List<Stock> maleStocks = stockService.getFathers(null,stockType);
             femaleStockSelect.setItems(femaleStocks);
             maleStockSelect.setItems(maleStocks);
+
+            if(dialogMode == DialogMode.EDIT && editingTaskPlan.getId() != null) {
+                //if we're editing an existing plan, set the selected mother and father based on the linkMotherId and linkFatherId of the task plan
+                if(editingTaskPlan.getLinkMotherId() != null) {
+                    Stock linkedMother = stockService.findById(editingTaskPlan.getLinkMotherId());
+                    femaleStockSelect.setValue(linkedMother);
+                }
+                if(editingTaskPlan.getLinkFatherId() != null) {
+                    Stock linkedFather = stockService.findById(editingTaskPlan.getLinkFatherId());
+                    maleStockSelect.setValue(linkedFather);
+                }
+            }
 
             //if the passed in stockEntity is a mother or father, pre-select it in the appropriate select field
             if(stockEntity != null) {
@@ -251,7 +289,7 @@ public class PlanEditor {
             femaleStockSelect.setRequiredIndicatorVisible(true);
             maleStockSelect.setRequiredIndicatorVisible(true);
 
-        }else{
+        } else {
             femaleStockSelect.setRequiredIndicatorVisible(false);
             maleStockSelect.setRequiredIndicatorVisible(false);
         }
@@ -260,11 +298,32 @@ public class PlanEditor {
         maleStockSelect.setItemLabelGenerator(Stock::getDisplayName);
 
         startDatePicker.setRequired(true);
-        startDatePicker.setValue(LocalDate.now());
+        if(dialogMode == DialogMode.EDIT && editingTaskPlan.getId() != null) {
+            //if we're editing an existing plan, set the start date to the earliest task date for the tasks in this plan
+            List<Task> existingTasks = taskService.findByPlanId(editingTaskPlan.getId());
+            LocalDate earliestDate = existingTasks.stream()
+                    .map(Task::getDate)
+                    .min(LocalDate::compareTo)
+                    .orElse(LocalDate.now());
+            startDatePicker.setValue(earliestDate);
+        } else {
+            startDatePicker.setValue(LocalDate.now());
+    }
 
         refreshGeneratedTasks();
         buildDialogLayout();
         dialog.open();
+    }
+
+    private void clearAllFields() {
+        //use this to ensure on open the dialog is set up properly and old values are gone
+        selectedPlanTemplate = null;
+        selectedTaskLinkType = null;
+        femaleStockSelect.clear();
+        maleStockSelect.clear();
+        startDatePicker.clear();
+        generatedTaskRows.clear();
+        taskGrid.setItems(generatedTaskRows);
     }
 
     private void buildDialogLayout() {
@@ -297,11 +356,21 @@ public class PlanEditor {
     }
 
     private void dialogSave() {
-        //map UI fields to a new TaskPlan so it can be saved to the database, then create Tasks based on the generatedTaskRows and save those to the database as well, linking them to the TaskPlan
+        if(dialogMode == DialogMode.EDIT && editingTaskPlan.getId() != null) {
+            //delete existing tasks if we're editing an existing plan
+            System.out.println("Deleting existing tasks for TaskPlan id: " + editingTaskPlan.getId());
+            List<Task> existingTasks = taskService.findByPlanId(editingTaskPlan.getId());
+            for(Task task : existingTasks) {
+                System.out.println("Deleting task: " + task);
+                taskService.deleteById(task.getId());
+            }
+        }
+
         editingTaskPlan.setType(selectedTaskLinkType);
         editingTaskPlan.setLinkMotherId(femaleStockSelect.getValue() != null ? femaleStockSelect.getValue().getId() : null);
         editingTaskPlan.setLinkFatherId(maleStockSelect.getValue() != null ? maleStockSelect.getValue().getId() : null);
         TaskPlan savedTaskPlan = taskPlanService.save(editingTaskPlan);
+        System.out.println("Saved TaskPlan: " + savedTaskPlan + " editingTaskPlan: " + editingTaskPlan);
         for (GeneratedTaskRow row : generatedTaskRows) {
             Task task = new Task();
             task.setName(row.getName());
@@ -310,6 +379,7 @@ public class PlanEditor {
             task.setLinkType(selectedTaskLinkType);
             task.setLinkBreederId(femaleStockSelect.getValue() != null ? femaleStockSelect.getValue().getId() : null);
             task.setType(row.getType());
+            System.out.println("Saving task: " + task);
             taskService.save(task);
         }
         notifyRefreshNeeded();
