@@ -68,4 +68,8 @@ public class LitterService {
     public Litter findById(Integer linkLitterId) {
         return litterRepository.findById(linkLitterId).orElse(null);
     }
+
+    public List<Litter> getAllLitters() {
+        return litterRepository.findAll();
+    }
 }

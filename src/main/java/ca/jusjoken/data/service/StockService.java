@@ -51,6 +51,12 @@ public class StockService {
         return kitsForLitter;
     }
 
+    public List<Stock> getKitsForLitter(Integer litterId){
+        List<Stock> kitsForLitter = stockRepository.findAllKitsByLitterId(litterId);
+        //TODO: update to include kits that are fostered
+        return kitsForLitter;
+    }
+
     public List<Stock> getKitsForParent(Stock stock){
         List<Stock> kitsForParent = new ArrayList<>();
         if(stock.getSex().equals(Utility.Gender.FEMALE)){

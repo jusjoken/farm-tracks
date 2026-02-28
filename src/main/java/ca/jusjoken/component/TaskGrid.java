@@ -33,6 +33,7 @@ public class TaskGrid extends Grid<Task> {
     private final Button addTaskButton = new Button("Add Task");
     private Integer stockId;
     private String currentCompletionFilter = Utility.TaskCompletionFilter.ACTIVE.filterName;
+    Grid.Column<Task> dateColumn;
 
     public TaskGrid() {
         this(null);
@@ -40,17 +41,19 @@ public class TaskGrid extends Grid<Task> {
 
     public TaskGrid(Integer stockId) {
         super(Task.class, false);
-        this.stockId = stockId;
         this.taskService = Registry.getBean(TaskService.class);
         this.stockService = Registry.getBean(StockService.class);
-        //setSizeFull();
-        //setHeight("300px");
         taskEditor.addListener(this::refreshGrid);
         planEditor.addListener(this::refreshGrid);
-        configureGrid(stockId);
+        this.stockId = stockId;
+        configureGrid();
     }
 
-    private void configureGrid(Integer stockId) {
+    private void configureGrid() {
+        System.out.println("Configuring TaskGrid with stockId: " + stockId);
+
+        setDataProvider();
+        addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
 
         addTaskButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SMALL);
         addTaskButton.addClickListener(e -> {
@@ -64,10 +67,6 @@ public class TaskGrid extends Grid<Task> {
                 taskEditor.dialogOpen();
             }
         });
-
-        setDataProvider();
-
-        addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
 
         this.<Icon>addComponentColumn((task) -> {
             Icon editIcon = new Icon("lumo", "edit");
@@ -92,7 +91,7 @@ public class TaskGrid extends Grid<Task> {
         }).setHeader("Task for:").setSortable(true);
 
         final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MM-dd-yyyy");
-        Grid.Column<Task> dateColumn = this.addComponentColumn(task -> {
+        dateColumn = this.addComponentColumn(task -> {
             LocalDate date = task.getDate();
             Span dateText = new Span(date != null ? date.format(dateFormatter) : "");
 
@@ -155,12 +154,16 @@ public class TaskGrid extends Grid<Task> {
             return editPlan;
         }).setHeader(addTaskButton);
         setMultiSort(true);
-        this.sort(List.of(new GridSortOrder<>(dateColumn, SortDirection.ASCENDING)));
-        // set UI value + apply filter explicitly on first display
         completionFilter.setValue(currentCompletionFilter);
         updateCompletionFilter(currentCompletionFilter);
+        updateSortOrder();
 
     }
+
+    public void setStockId(Integer stockId) {
+        this.stockId = stockId;
+        refreshGrid();
+    }    
 
     private void updateCompletionFilter(String filterValue) {
         System.out.println("Updating completion filter to: " + filterValue);
@@ -172,7 +175,13 @@ public class TaskGrid extends Grid<Task> {
         }
     }
 
+    private void updateSortOrder(){
+            System.out.println("Re-applying sort order after data provider refresh");
+            this.sort(List.of(new GridSortOrder<>(dateColumn, SortDirection.ASCENDING)));
+    }
+
     private void setDataProvider() {
+        System.out.println("Setting data provider for TaskGrid with stockId: " + stockId);
         if(stockId != null){
             dataProvider = new ListDataProvider<>(taskService.findByStockId(stockId));
         } else {
@@ -182,10 +191,11 @@ public class TaskGrid extends Grid<Task> {
     }
 
     public void refreshGrid() {
+        System.out.println("Refreshing TaskGrid with stockId: " + stockId);
         setDataProvider();
         // re-apply filter after data provider is recreated
         updateCompletionFilter(currentCompletionFilter);
-        dataProvider.refreshAll();
+        updateSortOrder();
     }
 
 }

@@ -83,7 +83,7 @@ public class PlanEditor {
         dialogLayout.setSpacing(false);
         dialogLayout.setPadding(false);
         dialogLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        dialogLayout.getStyle().set("width", "320px").set("max-width", "100%");
+        dialogLayout.getStyle().set("width", "270px").set("max-width", "100%");
         dialog.add(dialogLayout);
 
         dialogCloseButton.addClickListener(e -> dialogClose());

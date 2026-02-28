@@ -17,7 +17,6 @@ import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentUtil;
-import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
@@ -95,9 +94,11 @@ import ca.jusjoken.component.Item;
 import ca.jusjoken.component.Layout;
 import ca.jusjoken.component.LazyComponent;
 import ca.jusjoken.component.ListRefreshNeededListener;
+import ca.jusjoken.component.LitterGrid;
 import ca.jusjoken.component.PlanEditor;
 import ca.jusjoken.component.StatusEditor;
 import ca.jusjoken.component.StockDetailsFormLayout;
+import ca.jusjoken.component.StockGrid;
 import ca.jusjoken.component.TaskEditor;
 import ca.jusjoken.component.TaskGrid;
 import ca.jusjoken.component.WeightEditor;
@@ -106,7 +107,6 @@ import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.BreederFilter;
 import ca.jusjoken.data.Utility.TabType;
 import ca.jusjoken.data.entity.GenotypeSegment;
-import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
 import ca.jusjoken.data.entity.StockSavedQuery.StockViewStyle;
@@ -176,6 +176,8 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Select<StockViewStyle> stockViewStyleChoice = new Select<>();
     private Boolean skipSidebarUpdates = Boolean.FALSE;
     private Integer selectedTabIndex = 0;
+    private TaskGrid taskGrid = new TaskGrid();
+    private LitterGrid litterGrid = new LitterGrid();
 
     public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockTypeService stockTypeService, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService, StockWeightHistoryService weightService, TaskService taskService) {
         this.stockRepository = stockRepository;
@@ -829,6 +831,8 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             }else{
                 selectedStock = selected;
                 mdLayout.setDetail(createTabbedContentArea(selectedStock));
+                taskGrid.setStockId(selectedStock.getId());
+                litterGrid.setStockId(selectedStock.getId());
             }
         });
         return list;        
@@ -840,19 +844,9 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             });    
 
     private Layout createListItemLayout(Stock stock) {
-        // Image and favourite button
-//        Avatar avatar = new Avatar();
-//        Div avatarDiv = new Div(avatar);
-//        avatar.addThemeVariants(AvatarVariant.LUMO_XLARGE);
-//        avatar.setHeight("6em");
-//        avatar.setWidth("6em");
-//        avatar.setImageHandler(DownloadHandler.forFile(stock.getProfileFile()));
         AvatarDiv avatarDiv = stock.getAvatar(Boolean.TRUE);
         avatarDiv.getAvatar().setHeight("6em");
         avatarDiv.getAvatar().setWidth("6em");
-
-        
-//        UIUtilities.setBorders(avatar, stock, true);
         
         avatarDiv.getAvatar().getElement().addEventListener("click", click -> {
             //open image dialog
@@ -1256,56 +1250,23 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     
     private LazyComponent createTabLitters(Stock stock) {
         Layout layout = new Layout();
-        List<Litter> litters = litterService.getLitters(stock);
-        Grid<Litter> litterGrid = new Grid<>(Litter.class,false);
-        litterGrid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
-        litterGrid.setHeight("200px");
-
-        litterGrid.addColumn(Litter::getPrefix).setHeader("Prefix");
-        litterGrid.addColumn(Litter::getName).setHeader("Name");
-        litterGrid.addColumn(Litter::getParentsFormatted).setHeader("Parents");
-        litterGrid.addColumn(new LocalDateRenderer<>(Litter::getDoB,"MM-dd-YYYY")).setHeader("Born");
-        litterGrid.addColumn(new LocalDateRenderer<>(Litter::getBred,"MM-dd-YYYY")).setHeader("Bred");
-        litterGrid.addColumn(item -> item.getKitsCount()).setHeader(stock.getStockType().getNonBreederName());
-        litterGrid.addColumn(item -> item.getSurvivalRate()).setHeader("Survival Rate");
-        litterGrid.addColumn(item -> item.getDiedKitsCount()).setHeader("Died");
-        litterGrid.addColumn(item -> item.getKitsSurvivedCount()).setHeader("Survived");
-
-        litterGrid.setItemDetailsRenderer(new ComponentRenderer<>(item -> {
-            List<Stock> kits = stockService.getKitsForLitter(item);
-            Layout kitListLayoutForOffset = new Layout(getKitListGrid(kits));
-            kitListLayoutForOffset.addClassNames(Padding.Left.LARGE);
-            return kitListLayoutForOffset;
-        }));        
-        
-        litterGrid.setItems(litters);
+        litterGrid.setStockId(stock.getId());
+        litterGrid.setHeight("270px");
         layout.add(litterGrid);
         return new LazyComponent(() -> layout);
     }
 
     private LazyComponent createTabKits(Stock stock) {
-        Layout layout = new Layout();
-        List<Stock> kits = stockService.getKitsForParent(stock);
-        
-        layout.add(getKitListGrid(kits));
-        return new LazyComponent(() -> layout);
+        StockGrid stockGrid = new StockGrid();
+        stockGrid.setId(stock.getId(), StockGrid.StockGridType.STOCK);
+        stockGrid.setCurrentViewStyle(StockSavedQuery.StockViewStyle.TILE);
+        stockGrid.setHeight("270px");
+        stockGrid.createGrid();
+        Layout kitListLayoutForOffset = new Layout(stockGrid);
+        //kitListLayoutForOffset.addClassNames(Padding.Left.LARGE);
+        return new LazyComponent(() -> kitListLayoutForOffset);
     }
 
-    private Component getKitListGrid(List<Stock> kits){
-        Grid<Stock> kitGrid = new Grid<>(Stock.class, false);
-        //GridCompact<Stock> kitGrid = new GridCompact();
-        kitGrid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
-        kitGrid.setHeight("200px");
-
-        kitGrid.addColumn(Stock::getDisplayName).setHeader("Name");
-        kitGrid.addColumn(Stock::getColor).setHeader("Color");
-        kitGrid.addColumn(new ComponentRenderer<>(item -> {
-            return new Html(item.getWeightInLbsOz());
-        })).setHeader("Weight");
-        kitGrid.setItems(kits);
-        return kitGrid;
-    }
-    
     private Component createTabNotes(Stock stock) {
         //Add Edit and Save on this panel for notes
         Layout layout = new Layout();
@@ -1544,7 +1505,8 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     }
 
     private Component createTabTasks(Stock stock) {
-        TaskGrid taskGrid = new TaskGrid(stock.getId());
+        //taskGrid = new TaskGrid(stock.getId());
+        taskGrid.setStockId(stock.getId());
         taskGrid.setHeight("270px");
         return new LazyComponent(() -> taskGrid);
     }
