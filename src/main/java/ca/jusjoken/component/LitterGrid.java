@@ -2,6 +2,8 @@ package ca.jusjoken.component;
 
 import java.util.List;
 
+import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.grid.GridVariant;
@@ -9,10 +11,12 @@ import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
+import com.vaadin.flow.shared.Registration;
 import com.vaadin.flow.theme.lumo.LumoUtility.Padding;
 
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
+import ca.jusjoken.data.entity.StockSavedQuery;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.Registry;
@@ -27,7 +31,9 @@ public class LitterGrid extends Grid<Litter> {
     private final StockService stockService;
     private final LitterService litterService;
     private final StockTypeService stockTypeService;
-
+    private boolean mobileDevice = false;
+    private static final int MOBILE_BREAKPOINT_PX = 768;   
+    private Registration resizeRegistration;
 
     public LitterGrid() {
         this(null);
@@ -63,6 +69,15 @@ public class LitterGrid extends Grid<Litter> {
         setItemDetailsRenderer(new ComponentRenderer<>(item -> {
             StockGrid stockGrid = new StockGrid();
             stockGrid.setId(item.getId(), StockGrid.StockGridType.LITTER);
+
+            //if this is being viewed on a mobile device set the view style to tile otherwise set it to list 
+            stockGrid.setCurrentViewStyle(
+                mobileDevice
+                    ? StockSavedQuery.StockViewStyle.TILE
+                    : StockSavedQuery.StockViewStyle.LIST
+            );
+            stockGrid.setHeight("270px");
+            stockGrid.setShowViewStyleChoice(true);
             stockGrid.createGrid();
             Layout kitListLayoutForOffset = new Layout(stockGrid);
             kitListLayoutForOffset.addClassNames(Padding.Left.LARGE);
@@ -104,5 +119,39 @@ public class LitterGrid extends Grid<Litter> {
         dataProvider.refreshAll();
     }
 
+    @Override
+    protected void onAttach(AttachEvent attachEvent) {
+        super.onAttach(attachEvent);
+
+        // Initial width (non-deprecated approach)
+        attachEvent.getUI().getPage()
+                .executeJs("return window.innerWidth;")
+                .then(Integer.class, width -> {
+                    updateMobileFlag(width);
+                });
+
+        // Keep it updated when browser is resized
+        resizeRegistration = attachEvent.getUI().getPage()
+                .addBrowserWindowResizeListener(event -> {
+                    updateMobileFlag(event.getWidth());
+                });
+    }
+
+    @Override
+    protected void onDetach(DetachEvent detachEvent) {
+        if (resizeRegistration != null) {
+            resizeRegistration.remove();
+            resizeRegistration = null;
+        }
+        super.onDetach(detachEvent);
+    }
+
+    private void updateMobileFlag(int width) {
+        boolean isMobileNow = width < MOBILE_BREAKPOINT_PX;
+        if (this.mobileDevice != isMobileNow) {
+            this.mobileDevice = isMobileNow;
+            getDataProvider().refreshAll();
+        }
+    }
 
 }

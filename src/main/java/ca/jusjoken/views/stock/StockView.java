@@ -1,11 +1,9 @@
 package ca.jusjoken.views.stock;
 
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -17,6 +15,7 @@ import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentUtil;
+import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
@@ -27,7 +26,6 @@ import com.vaadin.flow.component.checkbox.CheckboxGroup;
 import com.vaadin.flow.component.checkbox.CheckboxGroupVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.contextmenu.MenuItem;
-import com.vaadin.flow.component.grid.ColumnTextAlign;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.Grid.Column;
 import com.vaadin.flow.component.grid.GridVariant;
@@ -58,9 +56,7 @@ import com.vaadin.flow.component.tabs.TabSheetVariant;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
-import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
-import com.vaadin.flow.data.renderer.NumberRenderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.BeforeEvent;
@@ -68,6 +64,7 @@ import com.vaadin.flow.router.HasDynamicTitle;
 import com.vaadin.flow.router.HasUrlParameter;
 import com.vaadin.flow.router.OptionalParameter;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.shared.Registration;
 import com.vaadin.flow.theme.lumo.LumoIcon;
 import com.vaadin.flow.theme.lumo.LumoUtility.AlignItems;
 import com.vaadin.flow.theme.lumo.LumoUtility.Border;
@@ -127,6 +124,7 @@ import ca.jusjoken.data.service.TaskService;
 import ca.jusjoken.views.MainLayout;
 import jakarta.annotation.security.PermitAll;
 
+
 @Route(value = "stock", layout = MainLayout.class)
 @PermitAll
 public class StockView extends Main implements ListRefreshNeededListener, HasDynamicTitle, HasUrlParameter<String> {
@@ -146,7 +144,8 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private String currentSavedQueryId = null;
     private Long stockListCountAll = 0L;
     private Long stockListCount = 0L;
-    private Grid<Stock> list = new Grid<>();
+    private StockGrid list = new StockGrid();
+    //private Grid<Stock> list = new Grid<>();
     private List<Column<Stock>> columnList;
     private GridLazyDataView<Stock> listDataView;
     private Stock selectedStock;
@@ -178,6 +177,9 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Integer selectedTabIndex = 0;
     private TaskGrid taskGrid = new TaskGrid();
     private LitterGrid litterGrid = new LitterGrid();
+    private boolean mobileDevice = false;
+    private static final int MOBILE_BREAKPOINT_PX = 768;   
+    private Registration resizeRegistration;
 
     public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockTypeService stockTypeService, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService, StockWeightHistoryService weightService, TaskService taskService) {
         this.stockRepository = stockRepository;
@@ -673,77 +675,17 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             listDataView.refreshItem(selectedStock);
         }
 
-        //build all views including column layouts
-        list.removeAllColumns();
-        if(currentStockSavedQuery==null){
-            list.addColumn(stockCardRenderer);
-        }else{
-            if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.LIST)){
-                list.setColumnReorderingAllowed(true);
-                list.addComponentColumn(stock -> {
-                    return stock.getnameAndPrefix(false,true, true);
-                }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name");
-                list.addComponentColumn(stock -> {
-                    if (stock.getBreeder()) {
-                        return new Icon(Utility.ICONS.TYPE_BREEDER.getIconSource());
-                    } else {
-                        return null;
-                    }
-                }).setHeader("Breeder").setResizable(true).setAutoWidth(true).setKey("breeder");   
+        list.setStockGridType(StockGrid.StockGridType.STOCK);
+        list.setCurrentViewStyle(currentStockSavedQuery.getViewStyle());
+        list.setCurrentStockSavedQuery(currentStockSavedQuery); 
+        list.setCurrentSearchName(currentSearchName);
 
-                list.addColumn(Stock::getBreed).setHeader("Breed").setResizable(true).setAutoWidth(true).setKey("breed");
-                list.addColumn(Stock::getChampNo).setHeader("ChampNo").setResizable(true).setAutoWidth(true).setKey("champno");
-                list.addColumn(Stock::getColor).setHeader("Colour").setResizable(true).setAutoWidth(true).setKey("color");
-                list.addColumn(Stock::getGenotype).setHeader("Genotype").setResizable(true).setAutoWidth(true).setKey("genotype");
-                list.addColumn(Stock::getLegs).setHeader("Legs").setResizable(true).setAutoWidth(true).setKey("legs");
-                list.addColumn(Stock::getNotes).setHeader("Notes").setResizable(true).setAutoWidth(true).setKey("notes");
-                list.addColumn(Stock::getRegNo).setHeader("RegNo").setResizable(true).setAutoWidth(true).setKey("regno");
-                list.addColumn(Stock::getStatus).setHeader("Status").setResizable(true).setAutoWidth(true).setKey("status");
-                list.addColumn(new LocalDateTimeRenderer<>(Stock::getStatusDate,"MM-dd-YYYY HHmm")).setHeader("Status Date").setResizable(true).setAutoWidth(true).setKey("statusdate");
-                list.addColumn(Stock::getTattoo).setHeader("Tattoo").setResizable(true).setAutoWidth(true).setKey("tattoo");
-                list.addColumn(Stock::getWeightInLbsOzAsString).setHeader("Weight").setResizable(true).setAutoWidth(true).setKey("weight");
-                list.addColumn(new LocalDateRenderer<>(Stock::getAcquired,"MM-dd-YYYY")).setHeader("Aquired").setResizable(true).setAutoWidth(true).setKey("aquired");
-                list.addColumn(new LocalDateRenderer<>(Stock::getDoB,"MM-dd-YYYY")).setHeader("DOB").setResizable(true).setAutoWidth(true).setKey("dob");
-                list.addColumn(stock -> {
-                    return stock.getAge().getAgeFormattedString();
-                }).setHeader("Age").setResizable(true).setAutoWidth(true).setKey("age");
-                list.addColumn(stock -> {
-                    Stock parent = stockService.getFather(stock);
-                    if(parent==null) return null;
-                    return parent.getDisplayName();
-                }).setHeader("Father").setResizable(true).setAutoWidth(true).setKey("father");
-                list.addColumn(stock -> {
-                    Stock parent = stockService.getMother(stock);
-                    if(parent==null) return null;
-                    return parent.getDisplayName();
-                }).setHeader("Mother").setResizable(true).setAutoWidth(true).setKey("mother");
-                list.addColumn(stock -> {return stockTypeService.getGenderForType(stock.getSex(), stock.getStockType());}).setHeader("Gender").setResizable(true).setAutoWidth(true).setKey("gender");
-                list.addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value");
-
-
-
-            }else if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.VALUE)){
-                List<Stock> currentStockList = stockService.listByExample(currentSearchName, currentStockSavedQuery);
-
-                list.setColumnReorderingAllowed(true);
-                list.addComponentColumn(stock -> {
-                    return stock.getnameAndPrefix(false,true, true);
-                }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name");
-                list.addColumn(Stock::getBreed).setHeader("Breed").setResizable(true).setAutoWidth(true).setKey("breed");
-                list.addColumn(Stock::getStatus).setHeader("Status").setResizable(true).setAutoWidth(true).setKey("status");
-                list.addColumn(new LocalDateTimeRenderer<>(Stock::getStatusDate,"MM-dd-YYYY HHmm")).setHeader("Status Date").setResizable(true).setAutoWidth(true).setKey("statusdate");
-                list.addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value").setFooter(getValueFooter(currentStockList)).setTextAlign(ColumnTextAlign.END);
-                //list.addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value");
-
-
-                //TODO: need invoice column and a Footer that totals Value column
-            }else{
-                list.addColumn(stockCardRenderer);
-            }
-        }
+        list.createGrid();
 
         columnList = getCleanColumnList(list.getColumns());
+        System.out.println("applyFilters: columnList:" + columnList);
         //retreive the visible columns and set them
+        System.out.println("applyFilters: setting visible columns to:" + currentStockSavedQuery.getVisibleColumnKeyList());
         if(!currentStockSavedQuery.getVisibleColumnKeyList().isEmpty()){
             for(Column<Stock> column: columnList){
                 list.getColumnByKey(column.getKey()).setVisible(currentStockSavedQuery.getVisibleColumnKeyList().contains(column.getKey()));
@@ -756,21 +698,6 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         sidebarSetValues();
     }
     
-    private String getValueFooter(List<Stock> currentStockList) {
-        // TODO Auto-generated method stub
-        System.out.println("getValueFooter: count:" + currentStockList.size());
-        Double totalValue = 0.0;
-        for (Stock item: currentStockList) {
-            totalValue = totalValue + item.getStockValue();
-        }
-        NumberFormat usFormat = NumberFormat.getCurrencyInstance(Locale.US);
-        return "Total value: " + usFormat.format(totalValue);
-    }
-
-/*     private void runBeforeClientResponse(SerializableConsumer<UI> command) {
-        getElement().getNode().runWhenAttached(ui -> ui.beforeClientResponse(this, context -> command.accept(ui)));
-    }        
- */    
     private Component createContent() {
         mdLayout.setSizeFull();
         mdLayout.setOrientation(Orientation.VERTICAL);
@@ -1258,9 +1185,17 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
     private LazyComponent createTabKits(Stock stock) {
         StockGrid stockGrid = new StockGrid();
-        stockGrid.setId(stock.getId(), StockGrid.StockGridType.STOCK);
-        stockGrid.setCurrentViewStyle(StockSavedQuery.StockViewStyle.TILE);
+        stockGrid.setId(stock.getId(), StockGrid.StockGridType.KITS);
+
+        //if this is being viewed on a mobile device set the view style to tile otherwise set it to list 
+        stockGrid.setCurrentViewStyle(
+            mobileDevice
+                ? StockSavedQuery.StockViewStyle.TILE
+                : StockSavedQuery.StockViewStyle.LIST
+        );
+
         stockGrid.setHeight("270px");
+        stockGrid.setShowViewStyleChoice(true);
         stockGrid.createGrid();
         Layout kitListLayoutForOffset = new Layout(stockGrid);
         //kitListLayoutForOffset.addClassNames(Padding.Left.LARGE);
@@ -1474,6 +1409,22 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
     @Override
     protected void onAttach(AttachEvent attachEvent) {
+        super.onAttach(attachEvent);
+
+        // Initial width (non-deprecated approach)
+        attachEvent.getUI().getPage()
+                .executeJs("return window.innerWidth;")
+                .then(Integer.class, width -> {
+                    updateMobileFlag(width);
+                });
+
+        // Keep it updated when browser is resized
+        resizeRegistration = attachEvent.getUI().getPage()
+                .addBrowserWindowResizeListener(event -> {
+                    updateMobileFlag(event.getWidth());
+                });
+
+
         ComponentUtil.addListener(attachEvent.getUI(), DialogCommonEvent.class, event ->{
             System.out.println("StockView: onAttach: Dialog Common event called: stock:" + event.getSource().getReturnStock());
             if(event.getSource().getReturnStock()!=null){
@@ -1482,7 +1433,23 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             applyFilters();
         });
     }
-    
+
+    @Override
+    protected void onDetach(DetachEvent detachEvent) {
+        if (resizeRegistration != null) {
+            resizeRegistration.remove();
+            resizeRegistration = null;
+        }
+        super.onDetach(detachEvent);
+    }
+
+    private void updateMobileFlag(int width) {
+        boolean isMobileNow = width < MOBILE_BREAKPOINT_PX;
+        if (this.mobileDevice != isMobileNow) {
+            this.mobileDevice = isMobileNow;
+            listRefreshNeeded();
+        }
+    }
 
     @Override
     public void listRefreshNeeded() {

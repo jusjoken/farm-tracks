@@ -1,15 +1,20 @@
 package ca.jusjoken.component;
 
+import java.text.NumberFormat;
 import java.util.List;
 import java.util.Locale;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Unit;
+import com.vaadin.flow.component.grid.ColumnTextAlign;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
+import com.vaadin.flow.component.grid.HeaderRow;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
@@ -44,12 +49,15 @@ public class StockGrid extends Grid<Stock>{
     private final StockTypeService stockTypeService;
     private final LitterService litterService;
     private StockSavedQuery.StockViewStyle currentViewStyle = StockSavedQuery.StockViewStyle.LIST;
+    private Boolean showViewStyleChoice = false;
+    private StockSavedQuery currentStockSavedQuery;
+    private String currentSearchName;
 
     public static enum StockGridType {
-        LITTER, STOCK
+        LITTER, STOCK, KITS
     }
 
-    private StockGridType stockGridType = StockGridType.STOCK;
+    private StockGridType stockGridType = StockGridType.KITS;
 
     public StockGrid() {
         super(Stock.class, false);
@@ -59,9 +67,8 @@ public class StockGrid extends Grid<Stock>{
     }
 
     public void createGrid() {
-        System.out.println("Creating StockGrid with stockId: " + stockId + " and litterId: " + litterId);
         //only configure grid after stockId or litterId is set and stockType is determined
-        if(stockId != null || litterId != null){
+        if(stockId != null || litterId != null || stockGridType == StockGridType.STOCK){
             configureGrid();
             refreshGrid();
         }
@@ -69,43 +76,96 @@ public class StockGrid extends Grid<Stock>{
 
     private void configureGrid() {
         removeAllColumns();
+        clearAllHeaderRows();
+
         if(null == currentViewStyle){
             configureListView(); // Default to list view if style is unrecognized
         }else // Configuration logic for the KitGrid
-        switch (currentViewStyle) {
-            case LIST -> configureListView();
-            case TILE -> configureTileView();
-            case VALUE -> configureValueView();
-            default -> configureListView(); // Default to list view if style is unrecognized
+            switch (currentViewStyle) {
+                case LIST -> configureListView();
+                case TILE -> configureTileView();
+                case VALUE -> configureValueView();
+                default -> configureListView(); // Default to list view if style is unrecognized
+        }
+
+        if(showViewStyleChoice){
+            addViewStyleHeaderRow();
         }
         //refreshGrid();
 
     }
 
+    private void clearAllHeaderRows() {
+        while (!getHeaderRows().isEmpty()) {
+            removeHeaderRow(getHeaderRows().get(0));
+        }
+    }
+
     private void configureValueView() {
-        System.out.println("Configuring Value View for StockGrid with stockId: " + stockId + " and litterId: " + litterId);
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'configureValueView'");
-    }
-
-    private void configureTileView() {
-        System.out.println("Configuring Tile View for StockGrid with stockId: " + stockId + " and litterId: " + litterId);
-        addColumn(stockCardRenderer);
-    }
-
-    private void configureListView() {
-        System.out.println("Configuring StockGrid with stockId: " + stockId + " and litterId: " + litterId);
-        //setDataProvider();
-        // Additional configuration such as columns, themes, etc.
-        addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
-        //setHeight("270px");
+        setColumnReorderingAllowed(true);
         addComponentColumn(stockEntity -> {
             return stockEntity.getnameAndPrefix(false,true, true);
         }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name");
         addColumn(Stock::getBreed).setHeader("Breed").setResizable(true).setAutoWidth(true).setKey("breed");
+        addColumn(Stock::getStatus).setHeader("Status").setResizable(true).setAutoWidth(true).setKey("status");
+        addColumn(new LocalDateTimeRenderer<>(Stock::getStatusDate,"MM-dd-YYYY HHmm")).setHeader("Status Date").setResizable(true).setAutoWidth(true).setKey("statusdate");
+        addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value").setFooter(getValueFooter()).setTextAlign(ColumnTextAlign.END);
+
+    }
+
+    private String getValueFooter() {
+        List<Stock> currentStockList;
+        if(stockGridType == StockGridType.STOCK){
+            currentStockList = stockService.listByExample(currentSearchName, currentStockSavedQuery);
+        } else {
+            currentStockList = dataProvider.getItems().stream().toList();
+        }
+
+        System.out.println("getValueFooter: count:" + currentStockList.size());
+        Double totalValue = 0.0;
+        for (Stock item: currentStockList) {
+            totalValue = totalValue + item.getStockValue();
+        }
+        NumberFormat usFormat = NumberFormat.getCurrencyInstance(Locale.US);
+        return "Total value: " + usFormat.format(totalValue);
+    }
+
+
+
+    private void configureTileView() {
+        addColumn(stockCardRenderer);
+    }
+
+    private void configureListView() {
+        //setDataProvider();
+        // Additional configuration such as columns, themes, etc.
+        addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
+        //setHeight("270px");
+        setColumnReorderingAllowed(true);
+        addComponentColumn(stockEntity -> {
+            return stockEntity.getnameAndPrefix(false,true, true);
+        }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name");
+
+        if(stockGridType == StockGridType.STOCK){
+            addComponentColumn(stockEntity -> {
+                        if (stockEntity.getBreeder()) {
+                            return new Icon(Utility.ICONS.TYPE_BREEDER.getIconSource());
+                        } else {
+                            return null;
+                        }
+                    }).setHeader("Breeder").setResizable(true).setAutoWidth(true).setKey("breeder");   
+        }
+
+        addColumn(Stock::getBreed).setHeader("Breed").setResizable(true).setAutoWidth(true).setKey("breed");
         addColumn(Stock::getColor).setHeader("Colour").setResizable(true).setAutoWidth(true).setKey("color");
         addColumn(Stock::getGenotype).setHeader("Genotype").setResizable(true).setAutoWidth(true).setKey("genotype");
-        addColumn(Stock::getNotes).setHeader("Notes").setResizable(true).setAutoWidth(true).setKey("notes");
+
+        if(stockGridType == StockGridType.STOCK){
+            addColumn(Stock::getChampNo).setHeader("ChampNo").setResizable(true).setAutoWidth(true).setKey("champno");
+            addColumn(Stock::getLegs).setHeader("Legs").setResizable(true).setAutoWidth(true).setKey("legs");
+            addColumn(Stock::getRegNo).setHeader("RegNo").setResizable(true).setAutoWidth(true).setKey("regno");
+        }
+
         addColumn(Stock::getStatus).setHeader("Status").setResizable(true).setAutoWidth(true).setKey("status");
         addColumn(new LocalDateTimeRenderer<>(Stock::getStatusDate,"MM-dd-YYYY HHmm")).setHeader("Status Date").setResizable(true).setAutoWidth(true).setKey("statusdate");
         addColumn(Stock::getTattoo).setHeader("Tattoo").setResizable(true).setAutoWidth(true).setKey("tattoo");
@@ -127,12 +187,13 @@ public class StockGrid extends Grid<Stock>{
         }).setHeader("Mother").setResizable(true).setAutoWidth(true).setKey("mother");
         addColumn(stockEntity -> {return stockTypeService.getGenderForType(stockEntity.getSex(), stockEntity.getStockType());}).setHeader("Gender").setResizable(true).setAutoWidth(true).setKey("gender");
         addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value");
+        addColumn(Stock::getNotes).setHeader("Notes").setResizable(true).setAutoWidth(true).setKey("notes");
 
     }
 
     private final ComponentRenderer<Component, Stock> stockCardRenderer = new ComponentRenderer<>(
-            stock -> {
-                return createListItemLayout(stock);
+            stockEntity -> {
+                return createListItemLayout(stockEntity);
             });    
 
     private Layout createListItemLayout(Stock stock) {
@@ -260,8 +321,7 @@ public class StockGrid extends Grid<Stock>{
     }
 
     public void setId(Integer id, StockGridType stockGridType) {
-        System.out.println("Setting ID for StockGrid: " + id + " with StockGridType: " + stockGridType);
-        if(stockGridType == StockGridType.STOCK){
+        if(stockGridType == StockGridType.KITS){
             this.stockId = id;
             this.litterId = null; // Clear litterId when stockId is set
         } else if (stockGridType == StockGridType.LITTER) {
@@ -269,30 +329,27 @@ public class StockGrid extends Grid<Stock>{
             this.stockId = null; // Clear stockId when litterId is set
         }
         setStockValues();
-        System.out.println("Stock values set for StockGrid with stockId: " + stockId + " and litterId: " + litterId);
     }
 
     private void setStockGridDataProvider() {
-        System.out.println("Setting data provider for StockGrid with stockId: " + stockId + " and litterId: " + litterId);
         if(stockId != null){
-            System.out.println("Fetching stock for stockId: " + stockId + " stock: " + stock);
             dataProvider = new ListDataProvider<>(stockService.getKitsForParent(stock));
+            super.setDataProvider(dataProvider);
         } else if (litterId != null) {
-            System.out.println("Fetching stock for litterId: " + litterId);
             dataProvider = new ListDataProvider<>(stockService.getKitsForLitter(litterId));
+            super.setDataProvider(dataProvider);
         }else{
-            dataProvider = new ListDataProvider<>(List.of());
+            //dataProvider = new ListDataProvider<>(getListDataView().getItems().collect(Collectors.toList()));
+            //super.setDataProvider(dataProvider);
         }
-        System.out.println("Data provider set with " + dataProvider.getItems().size() + " items for StockGrid with stockId: " + stockId + " and litterId: " + litterId);
-
-        // IMPORTANT: bind provider to Vaadin Grid
-        super.setDataProvider(dataProvider);
 
     }
 
     public void refreshGrid() {
         setStockGridDataProvider();
-        dataProvider.refreshAll();
+        if(stockGridType != StockGridType.STOCK){
+            dataProvider.refreshAll();
+        }
     }
 
     public StockGridType getStockGridType() {
@@ -310,5 +367,76 @@ public class StockGrid extends Grid<Stock>{
     public void setCurrentViewStyle(StockSavedQuery.StockViewStyle currentViewStyle) {
         this.currentViewStyle = currentViewStyle;
     }
-    
+
+    private void addViewStyleHeaderRow() {
+        if (getColumns().isEmpty()) {
+            return;
+        }
+
+        Select<StockSavedQuery.StockViewStyle> viewStyleSelect = new Select<>();
+        viewStyleSelect.setWidth("100px");
+        viewStyleSelect.setItems(StockSavedQuery.StockViewStyle.values());
+        viewStyleSelect.setItemLabelGenerator(style -> style.getShortName());
+        viewStyleSelect.setValue(currentViewStyle != null ? currentViewStyle : StockSavedQuery.StockViewStyle.LIST);
+
+        viewStyleSelect.addValueChangeListener(event -> {
+            if (!event.isFromClient() || event.getValue() == null || event.getValue() == currentViewStyle) {
+                return;
+            }
+            currentViewStyle = event.getValue();
+            configureGrid();
+            refreshGrid();
+        });
+
+        HorizontalLayout rightAlignedHeader = new HorizontalLayout(new Span("View Style: "), viewStyleSelect);
+        rightAlignedHeader.setWidthFull();
+        rightAlignedHeader.setPadding(false);
+        rightAlignedHeader.setSpacing(false);
+        rightAlignedHeader.setJustifyContentMode(HorizontalLayout.JustifyContentMode.START);
+        rightAlignedHeader.setAlignItems(HorizontalLayout.Alignment.BASELINE);
+
+        // Ensure first-created/default header row exists (cannot be joined).
+        if (getHeaderRows().isEmpty()) {
+            HeaderRow baseHeaderRow = appendHeaderRow();
+            for (Grid.Column<Stock> column : getColumns()) {
+                baseHeaderRow.getCell(column).setText("");
+            }
+        }
+
+        // Top-most control row.
+        HeaderRow controlHeaderRow = prependHeaderRow();
+        Grid.Column<Stock>[] columns = getColumns().toArray(new Grid.Column[0]);
+
+        if (columns.length == 1) {
+            controlHeaderRow.getCell(columns[0]).setComponent(rightAlignedHeader);
+        } else {
+            controlHeaderRow.join(columns).setComponent(rightAlignedHeader);
+        }
+        System.out.println("Added view style header row: row count: " + getHeaderRows().size());
+    }
+
+    public Boolean getShowViewStyleChoice() {
+        return showViewStyleChoice;
+    }
+
+    public void setShowViewStyleChoice(Boolean showViewStyleChoice) {
+        this.showViewStyleChoice = showViewStyleChoice;
+    }
+
+    public StockSavedQuery getCurrentStockSavedQuery() {
+        return currentStockSavedQuery;
+    }
+
+    public void setCurrentStockSavedQuery(StockSavedQuery currentStockSavedQuery) {
+        this.currentStockSavedQuery = currentStockSavedQuery;
+    }
+
+    public String getCurrentSearchName() {
+        return currentSearchName;
+    }
+
+    public void setCurrentSearchName(String currentSearchName) {
+        this.currentSearchName = currentSearchName;
+    }
+
 }
