@@ -72,4 +72,8 @@ public class LitterService {
     public List<Litter> getAllLitters() {
         return litterRepository.findAll();
     }
+
+    public List<Litter> getAllLitters(StockType stockType) {
+        return litterRepository.findAllByStockType(stockType);
+    }
 }

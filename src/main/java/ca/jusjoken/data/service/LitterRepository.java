@@ -43,5 +43,7 @@ public interface LitterRepository extends JpaRepository<Litter, Integer>  {
     
     public void deleteByFatherId(Integer stockId);
     public void deleteByMotherId(Integer stockId);
+
+    public List<Litter> findAllByStockType(StockType stockType);
     
 }

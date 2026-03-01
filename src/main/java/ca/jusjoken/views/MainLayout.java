@@ -55,6 +55,7 @@ import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.views.stock.StockPedigreeEditor;
 import ca.jusjoken.views.stock.StockTypeView;
 import ca.jusjoken.views.stock.StockView;
+import ca.jusjoken.views.utility.LitterListView;
 import ca.jusjoken.views.utility.MaintenanceView;
 import ca.jusjoken.views.utility.PlanTemplateView;
 import ca.jusjoken.views.utility.TaskListView;
@@ -270,6 +271,12 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
 
         }
         
+
+        if(accessChecker.hasAccess(LitterListView.class)){
+            SideNavItem sn = new SideNavItem("Litters", LitterListView.class);
+            nav.addItem(sn);
+            sn.setPrefixComponent(FontAwesome.Solid.LIST_SQUARES.create());
+        }
 
         if(accessChecker.hasAccess(StockPedigreeEditor.class)){
             SideNavItem sn = new SideNavItem("Pedigree Manager", StockPedigreeEditor.class, "");

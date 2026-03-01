@@ -12,10 +12,14 @@ import java.util.Objects;
 
 import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
+import com.vaadin.flow.component.html.Span;
 
+import ca.jusjoken.component.Badge;
+import ca.jusjoken.component.Layout;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.service.LocalDateCsvConverter;
 import ca.jusjoken.data.service.LocalDateTimeCsvConverter;
+import ca.jusjoken.utility.BadgeVariant;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -361,6 +365,49 @@ public class Litter {
     public void setStockType(StockType stockType) {
         this.stockType = stockType;
     }
+
+    public Badge getActiveBadge() {
+        Badge badge = new Badge(getActive() ? "Active" : "Archived");
+        badge.addThemeVariants(BadgeVariant.SMALL);
+        if(getActive()){
+            badge.addThemeVariants(BadgeVariant.SUCCESS);
+        }else{
+            badge.addThemeVariants(BadgeVariant.ERROR);
+        }
+        return badge;
+    }
+
+    public Layout getnameAndPrefix(Boolean columnBased, Boolean includeEmptyPrefix, Boolean includeGenderIcon){
+        Layout nameAndPrefix = new Layout();
+        if(columnBased){
+            nameAndPrefix.setFlexDirection(Layout.FlexDirection.COLUMN);
+            nameAndPrefix.setAlignItems(Layout.AlignItems.START);
+        }else{
+            nameAndPrefix.setFlexDirection(Layout.FlexDirection.ROW);
+            nameAndPrefix.setAlignItems(Layout.AlignItems.CENTER);
+        }
+
+        if(includeEmptyPrefix){
+            Badge badge = new Badge(Utility.EMPTY_VALUE);
+            if(!getPrefix().isEmpty()){
+                badge.setText(getPrefix());
+            }
+            badge.addThemeVariants(BadgeVariant.PILL, BadgeVariant.SMALL);
+            nameAndPrefix.add(badge);
+        }else{
+            if(!getPrefix().isEmpty()){
+                Badge badge = new Badge(getPrefix());
+                badge.addThemeVariants(BadgeVariant.PILL, BadgeVariant.SMALL);
+                nameAndPrefix.add(badge);
+            }
+        }
+        Span stockName = new Span(getName());
+        stockName.addClassNames("stock-name-responsive");
+        
+        nameAndPrefix.add(stockName);
+        return nameAndPrefix;
+    }
+
 
     @Override
     public String toString() {
