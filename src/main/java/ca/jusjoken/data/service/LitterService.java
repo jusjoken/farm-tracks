@@ -30,9 +30,13 @@ public class LitterService {
     public List<Litter> getLitters(Stock stock){
         if(!stock.getBreeder() || stock.getSex().equals(Utility.Gender.NA)) return List.of();
         if(stock.getSex().equals(Utility.Gender.FEMALE)){
-            return litterRepository.findByMotherId(stock.getId());
+            List<Litter> litters = litterRepository.findByMotherId(stock.getId());
+            Collections.sort(litters, new LitterComparator().reversed());
+            return litters;
         }else{ //male
-            return litterRepository.findByFatherId(stock.getId());
+            List<Litter> litters = litterRepository.findByFatherId(stock.getId());
+            Collections.sort(litters, new LitterComparator().reversed());
+            return litters;
         }
         
     }
@@ -70,10 +74,14 @@ public class LitterService {
     }
 
     public List<Litter> getAllLitters() {
-        return litterRepository.findAll();
+        List<Litter> litters = litterRepository.findAll();
+        Collections.sort(litters, new LitterComparator().reversed());
+        return litters;
     }
 
     public List<Litter> getAllLitters(StockType stockType) {
-        return litterRepository.findAllByStockType(stockType);
+        List<Litter> litters = litterRepository.findAllByStockType(stockType);
+        Collections.sort(litters, new LitterComparator().reversed());
+        return litters;
     }
 }

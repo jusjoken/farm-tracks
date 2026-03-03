@@ -1,5 +1,7 @@
 package ca.jusjoken.views.utility;
 
+import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.html.Main;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.select.Select;
@@ -7,6 +9,7 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.shared.Registration;
 
 import ca.jusjoken.component.ListRefreshNeededListener;
 import ca.jusjoken.component.LitterGrid;
@@ -21,6 +24,9 @@ import jakarta.annotation.security.PermitAll;
 public class LitterListView extends Main implements ListRefreshNeededListener{
     private final LitterGrid litterGrid = new LitterGrid();
     private final StockTypeService stockTypeService;
+    private boolean mobileDevice = false;
+    private static final int MOBILE_BREAKPOINT_PX = 768;   
+    private Registration resizeRegistration;
 
     public LitterListView(StockTypeService stockTypeService) {
         this.stockTypeService = stockTypeService;
@@ -75,11 +81,11 @@ public class LitterListView extends Main implements ListRefreshNeededListener{
         displayModeSelect.setValue(LitterGrid.LitterDisplayMode.ALL);
 
         HorizontalLayout filterLayout = new HorizontalLayout();
-        filterLayout.setPadding(false);
+        filterLayout.setPadding(true);
         filterLayout.setSpacing(true);
         filterLayout.setWidthFull();
         filterLayout.getStyle().set("flex", "0 0 auto");
-        filterLayout.add(stockTypeSelect, parentFilter, displayModeSelect);
+        filterLayout.add(parentFilter, stockTypeSelect, displayModeSelect);
         add(filterLayout);
 
         parentFilter.setAutofocus(true);
@@ -92,12 +98,58 @@ public class LitterListView extends Main implements ListRefreshNeededListener{
         litterGrid.getStyle().set("flex", "1 1 auto");
         litterGrid.getStyle().set("min-height", "0");
 
-        litterGrid.refreshGrid();
+        litterGrid.createGrid();
+        System.out.println("LitterListView initialized. Grid created with view style: " + litterGrid.getCurrentViewStyle() + " MobileDevice: " + mobileDevice  );
+    }
+
+    private void updateMobileFlag(int width) {
+        boolean isMobileNow = width < MOBILE_BREAKPOINT_PX;
+        System.out.println("Window width: " + width + "px. Mobile breakpoint: " + MOBILE_BREAKPOINT_PX + "px. isMobileNow: " + isMobileNow);
+        if (this.mobileDevice != isMobileNow) {
+            this.mobileDevice = isMobileNow;
+            System.out.println("Mobile device flag updated to: " + mobileDevice + " calling listRefreshNeeded to update grid view style.");
+            listRefreshNeeded();
+        }
+    }
+
+    
+    @Override
+    protected void onAttach(AttachEvent attachEvent) {
+        super.onAttach(attachEvent);
+        // Initial width (non-deprecated approach)
+        attachEvent.getUI().getPage()
+                .executeJs("return window.innerWidth;")
+                .then(Integer.class, width -> {
+                    updateMobileFlag(width);
+                });
+
+        // Keep it updated when browser is resized
+        resizeRegistration = attachEvent.getUI().getPage()
+                .addBrowserWindowResizeListener(event -> {
+                    updateMobileFlag(event.getWidth());
+                });
+    }
+
+    @Override
+    protected void onDetach(DetachEvent detachEvent) {
+        if (resizeRegistration != null) {
+            resizeRegistration.remove();
+            resizeRegistration = null;
+        }
+        super.onDetach(detachEvent);
     }
 
     @Override
     public void listRefreshNeeded() {
-        litterGrid.refreshGrid();
+        System.out.println("listRefreshNeeded. MobileDevice: " + mobileDevice );
+        if(mobileDevice){
+            litterGrid.setCurrentViewStyle(LitterGrid.LitterViewStyle.TILE);
+        } else {
+            litterGrid.setCurrentViewStyle(LitterGrid.LitterViewStyle.LIST);
+        }
+        System.out.println("listRefreshNeeded. CurrentViewStyle: " + litterGrid.getCurrentViewStyle());
+
+        litterGrid.createGrid();
     }
 
 }

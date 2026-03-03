@@ -628,7 +628,8 @@ public class Stock {
         if (getWeight() > 0) {
             return Utility.getInstance().WeightConverterOzToString(getWeight());
         }
-        return Utility.EMPTY_VALUE;
+        return "No weight";
+        // return Utility.EMPTY_VALUE;
     }
 
     public Boolean getNeedsSaving() {
@@ -894,7 +895,11 @@ public class Stock {
         if(getProfileFile()!=null){
             avatar.setImageHandler(DownloadHandler.forFile(getProfileFile()));
         }
-        UIUtilities.setBorders(avatar, this, UIUtilities.BorderSize.LARGE);
+        if(largeBorder){
+             UIUtilities.setBorders(avatar, this, UIUtilities.BorderSize.LARGE);
+        }else{
+             UIUtilities.setBorders(avatar, this, UIUtilities.BorderSize.SMALL);
+        }
         return avatarDiv;
     }
     

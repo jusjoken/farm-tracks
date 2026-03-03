@@ -50,7 +50,7 @@ public class TaskGrid extends Grid<Task> {
     }
 
     private void configureGrid() {
-        System.out.println("Configuring TaskGrid with stockId: " + stockId);
+        // System.out.println("Configuring TaskGrid with stockId: " + stockId);
 
         setDataProvider();
         addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
@@ -166,7 +166,7 @@ public class TaskGrid extends Grid<Task> {
     }    
 
     private void updateCompletionFilter(String filterValue) {
-        System.out.println("Updating completion filter to: " + filterValue);
+        // System.out.println("Updating completion filter to: " + filterValue);
         dataProvider.clearFilters();
         if (Utility.TaskCompletionFilter.COMPLETED.filterName.equals(filterValue)) {
             dataProvider.addFilter(Task::getCompleted);
@@ -176,12 +176,12 @@ public class TaskGrid extends Grid<Task> {
     }
 
     private void updateSortOrder(){
-            System.out.println("Re-applying sort order after data provider refresh");
+            //System.out.println("Re-applying sort order after data provider refresh");
             this.sort(List.of(new GridSortOrder<>(dateColumn, SortDirection.ASCENDING)));
     }
 
     private void setDataProvider() {
-        System.out.println("Setting data provider for TaskGrid with stockId: " + stockId);
+        // System.out.println("Setting data provider for TaskGrid with stockId: " + stockId);
         if(stockId != null){
             dataProvider = new ListDataProvider<>(taskService.findByStockId(stockId));
         } else {
@@ -191,7 +191,7 @@ public class TaskGrid extends Grid<Task> {
     }
 
     public void refreshGrid() {
-        System.out.println("Refreshing TaskGrid with stockId: " + stockId);
+        // System.out.println("Refreshing TaskGrid with stockId: " + stockId);
         setDataProvider();
         // re-apply filter after data provider is recreated
         updateCompletionFilter(currentCompletionFilter);

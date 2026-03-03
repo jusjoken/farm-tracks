@@ -4,9 +4,6 @@
  */
 package ca.jusjoken;
 
-import ca.jusjoken.component.ButtonNumberField;
-import ca.jusjoken.data.Utility;
-import ca.jusjoken.data.entity.Stock;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.button.Button;
@@ -21,6 +18,10 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.textfield.TextFieldVariant;
+
+import ca.jusjoken.component.ButtonNumberField;
+import ca.jusjoken.data.Utility;
+import ca.jusjoken.data.entity.Stock;
 
 /**
  *
@@ -215,6 +216,16 @@ public class UIUtilities {
         }
         */
         component.getStyle().set("border-style", "solid");
+    }
+
+    public static void setCardBorders(Component component, Stock stock){
+        if(stock.getSex().equals(Utility.Gender.FEMALE)){
+            component.getStyle().set("--vaadin-card-border-color", UIUtilities.borderColorFemale);
+        }else if(stock.getSex().equals(Utility.Gender.MALE)){
+            component.getStyle().set("--vaadin-card-border-color", UIUtilities.borderColorMale);
+        }else{
+            component.getStyle().set("--vaadin-card-border-color", UIUtilities.borderColorNA);
+        }
     }
     
 }

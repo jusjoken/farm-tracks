@@ -251,7 +251,11 @@ public class StockSavedQuery {
     }
 
     public void setVisibleColumns(String visibleColumns) {
-        this.visibleColumns = visibleColumns;
+        if(visibleColumns!=null && visibleColumns.isEmpty()){
+            this.visibleColumns = null;
+        }else{  
+            this.visibleColumns = visibleColumns;
+        }
     }
 
     public List<String> getVisibleColumnKeyList(){

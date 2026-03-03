@@ -94,15 +94,15 @@ public class StockService {
         stock.setStockType(savedQuery.getStockType());
         stock.setBreeder(savedQuery.getBreeder());
         if(savedQuery.getStockStatus().getName().equals("active")){
-            System.out.println("getExample: stockStatus Active selected");
+            // System.out.println("getExample: stockStatus Active selected");
             stock.setActive(Boolean.TRUE);
             stock.setStatus("active");
         }else if(savedQuery.getStockStatus().getName().equals("inactive")){
-            System.out.println("getExample: stockStatus Inactive selected");
+            // System.out.println("getExample: stockStatus Inactive selected");
             stock.setActive(Boolean.FALSE);
             stock.setStatus(null);
         }else if(savedQuery.getStockStatus().getName().equals("all")){
-            System.out.println("getExample: stockStatus All selected");
+            // System.out.println("getExample: stockStatus All selected");
             stock.setActive(null);
             stock.setStatus(null);
 
@@ -113,7 +113,7 @@ public class StockService {
             stock.setStatus(savedQuery.getStockStatus().getName());
             stock.setActive(null);
         }
-        System.out.println("getExample: stock:" + stock);
+        // System.out.println("getExample: stock:" + stock);
         
         // Create a custom ExampleMatcher
         ExampleMatcher matcher = matchingAll()
@@ -141,14 +141,14 @@ public class StockService {
         Instant start = Instant.now();
 
         Pageable newPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),getSort(savedQuery));
-        System.out.println("findStockWithCustomMatcher: pageNumber:" + pageable.getPageNumber() + " pageSize:" + pageable.getPageSize());
+        // System.out.println("findStockWithCustomMatcher: pageNumber:" + pageable.getPageNumber() + " pageSize:" + pageable.getPageSize());
         Page<Stock> page = stockRepository.findAll(getExample(name, savedQuery), newPageable);
         List<Stock> returnList = page.getContent();
         //System.out.println("findStockWithCustomMatcher: first stock item:" + returnList.get(0));
         
         Instant end = Instant.now();
         Duration duration = Duration.between(start, end);
-        System.out.println("***Stock query time:" + duration.toMillis() + " milliseconds");
+        // System.out.println("***Stock query time:" + duration.toMillis() + " milliseconds");
         return returnList;
     }
 

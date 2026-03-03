@@ -2,12 +2,8 @@ package ca.jusjoken.views.stock;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import org.springframework.data.domain.Sort;
 
@@ -21,16 +17,10 @@ import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.checkbox.Checkbox;
-import com.vaadin.flow.component.checkbox.CheckboxGroup;
-import com.vaadin.flow.component.checkbox.CheckboxGroupVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.contextmenu.MenuItem;
 import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.grid.Grid.Column;
 import com.vaadin.flow.component.grid.GridVariant;
-import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
-import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
 import com.vaadin.flow.component.grid.dataview.GridLazyDataView;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
@@ -43,8 +33,6 @@ import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout;
 import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout.Orientation;
 import com.vaadin.flow.component.menubar.MenuBar;
-import com.vaadin.flow.component.orderedlayout.FlexComponent;
-import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -82,7 +70,6 @@ import com.vaadin.flow.theme.lumo.LumoUtility.Padding;
 import com.vaadin.flow.theme.lumo.LumoUtility.Position;
 
 import ca.jusjoken.UIUtilities;
-import ca.jusjoken.component.AvatarDiv;
 import ca.jusjoken.component.ComponentConfirmEvent;
 import ca.jusjoken.component.DialogCommon;
 import ca.jusjoken.component.DialogCommonEvent;
@@ -93,6 +80,7 @@ import ca.jusjoken.component.LazyComponent;
 import ca.jusjoken.component.ListRefreshNeededListener;
 import ca.jusjoken.component.LitterGrid;
 import ca.jusjoken.component.PlanEditor;
+import ca.jusjoken.component.SidebarChangedListener;
 import ca.jusjoken.component.StatusEditor;
 import ca.jusjoken.component.StockDetailsFormLayout;
 import ca.jusjoken.component.StockGrid;
@@ -110,7 +98,6 @@ import ca.jusjoken.data.entity.StockSavedQuery.StockViewStyle;
 import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.entity.StockWeightHistory;
-import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.StockRepository;
 import ca.jusjoken.data.service.StockSavedQueryService;
@@ -127,7 +114,7 @@ import jakarta.annotation.security.PermitAll;
 
 @Route(value = "stock", layout = MainLayout.class)
 @PermitAll
-public class StockView extends Main implements ListRefreshNeededListener, HasDynamicTitle, HasUrlParameter<String> {
+public class StockView extends Main implements ListRefreshNeededListener, SidebarChangedListener, HasDynamicTitle, HasUrlParameter<String> {
 
     private final StockRepository stockRepository;
     private final StockTypeRepository stockTypeRepository;
@@ -146,7 +133,6 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Long stockListCount = 0L;
     private StockGrid list = new StockGrid();
     //private Grid<Stock> list = new Grid<>();
-    private List<Column<Stock>> columnList;
     private GridLazyDataView<Stock> listDataView;
     private Stock selectedStock;
     private Section sidebar;
@@ -172,7 +158,6 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private RadioButtonGroup<String> sort1Direction = new RadioButtonGroup<>();
     private Select<ColumnName> stockSort2Column = new Select<>();
     private RadioButtonGroup<String> sort2Direction = new RadioButtonGroup<>();
-    private Select<StockViewStyle> stockViewStyleChoice = new Select<>();
     private Boolean skipSidebarUpdates = Boolean.FALSE;
     private Integer selectedTabIndex = 0;
     private TaskGrid taskGrid = new TaskGrid();
@@ -217,6 +202,8 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         genotypeEditor.addListener(this);
         taskEditor.addListener(this);
         planEditor.addListener(this);
+        list.addListener(this);
+        list.addSidebarChangedListener(this);
     }
 
     private Hr createHr() {
@@ -374,26 +361,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         sortForm.addClassNames(Padding.Horizontal.LARGE);
         sortForm.setFlexDirection(Layout.FlexDirection.COLUMN);
 
-        stockViewStyleChoice.setAriaLabel("View Style");
-        stockViewStyleChoice.setLabel("View Style");
-        stockViewStyleChoice.addClassNames(MinWidth.NONE, Padding.Top.MEDIUM);
-        stockViewStyleChoice.setItemLabelGenerator(StockViewStyle::getShortName);
-        stockViewStyleChoice.addValueChangeListener(event -> {
-            currentStockSavedQuery.setViewStyle(event.getValue());
-            sidebarChanged(Boolean.TRUE);
-        });
-        List<StockViewStyle> styleList = Stream.of(StockViewStyle.values()).collect(Collectors.toList());
-        stockViewStyleChoice.setItems(styleList);
-        if(currentStockSavedQuery!=null){
-            stockViewStyleChoice.setValue(currentStockSavedQuery.getViewStyle());
-        }
-
-        Layout styleForm = new Layout(stockViewStyleChoice);
-
-        styleForm.addClassNames(Padding.Horizontal.LARGE);
-        styleForm.setFlexDirection(Layout.FlexDirection.COLUMN);
-        
-        this.sidebar = new Section(header, createSectionHeader("Filter options", false), filterForm, createSectionHeader("Sort options", true), sortForm, styleForm);
+        this.sidebar = new Section(header, createSectionHeader("Filter options", false), filterForm, createSectionHeader("Sort options", true), sortForm);
         this.sidebar.addClassNames("backdrop-blur-3xl", "var(--lumo-tint-90pct)", Border.RIGHT,
                 Display.FLEX, FlexDirection.COLUMN, Position.ABSOLUTE, "lg:static", "bottom-1", "top-0",
                 "transition-all", "z-10");
@@ -432,24 +400,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         if(currentStockSavedQuery.getSort2()!=null){
             sort2Direction.setValue(currentStockSavedQuery.getSort2Direction());
         }
-        stockViewStyleChoice.setValue(currentStockSavedQuery.getViewStyle());
         skipSidebarUpdates = Boolean.FALSE;
-    }
-    
-    private void sidebarChanged(Boolean changed){
-        if(skipSidebarUpdates){
-        }else{
-            currentStockSavedQuery.setDirty(changed);
-            currentStockSavedQuery.setNeedsSaving(changed);
-            applyOptionsButton.setEnabled(changed);
-            saveOptionsButton.setEnabled(changed);
-            resetOptionsButton.setEnabled(changed);
-            if(currentSavedQueryId.equals("0")){
-                deleteOptionsButton.setEnabled(false);
-            }else{
-                deleteOptionsButton.setEnabled(true);
-            }
-        }
     }
     
     //call one time to configure save options dialog
@@ -473,8 +424,15 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         saveQueryDialog.addConfirmListener(event -> {
             //save the item
             if(currentStockSavedQuery.getSavedQueryName().equals(saveQueryName.getValue())){
-                //set the visiblecolumns for the saved query
-                currentStockSavedQuery.setVisibleColumns(String.join(",", getVisibleColumnKeys()));
+                //get the viewStyle from the StockGrid and set it to the currentStockSavedQuery
+                currentStockSavedQuery.setViewStyle(list.getCurrentViewStyle());
+
+                //set the visiblecolumns for the saved query if not a Tile view
+                if(!list.getCurrentViewStyle().equals(StockViewStyle.TILE)){
+                    currentStockSavedQuery.setVisibleColumns(String.join(",", list.getVisibleColumnKeys()));
+                }else{
+                    currentStockSavedQuery.setVisibleColumns(null);
+                }
 
                 UIUtilities.showNotification("Saving current query overwritting:id:" + currentStockSavedQuery.getId() + " :" + currentStockSavedQuery.getSavedQueryName());
                 //save the currentStockSavedQuery to the database
@@ -485,6 +443,15 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
                 applyFilters();
                 sidebarChanged(Boolean.FALSE);
             }else{
+                //get the viewStyle from the StockGrid and set it to the currentStockSavedQuery
+                currentStockSavedQuery.setViewStyle(list.getCurrentViewStyle());
+
+                //set the visiblecolumns for the saved query
+                if(!list.getCurrentViewStyle().equals(StockViewStyle.TILE)){
+                    currentStockSavedQuery.setVisibleColumns(String.join(",", list.getVisibleColumnKeys()));
+                }else{
+                    currentStockSavedQuery.setVisibleColumns(null);
+                }
                 UIUtilities.showNotification("Saving current query as NEW :" + saveQueryName.getValue());
                 currentSavedQueryId = queryService.saveAsQuery(currentStockSavedQuery, saveQueryName.getValue()).toString();
                 //setting the dialog id will ensure the fireEvent will navigate to the id specified
@@ -628,7 +595,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     }
     
     private void loadFilters(){
-        System.out.println("loadFilters: currentSavedQueryId:" + currentSavedQueryId + " saveQuery:" + currentStockSavedQuery );
+        // System.out.println("loadFilters: currentSavedQueryId:" + currentSavedQueryId + " saveQuery:" + currentStockSavedQuery );
         if(currentSavedQueryId==null){
             currentStockSavedQuery = queryService.getSavedQueryList().get(0);
         }else if(Long.parseLong(currentSavedQueryId) < 0){
@@ -641,14 +608,26 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         selectedStock = null;
         sidebarChanged(Boolean.FALSE);
         updateStockTypeCount();
-        System.out.println("loadFilters: genotypes:" + currentStockSavedQuery.getStockType().getGenotypes());
-        System.out.println("loadFilters: genotypeSegments:");
+        // System.out.println("loadFilters: genotypes:" + currentStockSavedQuery.getStockType().getGenotypes());
+        // System.out.println("loadFilters: genotypeSegments:");
         for(GenotypeSegment segment: currentStockSavedQuery.getStockType().getGenotypeSegments()){
-            System.out.println("   segment:" + segment.toString());
+            // System.out.println("   segment:" + segment.toString());
         }
     }
     
     private void applyFilters(){
+
+        if(mobileDevice){
+            // System.out.println("applyFilters: mobile device detected, using STACK overlay mode and HORIZONTAL orientation");
+            mdLayout.setOverlayMode(MasterDetailLayout.OverlayMode.STACK);
+            mdLayout.setOrientation(Orientation.HORIZONTAL);
+        }else{
+            // System.out.println("applyFilters: desktop device detected, using DRAWER overlay mode and VERTICAL orientation");
+            mdLayout.setOverlayMode(MasterDetailLayout.OverlayMode.DRAWER);
+            mdLayout.setOrientation(Orientation.VERTICAL);
+            mdLayout.setDetailSize("400px");
+        }
+
         //System.out.println("applyFilters: stock(start):" + currentStockSavedQuery.toString() );
         Stock tempSelected = selectedStock;
         list.setPageSize(25);
@@ -668,7 +647,7 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             try {
                 list.scrollToItem(selectedStock);
             } catch (NoSuchElementException e) {
-                System.out.println("applyFilters: scrollToItem cannot find the item in the list:" + selectedStock);
+                // System.out.println("applyFilters: scrollToItem cannot find the item in the list:" + selectedStock);
                 //e.printStackTrace();
             }
             //runBeforeClientResponse(ui -> list.scrollToItem(selectedStock));
@@ -682,26 +661,16 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
 
         list.createGrid();
 
-        columnList = getCleanColumnList(list.getColumns());
-        System.out.println("applyFilters: columnList:" + columnList);
-        //retreive the visible columns and set them
-        System.out.println("applyFilters: setting visible columns to:" + currentStockSavedQuery.getVisibleColumnKeyList());
-        if(!currentStockSavedQuery.getVisibleColumnKeyList().isEmpty()){
-            for(Column<Stock> column: columnList){
-                list.getColumnByKey(column.getKey()).setVisible(currentStockSavedQuery.getVisibleColumnKeyList().contains(column.getKey()));
-            }
-        }
-        
         applyOptionsButton.setEnabled(false);
         currentStockSavedQuery.setDirty(Boolean.FALSE);
         saveOptionsButton.setEnabled(currentStockSavedQuery.getNeedsSaving());
         sidebarSetValues();
     }
-    
+
     private Component createContent() {
         mdLayout.setSizeFull();
-        mdLayout.setOrientation(Orientation.VERTICAL);
         mdLayout.setHeightFull();
+
         mdLayout.addBackdropClickListener(event -> {
             mdLayout.setDetail(null);
         });
@@ -713,7 +682,6 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         //content.addClassNames(Flex.GROW);
         content.setSizeFull();
 
-        mdLayout.setDetailSize("400px");
         mdLayout.setMaster(content);
         mdLayout.setDetail(null);
         return mdLayout;
@@ -737,17 +705,10 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
             List<Stock> items = stockService.listByExample(currentSearchName, currentStockSavedQuery);
             // Find the index of the matching item in the filtered and sorted list
             int index = items.indexOf(item);
-            System.out.println("createList: setItemIndexProvider: index:" + index + " looking for item:" + item);
+            // System.out.println("createList: setItemIndexProvider: index:" + index + " looking for item:" + item);
             return index >= 0 ? index : null;            
         });   
         
-        list.addColumnReorderListener(event -> {
-            columnList = getCleanColumnList(event.getColumns());
-            sidebarChanged(true);
-        });
-
-        createContextMenu(list);
-
         list.setWidthFull();
         list.setHeightFull();
         list.asSingleSelect().addValueChangeListener(event -> {
@@ -764,343 +725,6 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         });
         return list;        
     }
-    
-    private final ComponentRenderer<Component, Stock> stockCardRenderer = new ComponentRenderer<>(
-            stock -> {
-                return createListItemLayout(stock);
-            });    
-
-    private Layout createListItemLayout(Stock stock) {
-        AvatarDiv avatarDiv = stock.getAvatar(Boolean.TRUE);
-        avatarDiv.getAvatar().setHeight("6em");
-        avatarDiv.getAvatar().setWidth("6em");
-        
-        avatarDiv.getAvatar().getElement().addEventListener("click", click -> {
-            //open image dialog
-            //dialogCommon.setDisplayMode(DialogCommon.DisplayMode.PROFILE_IMAGE);
-            dialogCommon.setDialogTitle("Edit Profile Image");
-            dialogCommon.dialogOpen(stock,DialogCommon.DisplayMode.PROFILE_IMAGE);
-        }).addEventData("event.stopPropagation()");        
-        
-        Layout outerHeader = new Layout();
-        outerHeader.add(stock.getHeader());
-        
-        // Extra Info - Id, Breed, Color next to avatar
-        Layout extraInfo = new Layout();
-        extraInfo.addClassNames(FontSize.XSMALL);
-        extraInfo.addClassNames(FontWeight.LIGHT);
-        extraInfo.setFlexDirection(Layout.FlexDirection.COLUMN);
-        extraInfo.setAlignItems(Layout.AlignItems.START);
-        extraInfo.setGap(Layout.Gap.XSMALL);
-        extraInfo.setWidth(130, Unit.PIXELS);
-        
-        String stockId = stock.getTattoo();
-        if(!stockId.isEmpty() && !stockId.equals(stock.getDisplayName())){
-            Span stockIdInfo = new Span("Id: " + stockId);
-            //stockIdInfo.addClassNames(FontWeight.MEDIUM);
-            extraInfo.add(stockIdInfo);
-        }
-        
-        Span breedInfo = new Span("Breed: " + stock.getBreed());
-
-        Span colorInfo = new Span("Color: " + stock.getColor());
-
-        extraInfo.add(breedInfo,colorInfo);
-        
-        // Content layout
-        HorizontalLayout detailedInfo2 = new HorizontalLayout(extraInfo,createTags(stock,false));
-        detailedInfo2.setFlexGrow(1, extraInfo);
-
-        //top section layout
-        Layout topLayout = new Layout(outerHeader,detailedInfo2);
-        topLayout.setFlexDirection(Layout.FlexDirection.COLUMN);
-        topLayout.setGap(Layout.Gap.SMALL);
-        topLayout.setWidthFull();
-
-        //top outer section layout
-        Layout topOuterLayout = new Layout(avatarDiv,topLayout);
-        topOuterLayout.setFlexDirection(Layout.FlexDirection.ROW);
-        topOuterLayout.setGap(Layout.Gap.SMALL);
-        topOuterLayout.setWidthFull();
-        
-        // Main layout
-        Layout layout = new Layout(topOuterLayout,createTags(stock,true));
-        layout.addClassNames(Padding.Top.MEDIUM, Padding.Right.MEDIUM, Padding.Left.MEDIUM, Padding.Bottom.NONE);
-        layout.setFlexDirection(Layout.FlexDirection.COLUMN);
-        layout.addClassNames(AlignItems.STRETCH);
-        layout.setPosition(Layout.Position.RELATIVE);
-        layout.setSizeUndefined();
-        layout.addClassNames(Margin.NONE);
-
-        UIUtilities.setBorders(layout, stock, UIUtilities.BorderSize.SMALL);
-        return layout;
-    }
-
-    private VerticalLayout createColumnSelector(){
-        Set<String> resetColumnList = getVisibleColumnNames();
-        VerticalLayout columnSelector = UIUtilities.getVerticalLayout(true, true, false);
-        Div heading = new Div("Configure columns");
-        heading.getStyle().set("font-weight", "600");
-        heading.getStyle().set("padding", "var(--lumo-space-xs)");        
-
-        Checkbox selectAllCheckbox = new Checkbox("Select All");
-        if(getVisibleColumnKeys().size() == getColumnNames().size()){
-            selectAllCheckbox.setValue(true);
-            selectAllCheckbox.setIndeterminate(false);
-        }else if(getVisibleColumnKeys().isEmpty()){
-            selectAllCheckbox.setValue(false);
-            selectAllCheckbox.setIndeterminate(false);
-        }else{
-            selectAllCheckbox.setIndeterminate(true);
-        }
-
-
-        CheckboxGroup<String> group = new CheckboxGroup<>();
-        group.addThemeVariants(CheckboxGroupVariant.LUMO_VERTICAL);
-        group.setItems(getColumnNames());
-        group.setValue(getVisibleColumnNames());
-
-        group.addValueChangeListener((e) -> {
-            if (e.getValue().size() == getColumnNames().size()) {
-                selectAllCheckbox.setValue(true);
-                selectAllCheckbox.setIndeterminate(false);
-            } else if (e.getValue().isEmpty()) {
-                selectAllCheckbox.setValue(false);
-                selectAllCheckbox.setIndeterminate(false);
-            } else {
-                selectAllCheckbox.setIndeterminate(true);
-            }            
-
-            for(Column<Stock> column: columnList){
-                list.getColumnByKey(column.getKey()).setVisible(e.getValue().contains(column.getHeaderText()));
-            }
-            sidebarChanged(true);
-        });
-
-        selectAllCheckbox.addValueChangeListener(event -> {
-            if (event.getValue()) {
-                group.setValue(new HashSet<>(getColumnNames()));
-            } else {
-                group.deselectAll();
-            }            
-        });
-
-        Button reset = new Button("Reset", (e) -> {
-            group.setValue(resetColumnList);
-        });
-        reset.addThemeVariants(ButtonVariant.LUMO_SMALL);
-
-        HorizontalLayout options = new HorizontalLayout(selectAllCheckbox, reset);
-        options.setSpacing(false);
-        options.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-        options.setAlignItems(Alignment.BASELINE);
-
-        columnSelector.add(heading,options,group);
-
-        return columnSelector;
-    }
-
-    private GridContextMenu<Stock> createContextMenu(Grid<Stock> grid) {
-        GridContextMenu<Stock> menu = new GridContextMenu<>(grid);
-
-        menu.setDynamicContentHandler(stockEntity -> {
-            if(stockEntity==null){
-                if(currentStockSavedQuery.getViewStyle().equals(StockViewStyle.TILE)){
-                    return false;
-                }else{
-                    menu.removeAll();
-                    menu.addComponent(createColumnSelector());
-                    
-                    return true;
-                }
-
-            }else{
-                menu.removeAll();
-                String stockName = stockEntity.getDisplayName();
-                Div heading = new Div();
-                heading.setText(stockName);
-                heading.getStyle().set("text-align", "center");
-                heading.getStyle().set("font-weight", "bold");
-                heading.getStyle().set("padding", "8px");
-                //menu.setOpenOnClick(true);
-                
-                //add a label at the top with the stock name
-                menu.addComponentAsFirst(heading);
-                menu.addSeparator();
-
-                String addNewMenuTitle = "Add new " + stockEntity.getStockType().getNameSingular();
-                GridMenuItem<Stock> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));
-                addNewMenu.addMenuItemClickListener(click -> {
-                    //open stock edit dialog
-                    Stock newStock = new Stock();
-                    newStock.setExternal(false);
-                    newStock.setBreeder(true);
-                    newStock.setStockType(stockEntity.getStockType());
-                    newStock.setWeight(0);
-                    //newStock.setStatus("active");
-                    //newStock.setStatusDate(LocalDateTime.now());
-                    
-                    dialogCommon.setDialogTitle("Create new");
-                    dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
-                    
-                });
-
-                GridMenuItem<Stock> addTaskMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
-                addTaskMenu.addMenuItemClickListener(click -> {
-                    //open task edit dialog
-                    //create a new task for this stock with default values
-                    Task newTask = new Task();
-                    newTask.setLinkType(Utility.TaskLinkType.BREEDER);
-                    newTask.setLinkBreederId(stockEntity.getId());
-
-                    taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, stockEntity.getStockType());
-                    
-                });
-                menu.addSeparator();
-
-                GridMenuItem<Stock> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
-                editMenu.addMenuItemClickListener(click -> {
-                    //open stock edit dialog
-                    dialogCommon.setDialogTitle("Edit Stock");
-                    dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.STOCK_DETAILS);
-                });
-                GridMenuItem<Stock> editImageMenu = menu.addItem(new Item("Edit Image", Utility.ICONS.ACTION_EDIT_IMAGE.getIconSource()));
-                editImageMenu.addMenuItemClickListener(click -> {
-                    //open image dialog
-                    dialogCommon.setDialogTitle("Edit Profile Image");
-                    dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.PROFILE_IMAGE);
-                });
-                if(!stockEntity.getStockType().getGenotypes().isEmpty()){
-                    GridMenuItem<Stock> editGenotype = menu.addItem(new Item("Edit Genotype", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
-                    editGenotype.addMenuItemClickListener(click -> {
-                        //open genotypeEditor
-                        genotypeEditor.dialogOpen(stockEntity);
-                    });
-                }
-                menu.addSeparator();
-                //TODO: possible remove the Breed and Birth items as they are in Tasks
-                GridMenuItem<Stock> breedPlanMenu = menu.addItem(new Item("Breed Plan", Utility.ICONS.TYPE_BREEDER.getIconSource()));
-                    breedPlanMenu.addMenuItemClickListener(click -> {
-                        //open breed plan dialog
-                        planEditor.dialogOpen(Utility.TaskLinkType.BREEDER, stockEntity);
-                    });
-                menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
-                createStatusMenuItem(menu, stockEntity, "sold");
-                createStatusMenuItem(menu, stockEntity, "forsale");
-                createStatusMenuItem(menu, stockEntity, "deposit");
-                createStatusMenuItem(menu, stockEntity, "butchered");
-                createStatusMenuItem(menu, stockEntity, "died");
-                createStatusMenuItem(menu, stockEntity, "archived");
-                createStatusMenuItem(menu, stockEntity, "culled");
-                createStatusMenuItem(menu, stockEntity, "active");
-                GridMenuItem<Stock> weighMenu = menu.addItem(new Item("Weigh", Utility.ICONS.ACTION_WEIGH.getIconSource()));
-                weighMenu.addMenuItemClickListener(click -> {
-                    weightEditor.dialogOpen(stockEntity);
-                });
-                menu.addSeparator();
-                GridMenuItem<Stock> pedigreeEditorMenu = menu.addItem(new Item("Pedigree", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
-                pedigreeEditorMenu.addMenuItemClickListener(click -> {
-                    UI.getCurrent().navigate(StockPedigreeEditor.class, stockEntity.getId().toString());
-                });
-                menu.addSeparator();
-                GridMenuItem<Stock> deleteMenu = menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
-                deleteMenu.addMenuItemClickListener(click -> {
-                    deleteStockEntityWithConfirm(stockEntity);
-                });
-
-                return true;
-            }
-        });
-
-        return menu;
-    }
-
-    private List<Column<Stock>> getCleanColumnList(List<Column<Stock>> originalList){
-        List<Column<Stock>> returnList = new ArrayList<>(originalList);
-        returnList.remove(0);
-        return returnList;
-    }
-
-    private List<String> getColumnNames(){
-        List<String> columnNames = new ArrayList<>();
-        for (Column<Stock> column : columnList) {
-            columnNames.add(column.getHeaderText());
-        }
-        return columnNames;
-    }
-    
-    private Set<String> getVisibleColumnNames(){
-        List<String> columnNames = new ArrayList<>();
-        for (Column<Stock> column : columnList) {
-            if(column.isVisible()){
-                columnNames.add(column.getHeaderText());
-            }
-        }
-        return new HashSet<>(columnNames);
-    }
-    
-    private Set<String> getVisibleColumnKeys(){
-        List<String> columnNames = new ArrayList<>();
-        for (Column<Stock> column : columnList) {
-            if(column.isVisible()){
-                columnNames.add(column.getKey());
-            }
-        }
-        return new HashSet<>(columnNames);
-    }
-    
-    private void createStatusMenuItem(GridContextMenu<Stock> menu, Stock stockEntity, String statusToEdit){
-        if(!stockEntity.getStatus().equals(statusToEdit)){
-            StockStatus status = Utility.getInstance().getStockStatus(statusToEdit);
-            GridMenuItem<Stock> item = menu.addItem(new Item(status.getActionName(), status.getIcon().getIconSource()));
-            item.addMenuItemClickListener(click -> {
-                //open status editor
-                statusEditor.dialogOpen(stockEntity, statusToEdit);
-            });
-        }
-    }
-    
-    private void deleteStockEntityWithConfirm(Stock stockEntity){
-        ConfirmDialog dialog = new ConfirmDialog();
-        dialog.setHeader("Delete \"" + stockEntity.getDisplayName() + "\"?");
-        dialog.setText(
-                "Are you sure you want to permanently delete " + stockEntity.getDisplayName() + "?");
-
-        dialog.setCancelable(true);
-        //dialog.addCancelListener(event -> setStatus("Canceled"));
-
-        dialog.setConfirmText("Delete");
-        dialog.setConfirmButtonTheme("error primary");
-        dialog.addConfirmListener(event -> {
-            if(stockService.checkInUse(stockEntity)){ //if in use then do not delete and WARN
-                warnStockInUse(stockEntity);
-            }else{
-                //delete status
-                statusService.deleteByStockId(stockEntity.getId());
-                //delete weight
-                weightService.deleteByStockId(stockEntity.getId());
-                //delete stock
-                stockService.delete(stockEntity.getId());
-                listRefreshNeeded();
-            }
-        });     
-        dialog.open();
-    }
-
-    private void warnStockInUse(Stock stockEntity){
-        ConfirmDialog dialog = new ConfirmDialog();
-        dialog.setHeader("\"" + stockEntity.getDisplayName() + "\" in use!");
-        dialog.setText(
-                "Cannot permanently delete " + stockEntity.getDisplayName() + " as is in use as a parent!");
-
-        //dialog.setCancelable(false);
-        //dialog.addCancelListener(event -> setStatus("Canceled"));
-
-        dialog.setConfirmText("Ok");
-        //dialog.setConfirmButtonTheme("error primary");
-        dialog.open();
-    }
-
     
     private VerticalLayout createTabbedContentArea(Stock stock){
         VerticalLayout content = UIUtilities.getVerticalLayout(true, false, false);
@@ -1169,7 +793,12 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         VerticalLayout overviewLayout = UIUtilities.getVerticalLayout(Boolean.TRUE, Boolean.TRUE, Boolean.FALSE);
         Scroller scroll = new Scroller(new StockDetailsFormLayout(stock));
         scroll.setSizeFull();
-        scroll.setMaxHeight(270,Unit.PIXELS);
+        // scroll.setMaxHeight(270,Unit.PIXELS);
+        if(mobileDevice){
+            scroll.setMaxHeight(500,Unit.PIXELS);
+        }else{      
+            scroll.setMaxHeight(270,Unit.PIXELS);
+        }
         overviewLayout.setSizeUndefined();
         overviewLayout.add(scroll);
         return overviewLayout;
@@ -1178,7 +807,16 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private LazyComponent createTabLitters(Stock stock) {
         Layout layout = new Layout();
         litterGrid.setStockId(stock.getId());
-        litterGrid.setHeight("270px");
+        // litterGrid.setHeight("270px");
+        System.out.println("createTabLitters: mobileDevice:" + mobileDevice);
+        if(mobileDevice){
+            litterGrid.setCurrentViewStyle(LitterGrid.LitterViewStyle.TILE);
+            litterGrid.setHeight("500px");
+        }else{      
+            litterGrid.setCurrentViewStyle(LitterGrid.LitterViewStyle.LIST);
+            litterGrid.setHeight("270px");
+        }
+        litterGrid.createGrid();
         layout.add(litterGrid);
         return new LazyComponent(() -> layout);
     }
@@ -1194,12 +832,13 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
                 : StockSavedQuery.StockViewStyle.LIST
         );
 
-        stockGrid.setHeight("270px");
-        stockGrid.setShowViewStyleChoice(true);
+        if(mobileDevice){
+            stockGrid.setHeight("500px");
+        }else{      
+            stockGrid.setHeight("270px");
+        }
         stockGrid.createGrid();
-        Layout kitListLayoutForOffset = new Layout(stockGrid);
-        //kitListLayoutForOffset.addClassNames(Padding.Left.LARGE);
-        return new LazyComponent(() -> kitListLayoutForOffset);
+        return new LazyComponent(() -> stockGrid);
     }
 
     private Component createTabNotes(Stock stock) {
@@ -1218,7 +857,12 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         List<StockStatusHistory> statuses = statusService.findByStockId(stock.getId());
         Grid<StockStatusHistory> grid = new Grid<>(StockStatusHistory.class,false);
         grid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
-        grid.setHeight("200px");
+        if(mobileDevice){
+            grid.setHeight("500px");
+        }else{      
+            grid.setHeight("270px");
+        }
+        // grid.setHeight("200px");
 
         grid.addComponentColumn(item -> {
             Icon editIcon = new Icon("lumo", "edit");
@@ -1276,7 +920,12 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
         List<StockWeightHistory> weights = weightService.findByStockId(stock.getId());
         Grid<StockWeightHistory> grid = new Grid<>(StockWeightHistory.class,false);
         grid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
-        grid.setHeight("200px");
+        // grid.setHeight("200px");
+        if(mobileDevice){
+            grid.setHeight("500px");
+        }else{      
+            grid.setHeight("270px");
+        }
 
         grid.addComponentColumn(item -> {
             Icon editIcon = new Icon("lumo", "edit");
@@ -1474,8 +1123,30 @@ public class StockView extends Main implements ListRefreshNeededListener, HasDyn
     private Component createTabTasks(Stock stock) {
         //taskGrid = new TaskGrid(stock.getId());
         taskGrid.setStockId(stock.getId());
-        taskGrid.setHeight("270px");
+        // taskGrid.setHeight("270px");
+        if(mobileDevice){
+            taskGrid.setHeight("500px");
+        }else{      
+            taskGrid.setHeight("270px");
+        }
         return new LazyComponent(() -> taskGrid);
+    }
+   
+    @Override
+    public void sidebarChanged(Boolean changed) {
+        if(skipSidebarUpdates){
+        }else{
+            currentStockSavedQuery.setDirty(changed);
+            currentStockSavedQuery.setNeedsSaving(changed);
+            applyOptionsButton.setEnabled(changed);
+            saveOptionsButton.setEnabled(changed);
+            resetOptionsButton.setEnabled(changed);
+            if(currentSavedQueryId.equals("0")){
+                deleteOptionsButton.setEnabled(false);
+            }else{
+                deleteOptionsButton.setEnabled(true);
+            }
+        }
     }
 
 }

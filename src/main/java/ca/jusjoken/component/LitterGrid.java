@@ -1,17 +1,26 @@
 package ca.jusjoken.component;
 
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 import com.vaadin.flow.component.AttachEvent;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
+import com.vaadin.flow.component.card.Card;
+import com.vaadin.flow.component.card.CardVariant;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.grid.GridVariant;
+import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.shared.Registration;
+import com.vaadin.flow.theme.lumo.LumoUtility.FontSize;
+import com.vaadin.flow.theme.lumo.LumoUtility.FontWeight;
 import com.vaadin.flow.theme.lumo.LumoUtility.Padding;
 
 import ca.jusjoken.data.entity.Litter;
@@ -22,6 +31,7 @@ import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockTypeService;
+import ca.jusjoken.utility.BadgeVariant;
 
 public class LitterGrid extends Grid<Litter> {
     private ListDataProvider<Litter> dataProvider;
@@ -36,12 +46,40 @@ public class LitterGrid extends Grid<Litter> {
     private Registration resizeRegistration;
     private String parentNameFilter;
     private LitterDisplayMode litterDisplayMode = LitterDisplayMode.ALL;
-
+    private Select<LitterViewStyle> viewStyleSelect;
     public enum LitterDisplayMode {
         ALL,
         ACTIVE,
         ARCHIVED
     }
+
+    public static enum LitterViewStyle{
+        TILE("Tile"), LIST("List");
+
+        private final String shortName;
+        
+        private LitterViewStyle(String shortName) {
+            this.shortName = shortName;
+        }
+        
+        public String getShortName(){
+            return shortName;
+        }
+        
+        public static LitterViewStyle fromShortName(String shortName){
+            switch (shortName){
+                case "Tile" -> {
+                    return LitterViewStyle.TILE;
+                }
+                case "List" -> {
+                    return LitterViewStyle.LIST;
+                }
+                default -> throw new IllegalArgumentException("ShortName [" + shortName + "] not supported.");
+            }
+        }
+    }
+
+    private LitterViewStyle currentViewStyle = LitterViewStyle.TILE;
 
     public LitterGrid() {
         this(null);
@@ -54,21 +92,45 @@ public class LitterGrid extends Grid<Litter> {
         this.stockTypeService = Registry.getBean(StockTypeService.class);
         this.stockId = stockId;
         setStockValues();
+        createGrid();
+    }
+
+    public void createGrid(){
         configureGrid();
     }
 
     private void configureGrid() {
+        removeAllColumns();
+        
+        if(null == currentViewStyle){
+            configureListView(); // Default to list view if style is unrecognized
+        }else // Configuration logic for the KitGrid
+            switch (currentViewStyle) {
+                case LIST -> configureListView();
+                case TILE -> configureTileView();
+                default -> configureListView(); // Default to list view if style is unrecognized
+        }
 
         setEmptyStateText("No litters available to display");
-        setSizeFull();
+        // setSizeFull();
 
-        setDataProvider();
+        setLitterDataProvider();
+
+        getHeaderRows().get(0).getCell(getColumnByKey("name")).setComponent(getViewSelectLayout());
+        
+    }
+
+    private void configureTileView() {
+        addColumn(litterCardRenderer).setKey("name").setHeader("Name");
+    }
+
+    private void configureListView() {
         addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
 
         //setHeight("200px");
 
         addComponentColumn(litter -> {
-            return litter.getnameAndPrefix(false,true, true);
+            return litter.getnameAndPrefix(false,true);
         }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name");
 
         addColumn(Litter::getParentsFormatted).setHeader("Parents").setSortable(true).setResizable(true);
@@ -91,27 +153,104 @@ public class LitterGrid extends Grid<Litter> {
         statusColumn.setFrozenToEnd(true);
 
         setItemDetailsRenderer(new ComponentRenderer<>(item -> {
-            StockGrid stockGrid = new StockGrid();
-            stockGrid.setId(item.getId(), StockGrid.StockGridType.LITTER);
-
-            //if this is being viewed on a mobile device set the view style to tile otherwise set it to list 
-            stockGrid.setCurrentViewStyle(
-                mobileDevice
-                    ? StockSavedQuery.StockViewStyle.TILE
-                    : StockSavedQuery.StockViewStyle.LIST
-            );
-            stockGrid.setHeight("270px");
-            stockGrid.setShowViewStyleChoice(true);
-            stockGrid.createGrid();
-            Layout kitListLayoutForOffset = new Layout(stockGrid);
-            kitListLayoutForOffset.addClassNames(Padding.Left.LARGE);
-            return kitListLayoutForOffset;
+            return createKitsInLitterLayout(item);
         }));        
 
         setMultiSort(true);
         sort(List.of(new GridSortOrder<>(bornColumn, SortDirection.DESCENDING)));
         updateFooterStats();
-        
+    }
+
+    private Layout createKitsInLitterLayout(Litter litter){
+        StockGrid stockGrid = new StockGrid();
+        stockGrid.setId(litter.getId(), StockGrid.StockGridType.LITTER);
+
+        //if this is being viewed on a mobile device set the view style to tile otherwise set it to list 
+        stockGrid.setCurrentViewStyle(
+            mobileDevice
+                ? StockSavedQuery.StockViewStyle.TILE
+                : StockSavedQuery.StockViewStyle.LIST
+        );
+        stockGrid.setHeight("270px");
+        stockGrid.createGrid();
+        Layout kitListLayoutForOffset = new Layout(stockGrid);
+        kitListLayoutForOffset.addClassNames(Padding.Left.LARGE);
+        return kitListLayoutForOffset;
+    }
+
+    private final ComponentRenderer<Component, Litter> litterCardRenderer = new ComponentRenderer<>(
+            litterEntity -> {
+                // return createListItemLayout(litterEntity);
+                return createListItemCard(litterEntity);
+            });    
+
+    private Card createListItemCard(Litter litter){
+        Card card = new Card();
+        card.setWidthFull();
+        card.addThemeVariants(CardVariant.LUMO_ELEVATED);
+
+        card.setHeader(litter.getnameAndPrefix(false,true));
+        card.setHeaderSuffix(new Span(litter.getParentsFormatted()));
+
+        String born = litter.getDoB().format(DateTimeFormatter.ofPattern("MM-dd-YYYY"));
+        if(!born.isEmpty()){
+            card.addToFooter(createBadge("Born: ",born, BadgeVariant.SUCCESS));
+        }
+
+        String bred = litter.getBred().format(DateTimeFormatter.ofPattern("MM-dd-YYYY"));
+        if(!bred.isEmpty()){
+            card.addToFooter(createBadge("Bred: ",bred, BadgeVariant.SUCCESS));
+        }
+
+        card.addToFooter(litter.getActiveBadge());
+
+        card.addToFooter(createBadge("Kits: ",litter.getKitsCount().toString(), BadgeVariant.CONTRAST));
+        card.addToFooter(createBadge("Died: ",litter.getDiedKitsCount().toString(), BadgeVariant.CONTRAST));
+        card.addToFooter(createBadge("Survived: ",litter.getKitsSurvivedCount().toString(), BadgeVariant.CONTRAST));
+        card.addToFooter(createBadge("Rate: ",litter.getSurvivalRate().toString(), BadgeVariant.CONTRAST));
+
+        setItemDetailsRenderer(new ComponentRenderer<>(item -> {
+            return createKitsInLitterLayout(item);
+        }));        
+
+        return card;
+    }
+
+    private Badge createBadge(String prefix, String text, BadgeVariant... variants){
+        if(prefix!=null){
+            text = prefix + ": " + text;
+        }
+        Badge badge = new Badge(text);
+        badge.addClassNames(FontSize.SMALL, FontWeight.MEDIUM);
+        badge.addThemeVariants(BadgeVariant.PILL);
+        badge.addThemeVariants(variants);
+        return badge;
+    }
+
+    private HorizontalLayout getViewSelectLayout() {
+
+        viewStyleSelect = new Select<>();
+        viewStyleSelect.setWidth("100px");
+        viewStyleSelect.setItems(LitterViewStyle.values());
+        viewStyleSelect.setItemLabelGenerator(style -> style.getShortName());
+        viewStyleSelect.setValue(currentViewStyle != null ? currentViewStyle : LitterViewStyle.LIST);
+
+        viewStyleSelect.addValueChangeListener(event -> {
+            if (!event.isFromClient() || event.getValue() == null || event.getValue() == currentViewStyle) {
+                return;
+            }
+            currentViewStyle = event.getValue();
+            configureGrid();
+            refreshGrid();
+        });
+
+        HorizontalLayout leftAlignedHeader = new HorizontalLayout(new Span("View Style: "), viewStyleSelect);
+        leftAlignedHeader.setWidthFull();
+        leftAlignedHeader.setPadding(false);
+        leftAlignedHeader.setSpacing(false);
+        leftAlignedHeader.setJustifyContentMode(HorizontalLayout.JustifyContentMode.START);
+        leftAlignedHeader.setAlignItems(HorizontalLayout.Alignment.BASELINE);
+        return leftAlignedHeader;
     }
 
     private void setStockValues() {
@@ -132,7 +271,7 @@ public class LitterGrid extends Grid<Litter> {
         refreshGrid();
     }    
 
-    private void setDataProvider() {
+    private void setLitterDataProvider() {
         if(stockId != null){
             dataProvider = new ListDataProvider<>(litterService.getLitters(stock));
         } else if (stockType != null) {
@@ -145,7 +284,7 @@ public class LitterGrid extends Grid<Litter> {
     }
 
     public void refreshGrid() {
-        setDataProvider();
+        setLitterDataProvider();
         dataProvider.refreshAll();
     }
 
@@ -234,8 +373,7 @@ public class LitterGrid extends Grid<Litter> {
     }
 
     private void updateFooterStats() {
-        if (kitsCountColumn == null || survivalRateColumn == null || diedKitsCountColumn == null
-                || kitsSurvivedCountColumn == null || dataProvider == null || bredColumn == null) {
+        if (dataProvider == null) {
             return;
         }
 
@@ -263,11 +401,24 @@ public class LitterGrid extends Grid<Litter> {
             }
         }
 
-        bredColumn.setFooter("Litters: " + litterCount);
-        kitsCountColumn.setFooter("Kits: " + kitsTotal);
-        diedKitsCountColumn.setFooter("Died: " + diedTotal);
-        kitsSurvivedCountColumn.setFooter("Survived: " + survivedTotal);
-        survivalRateColumn.setFooter(survivalCount == 0 ? "Avg: -" : String.format("Survival: %.1f%%", survivalSum / survivalCount));
+        if(currentViewStyle == LitterViewStyle.LIST){
+            if (kitsCountColumn == null || survivalRateColumn == null || diedKitsCountColumn == null
+                    || kitsSurvivedCountColumn == null || dataProvider == null || bredColumn == null) {
+                return;
+            }
+
+            bredColumn.setFooter("Litters: " + litterCount);
+            kitsCountColumn.setFooter("Kits: " + kitsTotal);
+            diedKitsCountColumn.setFooter("Died: " + diedTotal);
+            kitsSurvivedCountColumn.setFooter("Survived: " + survivedTotal);
+            survivalRateColumn.setFooter(survivalCount == 0 ? "Avg: -" : String.format("Survival: %.1f%%", survivalSum / survivalCount));
+
+        }else{
+            //for tile view put all the stats in the first column as it is the only column
+            getColumnByKey("name").setFooter("Litters: " + litterCount + " | Kits: " + kitsTotal + " | Died: " + diedTotal + " | Survived: " + survivedTotal + " | Survival: " + (survivalCount == 0 ? "-" : String.format("%.1f%%", survivalSum / survivalCount)));
+        }
+
+
     }
 
     private boolean matchesAllCurrentFilters(Litter litter) {
@@ -349,4 +500,14 @@ public class LitterGrid extends Grid<Litter> {
     private Grid.Column<Litter> diedKitsCountColumn;
     private Grid.Column<Litter> kitsSurvivedCountColumn;
     private Grid.Column<Litter> bredColumn;
+
+    public LitterViewStyle getCurrentViewStyle() {
+        return currentViewStyle;
+    }
+
+    public void setCurrentViewStyle(LitterViewStyle currentViewStyle) {
+        this.currentViewStyle = currentViewStyle;
+        viewStyleSelect.setValue(currentViewStyle);
+    }
+
 }

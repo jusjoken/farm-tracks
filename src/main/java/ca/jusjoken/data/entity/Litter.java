@@ -377,7 +377,7 @@ public class Litter {
         return badge;
     }
 
-    public Layout getnameAndPrefix(Boolean columnBased, Boolean includeEmptyPrefix, Boolean includeGenderIcon){
+    public Layout getnameAndPrefix(Boolean columnBased, Boolean includeEmptyPrefix){
         Layout nameAndPrefix = new Layout();
         if(columnBased){
             nameAndPrefix.setFlexDirection(Layout.FlexDirection.COLUMN);

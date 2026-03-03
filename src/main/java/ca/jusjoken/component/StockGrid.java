@@ -1,44 +1,62 @@
 package ca.jusjoken.component;
 
 import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.Unit;
+import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.avatar.Avatar;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.card.Card;
+import com.vaadin.flow.component.card.CardVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
+import com.vaadin.flow.component.checkbox.CheckboxGroup;
+import com.vaadin.flow.component.checkbox.CheckboxGroupVariant;
+import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.grid.ColumnTextAlign;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
-import com.vaadin.flow.component.grid.HeaderRow;
+import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
+import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
+import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
 import com.vaadin.flow.data.renderer.NumberRenderer;
-import com.vaadin.flow.theme.lumo.LumoUtility.AlignItems;
-import com.vaadin.flow.theme.lumo.LumoUtility.BorderRadius;
-import com.vaadin.flow.theme.lumo.LumoUtility.Display;
 import com.vaadin.flow.theme.lumo.LumoUtility.FontSize;
 import com.vaadin.flow.theme.lumo.LumoUtility.FontWeight;
-import com.vaadin.flow.theme.lumo.LumoUtility.Margin;
-import com.vaadin.flow.theme.lumo.LumoUtility.Padding;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
+import ca.jusjoken.data.entity.StockSavedQuery.StockViewStyle;
 import ca.jusjoken.data.entity.StockType;
+import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
+import ca.jusjoken.data.service.StockStatus;
+import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeService;
+import ca.jusjoken.data.service.StockWeightHistoryService;
+import ca.jusjoken.utility.BadgeVariant;
+import ca.jusjoken.views.stock.StockPedigreeEditor;
 
-public class StockGrid extends Grid<Stock>{
+public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
     private ListDataProvider<Stock> dataProvider;
     private Integer stockId;
@@ -49,10 +67,19 @@ public class StockGrid extends Grid<Stock>{
     private final StockTypeService stockTypeService;
     private final LitterService litterService;
     private StockSavedQuery.StockViewStyle currentViewStyle = StockSavedQuery.StockViewStyle.LIST;
-    private Boolean showViewStyleChoice = false;
     private StockSavedQuery currentStockSavedQuery;
     private String currentSearchName;
-
+    private DialogCommon dialogCommon;
+    private final List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
+    private final List<SidebarChangedListener> sidebarChangedListeners = new ArrayList<>();
+    private final StockStatusHistoryService statusService;
+    private final StockWeightHistoryService weightService;
+    private final StatusEditor statusEditor;
+    private final WeightEditor weightEditor;
+    private final GenotypeEditor genotypeEditor;
+    private final TaskEditor taskEditor;
+    private final PlanEditor planEditor;
+    private List<Column<Stock>> columnList;
     public static enum StockGridType {
         LITTER, STOCK, KITS
     }
@@ -64,6 +91,25 @@ public class StockGrid extends Grid<Stock>{
         this.stockService = Registry.getBean(StockService.class);
         this.stockTypeService = Registry.getBean(StockTypeService.class);
         this.litterService = Registry.getBean(LitterService.class);
+        this.statusService = Registry.getBean(StockStatusHistoryService.class);
+        this.weightService = Registry.getBean(StockWeightHistoryService.class);
+
+        this.dialogCommon = new DialogCommon();
+        this.statusEditor = new StatusEditor();
+        this.weightEditor = new WeightEditor();
+        this.genotypeEditor = new GenotypeEditor();
+        this.taskEditor = new TaskEditor();
+        this.planEditor = new PlanEditor();
+        setupListeners();
+    }
+
+    private void setupListeners() {
+        dialogCommon.addListener(this);
+        statusEditor.addListener(this);
+        weightEditor.addListener(this);
+        genotypeEditor.addListener(this);
+        taskEditor.addListener(this);
+        planEditor.addListener(this);
     }
 
     public void createGrid() {
@@ -71,12 +117,29 @@ public class StockGrid extends Grid<Stock>{
         if(stockId != null || litterId != null || stockGridType == StockGridType.STOCK){
             configureGrid();
             refreshGrid();
+            setColumns();
+            addColumnReorderListener(event -> {
+                columnList = getCleanColumnList(event.getColumns());
+                notifySidebarChanged(true);
+            });
+            createContextMenu(this);
+        }
+    }
+
+    private void setColumns(){
+        columnList = getCleanColumnList(getColumns());
+        // System.out.println("applyFilters: columnList:" + columnList);
+        //retreive the visible columns and set them
+        if(currentStockSavedQuery != null && !currentStockSavedQuery.getVisibleColumnKeyList().isEmpty()){
+            // System.out.println("applyFilters: setting visible columns to:" + currentStockSavedQuery.getVisibleColumnKeyList());
+            for(Column<Stock> column: columnList){
+                getColumnByKey(column.getKey()).setVisible(currentStockSavedQuery.getVisibleColumnKeyList().contains(column.getKey()));
+            }
         }
     }
 
     private void configureGrid() {
         removeAllColumns();
-        clearAllHeaderRows();
 
         if(null == currentViewStyle){
             configureListView(); // Default to list view if style is unrecognized
@@ -88,28 +151,36 @@ public class StockGrid extends Grid<Stock>{
                 default -> configureListView(); // Default to list view if style is unrecognized
         }
 
-        if(showViewStyleChoice){
-            addViewStyleHeaderRow();
-        }
-        //refreshGrid();
+        setEmptyStateText("No data available to display");
 
-    }
+        getHeaderRows().get(0).getCell(getColumnByKey("name")).setComponent(getViewSelectLayout());
 
-    private void clearAllHeaderRows() {
-        while (!getHeaderRows().isEmpty()) {
-            removeHeaderRow(getHeaderRows().get(0));
-        }
     }
 
     private void configureValueView() {
-        setColumnReorderingAllowed(true);
+        setColumnReorderingAllowed(false);
+
         addComponentColumn(stockEntity -> {
             return stockEntity.getnameAndPrefix(false,true, true);
-        }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name");
-        addColumn(Stock::getBreed).setHeader("Breed").setResizable(true).setAutoWidth(true).setKey("breed");
-        addColumn(Stock::getStatus).setHeader("Status").setResizable(true).setAutoWidth(true).setKey("status");
-        addColumn(new LocalDateTimeRenderer<>(Stock::getStatusDate,"MM-dd-YYYY HHmm")).setHeader("Status Date").setResizable(true).setAutoWidth(true).setKey("statusdate");
-        addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value").setFooter(getValueFooter()).setTextAlign(ColumnTextAlign.END);
+        }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(false).setKey("name");
+
+        addColumn(Stock::getBreed)
+                .setHeader("Breed").setResizable(true).setAutoWidth(true).setKey("breed");
+
+        addColumn(Stock::getStatus)
+                .setHeader("Status").setResizable(true).setAutoWidth(true).setKey("status");
+
+        addColumn(new LocalDateTimeRenderer<>(Stock::getStatusDate,"MM-dd-YYYY HHmm"))
+                .setHeader("Status Date").setResizable(true).setAutoWidth(true).setKey("statusdate");
+
+        addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00"))
+                .setHeader("Value")
+                .setResizable(true)
+                .setAutoWidth(true)
+                .setKey("value")
+                .setFooter(getValueFooter())
+                .setTextAlign(ColumnTextAlign.END)
+                .setFrozenToEnd(true);
 
     }
 
@@ -118,10 +189,14 @@ public class StockGrid extends Grid<Stock>{
         if(stockGridType == StockGridType.STOCK){
             currentStockList = stockService.listByExample(currentSearchName, currentStockSavedQuery);
         } else {
-            currentStockList = dataProvider.getItems().stream().toList();
+            if(this.dataProvider == null){
+                currentStockList = List.of();
+            }else{      
+                currentStockList = dataProvider.getItems().stream().toList();
+            }
         }
 
-        System.out.println("getValueFooter: count:" + currentStockList.size());
+        // System.out.println("getValueFooter: count:" + currentStockList.size());
         Double totalValue = 0.0;
         for (Stock item: currentStockList) {
             totalValue = totalValue + item.getStockValue();
@@ -133,18 +208,17 @@ public class StockGrid extends Grid<Stock>{
 
 
     private void configureTileView() {
-        addColumn(stockCardRenderer);
+        addColumn(stockCardRenderer).setKey("name").setHeader("Name");
     }
 
     private void configureListView() {
-        //setDataProvider();
         // Additional configuration such as columns, themes, etc.
         addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
         //setHeight("270px");
         setColumnReorderingAllowed(true);
         addComponentColumn(stockEntity -> {
             return stockEntity.getnameAndPrefix(false,true, true);
-        }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name");
+        }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(false).setKey("name");
 
         if(stockGridType == StockGridType.STOCK){
             addComponentColumn(stockEntity -> {
@@ -193,121 +267,62 @@ public class StockGrid extends Grid<Stock>{
 
     private final ComponentRenderer<Component, Stock> stockCardRenderer = new ComponentRenderer<>(
             stockEntity -> {
-                return createListItemLayout(stockEntity);
+                // return createListItemLayout(stockEntity);
+                return createListItemCard(stockEntity);
             });    
 
-    private Layout createListItemLayout(Stock stock) {
-        AvatarDiv avatarDiv = stock.getAvatar(Boolean.TRUE);
-        avatarDiv.getAvatar().setHeight("6em");
-        avatarDiv.getAvatar().setWidth("6em");
-        
-        avatarDiv.getAvatar().getElement().addEventListener("click", click -> {
+    private Card createListItemCard(Stock stock){
+        Card card = new Card();
+        card.setWidthFull();
+        Avatar avatar = stock.getAvatar(false).getAvatar();
+        avatar.getElement().addEventListener("click", click -> {
             //open image dialog
-            //dialogCommon.setDialogTitle("Edit Profile Image");
-            //dialogCommon.dialogOpen(stock,DialogCommon.DisplayMode.PROFILE_IMAGE);
-        }).addEventData("event.stopPropagation()");        
+            dialogCommon.setDialogTitle("Edit Profile Image");
+            dialogCommon.dialogOpen(stock,DialogCommon.DisplayMode.PROFILE_IMAGE);
+        }).addEventData("event.stopPropagation()");  
         
-        Layout outerHeader = new Layout();
-        outerHeader.add(stock.getHeader());
-        
-        // Extra Info - Id, Breed, Color next to avatar
-        Layout extraInfo = new Layout();
-        extraInfo.addClassNames(FontSize.XSMALL);
-        extraInfo.addClassNames(FontWeight.LIGHT);
-        extraInfo.setFlexDirection(Layout.FlexDirection.COLUMN);
-        extraInfo.setAlignItems(Layout.AlignItems.START);
-        extraInfo.setGap(Layout.Gap.XSMALL);
-        extraInfo.setWidth(130, Unit.PIXELS);
-        
-        String stockId = stock.getTattoo();
-        if(!stockId.isEmpty() && !stockId.equals(stock.getDisplayName())){
-            Span stockIdInfo = new Span("Id: " + stockId);
-            //stockIdInfo.addClassNames(FontWeight.MEDIUM);
-            extraInfo.add(stockIdInfo);
+        card.addThemeVariants(CardVariant.LUMO_ELEVATED);
+
+        card.setHeaderPrefix(avatar);
+        card.setHeader(stock.getHeader());
+
+        String stockTattoo = stock.getTattoo();
+        if(!stockTattoo.isEmpty() && !stockTattoo.equals(stock.getDisplayName())){
+            card.addToFooter(createBadge(null,stockTattoo, BadgeVariant.SUCCESS));
         }
-        
-        Span breedInfo = new Span("Breed: " + stock.getBreed());
 
-        Span colorInfo = new Span("Color: " + stock.getColor());
+        Badge breedBadge = createBadge(null,stock.getBreed(), BadgeVariant.SUCCESS);
+        if(!breedBadge.getText().isEmpty()){
+            card.addToFooter(breedBadge);
+        }
 
-        extraInfo.add(breedInfo,colorInfo);
-        
-        // Content layout
-        HorizontalLayout detailedInfo2 = new HorizontalLayout(extraInfo,createTags(stock,false));
-        detailedInfo2.setFlexGrow(1, extraInfo);
+        Badge colorBadge = createBadge(null,stock.getColor(), BadgeVariant.SUCCESS);
+        if(!colorBadge.getText().isEmpty()){
+            card.addToFooter(colorBadge);
+        }
 
-        //top section layout
-        Layout topLayout = new Layout(outerHeader,detailedInfo2);
-        topLayout.setFlexDirection(Layout.FlexDirection.COLUMN);
-        topLayout.setGap(Layout.Gap.SMALL);
-        topLayout.setWidthFull();
+        if(stock.getBreeder()){
+            card.addToFooter(createBadge("Litters",litterService.getLitterCountForParent(stock).toString(), BadgeVariant.CONTRAST));
+            card.addToFooter(createBadge(stock.getStockType().getNonBreederName(), stockService.getKitCountForParent(stock).toString(), BadgeVariant.CONTRAST));
+        }
 
-        //top outer section layout
-        Layout topOuterLayout = new Layout(avatarDiv,topLayout);
-        topOuterLayout.setFlexDirection(Layout.FlexDirection.ROW);
-        topOuterLayout.setGap(Layout.Gap.SMALL);
-        topOuterLayout.setWidthFull();
-        
-        // Main layout
-        Layout layout = new Layout(topOuterLayout,createTags(stock,true));
-        layout.addClassNames(Padding.Top.MEDIUM, Padding.Right.MEDIUM, Padding.Left.MEDIUM, Padding.Bottom.NONE);
-        layout.setFlexDirection(Layout.FlexDirection.COLUMN);
-        layout.addClassNames(AlignItems.STRETCH);
-        layout.setPosition(Layout.Position.RELATIVE);
-        layout.setSizeUndefined();
-        layout.addClassNames(Margin.NONE);
+        card.addToFooter(createBadge(null,stock.getAge().getAgeFormattedString()));
+        card.addToFooter(createBadge(null,stock.getWeightInLbsOzAsString()));
 
-        UIUtilities.setBorders(layout, stock, UIUtilities.BorderSize.SMALL);
-        return layout;
+        UIUtilities.setCardBorders(card, stock);
+
+        return card;
     }
 
-    private Layout createTags(Stock stock, Boolean topLayout){
-        Layout tags = new Layout(
-                createPanel("Litters",litterService.getLitterCountForParent(stock).toString(),false,Utility.PanelType.LITTERS), 
-                createPanel(stock.getStockType().getNonBreederName(), stockService.getKitCountForParent(stock).toString(),false,Utility.PanelType.KITS), 
-                createPanel("Age", stock.getAge().getAgeFormattedHTML(),true,Utility.PanelType.NONE), 
-                createPanel("Weight", stock.getWeightInLbsOz(),true,Utility.PanelType.NONE));
-        tags.setAlignItems(Layout.AlignItems.STRETCH);
-        tags.setJustifyContent(Layout.JustifyContent.AROUND);
-        //tags.setAlignSelf(Layout.AlignSelf.CENTER);
-        tags.setGap(Layout.Gap.SMALL);
-        //tags.addClassNames(Padding.Left.LARGE);
-        tags.addClassNames(BorderRadius.MEDIUM);
-        tags.setWidthFull();
-        //tags.getStyle().set("max-width", "70%");
-        if(topLayout){  //tags displayed at the bottom on SMALL screens
-            tags.addClassNames(Display.Breakpoint.Small.HIDDEN);
-       }else{  //tags displayed beside extra info on LARGE screens
-            tags.addClassNames(Display.HIDDEN,Display.Breakpoint.Small.FLEX);
+    private Badge createBadge(String prefix, String text, BadgeVariant... variants){
+        if(prefix!=null){
+            text = prefix + ": " + text;
         }
-        //setBorders(tags, stock, false);
-        return tags;
-        
-    }
-
-    private Layout createPanel(String title, String value, Boolean sourceHTML, Utility.PanelType panelType){
-        if(!sourceHTML){
-            value = "<p>" + value + "</p>";
-        }
-
-        Span panelTitle = new Span(title.toUpperCase());
-        panelTitle.addClassNames(FontWeight.LIGHT, FontSize.XXSMALL);
-        Layout layoutTitle = new Layout(panelTitle);
-        
-        Div panelValue = new Div();
-        panelValue.getElement().setProperty("innerHTML", value);
-        //panelValue.addClassNames(FontWeight.BOLD, FontSize.LARGE);
-        panelValue.addClassName("tag-panel-value-responsive");
-        
-        Layout layoutValue = new Layout(panelValue);
-
-        Layout panel = new Layout(layoutValue,layoutTitle);
-        panel.setId(panelType.typeName);
-        panel.setFlexDirection(Layout.FlexDirection.COLUMN);
-        panel.addClassNames(AlignItems.CENTER);
-        panel.addClassNames(Padding.SMALL);
-        
-        return panel;
+        Badge badge = new Badge(text);
+        badge.addClassNames(FontSize.SMALL, FontWeight.MEDIUM);
+        badge.addThemeVariants(BadgeVariant.PILL);
+        badge.addThemeVariants(variants);
+        return badge;
     }
 
     private void setStockValues() {
@@ -368,10 +383,7 @@ public class StockGrid extends Grid<Stock>{
         this.currentViewStyle = currentViewStyle;
     }
 
-    private void addViewStyleHeaderRow() {
-        if (getColumns().isEmpty()) {
-            return;
-        }
+    private HorizontalLayout getViewSelectLayout() {
 
         Select<StockSavedQuery.StockViewStyle> viewStyleSelect = new Select<>();
         viewStyleSelect.setWidth("100px");
@@ -384,44 +396,32 @@ public class StockGrid extends Grid<Stock>{
                 return;
             }
             currentViewStyle = event.getValue();
+            showAllColumns();
+            if(currentStockSavedQuery != null){
+                currentStockSavedQuery.setVisibleColumns(null);
+            }
             configureGrid();
             refreshGrid();
+            notifySidebarChanged(true);
         });
 
-        HorizontalLayout rightAlignedHeader = new HorizontalLayout(new Span("View Style: "), viewStyleSelect);
-        rightAlignedHeader.setWidthFull();
-        rightAlignedHeader.setPadding(false);
-        rightAlignedHeader.setSpacing(false);
-        rightAlignedHeader.setJustifyContentMode(HorizontalLayout.JustifyContentMode.START);
-        rightAlignedHeader.setAlignItems(HorizontalLayout.Alignment.BASELINE);
+        HorizontalLayout leftAlignedHeader = new HorizontalLayout(new Span("View Style: "), viewStyleSelect);
+        leftAlignedHeader.setWidthFull();
+        leftAlignedHeader.setPadding(false);
+        leftAlignedHeader.setSpacing(false);
+        leftAlignedHeader.setJustifyContentMode(HorizontalLayout.JustifyContentMode.START);
+        leftAlignedHeader.setAlignItems(HorizontalLayout.Alignment.BASELINE);
+        return leftAlignedHeader;
+    }
 
-        // Ensure first-created/default header row exists (cannot be joined).
-        if (getHeaderRows().isEmpty()) {
-            HeaderRow baseHeaderRow = appendHeaderRow();
-            for (Grid.Column<Stock> column : getColumns()) {
-                baseHeaderRow.getCell(column).setText("");
-            }
+    private void showAllColumns(){
+        for(Column<Stock> column: getColumns()){
+            getColumnByKey(column.getKey()).setVisible(true);
         }
-
-        // Top-most control row.
-        HeaderRow controlHeaderRow = prependHeaderRow();
-        Grid.Column<Stock>[] columns = getColumns().toArray(new Grid.Column[0]);
-
-        if (columns.length == 1) {
-            controlHeaderRow.getCell(columns[0]).setComponent(rightAlignedHeader);
-        } else {
-            controlHeaderRow.join(columns).setComponent(rightAlignedHeader);
-        }
-        System.out.println("Added view style header row: row count: " + getHeaderRows().size());
     }
+    
 
-    public Boolean getShowViewStyleChoice() {
-        return showViewStyleChoice;
-    }
 
-    public void setShowViewStyleChoice(Boolean showViewStyleChoice) {
-        this.showViewStyleChoice = showViewStyleChoice;
-    }
 
     public StockSavedQuery getCurrentStockSavedQuery() {
         return currentStockSavedQuery;
@@ -437,6 +437,298 @@ public class StockGrid extends Grid<Stock>{
 
     public void setCurrentSearchName(String currentSearchName) {
         this.currentSearchName = currentSearchName;
+    }
+
+    private VerticalLayout createColumnSelector(){
+        Set<String> resetColumnList = getVisibleColumnNames();
+        VerticalLayout columnSelector = UIUtilities.getVerticalLayout(true, true, false);
+        Div heading = new Div("Configure columns");
+        heading.getStyle().set("font-weight", "600");
+        heading.getStyle().set("padding", "var(--lumo-space-xs)");        
+
+        Checkbox selectAllCheckbox = new Checkbox("Select All");
+        if(getVisibleColumnKeys().size() == getColumnNames().size()){
+            selectAllCheckbox.setValue(true);
+            selectAllCheckbox.setIndeterminate(false);
+        }else if(getVisibleColumnKeys().isEmpty()){
+            selectAllCheckbox.setValue(false);
+            selectAllCheckbox.setIndeterminate(false);
+        }else{
+            selectAllCheckbox.setIndeterminate(true);
+        }
+
+
+        CheckboxGroup<String> group = new CheckboxGroup<>();
+        group.addThemeVariants(CheckboxGroupVariant.LUMO_VERTICAL);
+        group.setItems(getColumnNames());
+        group.setValue(getVisibleColumnNames());
+
+        group.addValueChangeListener((e) -> {
+            if (e.getValue().size() == getColumnNames().size()) {
+                selectAllCheckbox.setValue(true);
+                selectAllCheckbox.setIndeterminate(false);
+            } else if (e.getValue().isEmpty()) {
+                selectAllCheckbox.setValue(false);
+                selectAllCheckbox.setIndeterminate(false);
+            } else {
+                selectAllCheckbox.setIndeterminate(true);
+            }            
+
+            for(Column<Stock> column: columnList){
+                getColumnByKey(column.getKey()).setVisible(e.getValue().contains(column.getHeaderText()));
+            }
+            notifySidebarChanged(true);
+        });
+
+        selectAllCheckbox.addValueChangeListener(event -> {
+            if (event.getValue()) {
+                group.setValue(new HashSet<>(getColumnNames()));
+            } else {
+                group.deselectAll();
+            }            
+        });
+
+        Button reset = new Button("Reset", (e) -> {
+            group.setValue(resetColumnList);
+        });
+        reset.addThemeVariants(ButtonVariant.LUMO_SMALL);
+
+        HorizontalLayout options = new HorizontalLayout(selectAllCheckbox, reset);
+        options.setSpacing(false);
+        options.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        options.setAlignItems(Alignment.BASELINE);
+
+        columnSelector.add(heading,options,group);
+
+        return columnSelector;
+    }
+
+    private GridContextMenu<Stock> createContextMenu(Grid<Stock> grid) {
+        GridContextMenu<Stock> menu = new GridContextMenu<>(grid);
+
+        menu.setDynamicContentHandler(stockEntity -> {
+            if(stockEntity==null){
+                if(currentStockSavedQuery != null && currentStockSavedQuery.getViewStyle().equals(StockViewStyle.TILE)){
+                    return false;
+                }else{
+                    menu.removeAll();
+                    menu.addComponent(createColumnSelector());
+                    
+                    return true;
+                }
+
+            }else{
+                menu.removeAll();
+                String stockName = stockEntity.getDisplayName();
+                Div heading = new Div();
+                heading.setText(stockName);
+                heading.getStyle().set("text-align", "center");
+                heading.getStyle().set("font-weight", "bold");
+                heading.getStyle().set("padding", "8px");
+                //menu.setOpenOnClick(true);
+                
+                //add a label at the top with the stock name
+                menu.addComponentAsFirst(heading);
+                menu.addSeparator();
+
+                String addNewMenuTitle = "Add new " + stockEntity.getStockType().getNameSingular();
+                GridMenuItem<Stock> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+                addNewMenu.addMenuItemClickListener(click -> {
+                    //open stock edit dialog
+                    Stock newStock = new Stock();
+                    newStock.setExternal(false);
+                    newStock.setBreeder(true);
+                    newStock.setStockType(stockEntity.getStockType());
+                    newStock.setWeight(0);
+                    //newStock.setStatus("active");
+                    //newStock.setStatusDate(LocalDateTime.now());
+                    
+                    dialogCommon.setDialogTitle("Create new");
+                    dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
+                    
+                });
+
+                GridMenuItem<Stock> addTaskMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+                addTaskMenu.addMenuItemClickListener(click -> {
+                    //open task edit dialog
+                    //create a new task for this stock with default values
+                    Task newTask = new Task();
+                    newTask.setLinkType(Utility.TaskLinkType.BREEDER);
+                    newTask.setLinkBreederId(stockEntity.getId());
+
+                    taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, stockEntity.getStockType());
+                    
+                });
+                menu.addSeparator();
+
+                GridMenuItem<Stock> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
+                editMenu.addMenuItemClickListener(click -> {
+                    //open stock edit dialog
+                    dialogCommon.setDialogTitle("Edit Stock");
+                    dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.STOCK_DETAILS);
+                });
+                GridMenuItem<Stock> editImageMenu = menu.addItem(new Item("Edit Image", Utility.ICONS.ACTION_EDIT_IMAGE.getIconSource()));
+                editImageMenu.addMenuItemClickListener(click -> {
+                    //open image dialog
+                    dialogCommon.setDialogTitle("Edit Profile Image");
+                    dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.PROFILE_IMAGE);
+                });
+                if(!stockEntity.getStockType().getGenotypes().isEmpty()){
+                    GridMenuItem<Stock> editGenotype = menu.addItem(new Item("Edit Genotype", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
+                    editGenotype.addMenuItemClickListener(click -> {
+                        //open genotypeEditor
+                        genotypeEditor.dialogOpen(stockEntity);
+                    });
+                }
+                menu.addSeparator();
+                //TODO: possible remove the Breed and Birth items as they are in Tasks
+                GridMenuItem<Stock> breedPlanMenu = menu.addItem(new Item("Breed Plan", Utility.ICONS.TYPE_BREEDER.getIconSource()));
+                    breedPlanMenu.addMenuItemClickListener(click -> {
+                        //open breed plan dialog
+                        planEditor.dialogOpen(Utility.TaskLinkType.BREEDER, stockEntity);
+                    });
+                menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
+                createStatusMenuItem(menu, stockEntity, "sold");
+                createStatusMenuItem(menu, stockEntity, "forsale");
+                createStatusMenuItem(menu, stockEntity, "deposit");
+                createStatusMenuItem(menu, stockEntity, "butchered");
+                createStatusMenuItem(menu, stockEntity, "died");
+                createStatusMenuItem(menu, stockEntity, "archived");
+                createStatusMenuItem(menu, stockEntity, "culled");
+                createStatusMenuItem(menu, stockEntity, "active");
+                GridMenuItem<Stock> weighMenu = menu.addItem(new Item("Weigh", Utility.ICONS.ACTION_WEIGH.getIconSource()));
+                weighMenu.addMenuItemClickListener(click -> {
+                    weightEditor.dialogOpen(stockEntity);
+                });
+                menu.addSeparator();
+                GridMenuItem<Stock> pedigreeEditorMenu = menu.addItem(new Item("Pedigree", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
+                pedigreeEditorMenu.addMenuItemClickListener(click -> {
+                    UI.getCurrent().navigate(StockPedigreeEditor.class, stockEntity.getId().toString());
+                });
+                menu.addSeparator();
+                GridMenuItem<Stock> deleteMenu = menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
+                deleteMenu.addMenuItemClickListener(click -> {
+                    deleteStockEntityWithConfirm(stockEntity);
+                });
+
+                return true;
+            }
+        });
+
+        return menu;
+    }
+
+    private List<Column<Stock>> getCleanColumnList(List<Column<Stock>> originalList){
+        List<Column<Stock>> returnList = new ArrayList<>(originalList);
+        returnList.remove(0);
+        return returnList;
+    }
+
+    private List<String> getColumnNames(){
+        List<String> columnNames = new ArrayList<>();
+        for (Column<Stock> column : columnList) {
+            columnNames.add(column.getHeaderText());
+        }
+        return columnNames;
+    }
+    
+    private Set<String> getVisibleColumnNames(){
+        List<String> columnNames = new ArrayList<>();
+        for (Column<Stock> column : columnList) {
+            if(column.isVisible()){
+                columnNames.add(column.getHeaderText());
+            }
+        }
+        return new HashSet<>(columnNames);
+    }
+    
+    public Set<String> getVisibleColumnKeys(){
+        List<String> columnNames = new ArrayList<>();
+        for (Column<Stock> column : columnList) {
+            if(column.isVisible()){
+                columnNames.add(column.getKey());
+            }
+        }
+        return new HashSet<>(columnNames);
+    }
+    
+    private void createStatusMenuItem(GridContextMenu<Stock> menu, Stock stockEntity, String statusToEdit){
+        if(!stockEntity.getStatus().equals(statusToEdit)){
+            StockStatus status = Utility.getInstance().getStockStatus(statusToEdit);
+            GridMenuItem<Stock> item = menu.addItem(new Item(status.getActionName(), status.getIcon().getIconSource()));
+            item.addMenuItemClickListener(click -> {
+                //open status editor
+                statusEditor.dialogOpen(stockEntity, statusToEdit);
+            });
+        }
+    }
+    
+    private void deleteStockEntityWithConfirm(Stock stockEntity){
+        ConfirmDialog dialog = new ConfirmDialog();
+        dialog.setHeader("Delete \"" + stockEntity.getDisplayName() + "\"?");
+        dialog.setText(
+                "Are you sure you want to permanently delete " + stockEntity.getDisplayName() + "?");
+
+        dialog.setCancelable(true);
+        //dialog.addCancelListener(event -> setStatus("Canceled"));
+
+        dialog.setConfirmText("Delete");
+        dialog.setConfirmButtonTheme("error primary");
+        dialog.addConfirmListener(event -> {
+            if(stockService.checkInUse(stockEntity)){ //if in use then do not delete and WARN
+                warnStockInUse(stockEntity);
+            }else{
+                //delete status
+                statusService.deleteByStockId(stockEntity.getId());
+                //delete weight
+                weightService.deleteByStockId(stockEntity.getId());
+                //delete stock
+                stockService.delete(stockEntity.getId());
+                listRefreshNeeded();
+            }
+        });     
+        dialog.open();
+    }
+
+    private void warnStockInUse(Stock stockEntity){
+        ConfirmDialog dialog = new ConfirmDialog();
+        dialog.setHeader("\"" + stockEntity.getDisplayName() + "\" in use!");
+        dialog.setText(
+                "Cannot permanently delete " + stockEntity.getDisplayName() + " as is in use as a parent!");
+
+        //dialog.setCancelable(false);
+        //dialog.addCancelListener(event -> setStatus("Canceled"));
+
+        dialog.setConfirmText("Ok");
+        //dialog.setConfirmButtonTheme("error primary");
+        dialog.open();
+    }
+
+
+    @Override
+    public void listRefreshNeeded() {
+        refreshGrid();
+        notifyRefreshNeeded();
+    }
+
+    public void addListener(ListRefreshNeededListener listener) {
+        listRefreshNeededListeners.add(listener);
+    }
+
+    private void notifyRefreshNeeded() {
+        for (ListRefreshNeededListener listener : listRefreshNeededListeners) {
+            listener.listRefreshNeeded();
+        }
+    }
+
+    public void addSidebarChangedListener(SidebarChangedListener listener) {
+        sidebarChangedListeners.add(listener);
+    }
+
+    private void notifySidebarChanged(Boolean changed) {
+        for (SidebarChangedListener listener : sidebarChangedListeners) {
+            listener.sidebarChanged(changed);
+        }
     }
 
 }
