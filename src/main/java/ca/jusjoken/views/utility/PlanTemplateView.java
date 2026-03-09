@@ -34,6 +34,7 @@ import ca.jusjoken.data.service.ListRefreshNeededEvent;
 import ca.jusjoken.data.service.PlanTemplateService;
 import ca.jusjoken.data.service.PlanTemplateTaskService;
 import ca.jusjoken.data.service.StockTypeService;
+import ca.jusjoken.utility.TaskType;
 import ca.jusjoken.views.MainLayout;
 import jakarta.annotation.security.PermitAll;
 
@@ -52,7 +53,7 @@ public class PlanTemplateView extends MasterDetailLayout{
     private final TextField templateName = new TextField("Template Name");
     private final Select<StockType> templateStockTypeChoice = new Select<>();
 
-    private final Select<Utility.TaskType> templateTaskTypeSelect = new Select<>();
+    private final Select<TaskType> templateTaskTypeSelect = new Select<>();
     private final TextField taskCustomNamField = new TextField();
     private final NumberField taskDaysFromStart = new NumberField();
     private final NumberField taskSequence = new NumberField();
@@ -219,8 +220,8 @@ public class PlanTemplateView extends MasterDetailLayout{
         templateStockTypeChoice.setRequiredIndicatorVisible(true);
 
         //templateTaskTypeSelect.setLabel("Task type");
-        templateTaskTypeSelect.setItems(Utility.TaskType.values());
-        templateTaskTypeSelect.setItemLabelGenerator(Utility.TaskType::getShortName);
+        templateTaskTypeSelect.setItems(TaskType.values());
+        templateTaskTypeSelect.setItemLabelGenerator(TaskType::getShortName);
         templateTaskTypeSelect.setWidthFull();
 
         taskSequence.setStepButtonsVisible(true);
@@ -335,7 +336,7 @@ public class PlanTemplateView extends MasterDetailLayout{
 
     private void addTaskToBuffer() {
         PlanTemplateTask newTask = new PlanTemplateTask();
-        newTask.setType(Utility.TaskType.values()[0]);
+        newTask.setType(TaskType.values()[0]);
         newTask.setDaysFromStart(0);
         newTask.setSequence(taskBuffer.size() + 1);
         taskBuffer.add(newTask);

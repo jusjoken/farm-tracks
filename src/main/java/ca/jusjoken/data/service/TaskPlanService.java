@@ -5,15 +5,36 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import ca.jusjoken.component.Badge;
+import ca.jusjoken.data.Utility;
+import ca.jusjoken.data.entity.Stock;
+import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.entity.TaskPlan;
+import ca.jusjoken.utility.BadgeVariant;
+import ca.jusjoken.utility.TaskType;
 
 @Service
 public class TaskPlanService {
 
     private final TaskPlanRepository taskPlanRepository;
+    private final StockService stockService;
+    private final TaskService taskService;
 
-    public TaskPlanService(TaskPlanRepository taskPlanRepository) {
+    public TaskPlanService(TaskPlanRepository taskPlanRepository, StockService stockService, TaskService taskService) {
         this.taskPlanRepository = taskPlanRepository;
+        this.stockService = stockService;
+        this.taskService = taskService;
+    }
+
+    //find all task plans that have an associated task with a task type of BIRTH that is not complete
+    public List<TaskPlan> findAllIncompleteBirthPlans() {
+        List<TaskPlan> allPlans = taskPlanRepository.findAll();
+        return allPlans.stream()
+                .filter(plan -> {
+                    List<Task> tasks = taskService.findByPlanId(plan.getId());
+                    return tasks.stream().anyMatch(task -> !task.getCompleted() && task.getType() == TaskType.BIRTH);
+                })
+                .toList();
     }
 
     public List<TaskPlan> findAll() {
@@ -31,4 +52,61 @@ public class TaskPlanService {
     public void deleteById(Integer id) {
         taskPlanRepository.deleteById(id);
     }
+
+    //add a method to create a displayname for a taskplan that includes the father, mother and the date for the task associated with a sequence of 1
+    public String getDisplayName(TaskPlan taskPlan) {
+        String fatherName = "Unknown Father";
+        String motherName = "Unknown Mother";
+        String dateInfo = "";
+
+        if (taskPlan.getLinkFatherId() != null) {
+            Stock fatherOpt = stockService.findById(taskPlan.getLinkFatherId());
+            fatherName = fatherOpt.getName();
+        }
+
+        if (taskPlan.getLinkMotherId() != null) {
+            Stock motherOpt = stockService.findById(taskPlan.getLinkMotherId());
+            motherName = motherOpt.getName();
+        }
+
+        List<Task> tasks = taskService.findByPlanId(taskPlan.getId());
+        if (!tasks.isEmpty()) {
+            var firstTask = tasks.get(0);
+            if (firstTask.getDate() != null) {
+                dateInfo = firstTask.getDate().toString();
+            }
+        }
+
+        return dateInfo + ": " + fatherName + " / " + motherName;
+    }
+
+    public Badge getDisplayNameBadge(TaskPlan taskPlan) {
+        String dateInfo = "";
+        String linkTypeInfo = "";
+
+        linkTypeInfo = switch (taskPlan.getType()) {
+            case BREEDER -> "Breeder";
+            case LITTER -> "Litter";
+            default -> "General";
+        };
+        List<Task> tasks = taskService.findByPlanId(taskPlan.getId());
+        if (!tasks.isEmpty()) {
+            var firstTask = tasks.get(0);
+            if (firstTask.getDate() != null) {
+                dateInfo = firstTask.getDate().toString();
+            }
+        }
+        Badge badge = new Badge(linkTypeInfo + " Plan: " + dateInfo);
+        badge.addThemeVariants(BadgeVariant.PILL);
+        if(linkTypeInfo.equals("Breeder")) {
+            badge.addThemeVariants(BadgeVariant.SUCCESS);
+        } else if (linkTypeInfo.equals("Litter")) {
+            badge.addThemeVariants(BadgeVariant.CONTRAST);
+        } else {
+            badge.addThemeVariants(BadgeVariant.WARNING);
+        }
+
+        return badge;
+    }
+
 }

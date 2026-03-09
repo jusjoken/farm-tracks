@@ -45,5 +45,14 @@ public interface LitterRepository extends JpaRepository<Litter, Integer>  {
     public void deleteByMotherId(Integer stockId);
 
     public List<Litter> findAllByStockType(StockType stockType);
-    
+
+    @Query("""
+        select l.name
+        from Litter l
+        where l.name like concat(:prefixToUse, '%')
+        order by length(l.name) desc, l.name desc
+    """)
+    // this query will return names like "LitterA", "LitterA1", "LitterA2", etc. and we can take the first result to find the next litter name
+    public List<String> findLitterNamesByPrefixAndStockType(@Param("prefixToUse") String prefixToUse);
+
 }

@@ -771,9 +771,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     private Tab createTab(String labelText, TabType tabType, String itemData){
         Span label = new Span(labelText);
         if(tabType.equals(TabType.COUNT) && (!itemData.equals(Utility.EMPTY_VALUE) && !itemData.equals("0"))){
-            Span counter = new Span(itemData);
-            counter.getElement().getThemeList().add("badge pill small contrast");
-            counter.getStyle().set("margin-inline-start", "var(--lumo-space-s)");
+            Span counter = UIUtilities.getSuperScriptSpan(itemData);
             // Accessible badge label
             String counterLabel = itemData;
             counter.getElement().setAttribute("aria-label", counterLabel);

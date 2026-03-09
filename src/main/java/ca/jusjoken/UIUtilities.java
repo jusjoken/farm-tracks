@@ -9,6 +9,7 @@ import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
@@ -19,6 +20,7 @@ import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.textfield.TextFieldVariant;
 
+import ca.jusjoken.component.Badge;
 import ca.jusjoken.component.ButtonNumberField;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Stock;
@@ -227,5 +229,45 @@ public class UIUtilities {
             component.getStyle().set("--vaadin-card-border-color", UIUtilities.borderColorNA);
         }
     }
-    
+
+    public static Span getSuperScriptSpan(String text){
+        Span span = new Span(text);
+        span.getStyle().set("font-size", "0.6em");
+        span.getStyle().set("line-height", "1");
+        span.getStyle().set("display", "inline-block");
+        span.getStyle().set("transform", "translateY(-0.5em)");
+
+        // span.getStyle().set("font-size", "0.72em");
+        // span.getStyle().set("line-height", "1");
+        // span.getStyle().set("transform", "translateY(-0.45em)");
+        span.getStyle().set("margin-left", "0.15em");
+        span.getStyle().set("margin-right", "0.2em");
+
+        return span;
+    } 
+
+    public static Div getContextMenuHeaderOld(String text){
+        Div header = new Div(new Text(text));
+        header.getStyle().set("font-weight", "bold");
+        header.getStyle().set("padding", "var(--lumo-space-s)");
+        header.getStyle().set("text-align", "center");
+        return header;
+    }
+
+    public static Component getContextMenuHeader(String text){
+        //return a layout with the text centered and bold, and with a bottom border
+        HorizontalLayout header = new HorizontalLayout(new Text(text));
+        header.setPadding(true);
+        header.setWidthFull();
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
+        header.getStyle().set("font-weight", "bold");
+        // match SVG: linearGradient x1="0" y1="0" x2="1" y2="1" with 2 stops
+        header.getStyle().set("background", "linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)");
+        header.getStyle().set("border-radius", "0 0 0.25em 0.25em");
+        return header;
+    }
+
+
+
 }

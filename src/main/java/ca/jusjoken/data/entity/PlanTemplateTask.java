@@ -1,6 +1,7 @@
 package ca.jusjoken.data.entity;
 
 import ca.jusjoken.data.Utility;
+import ca.jusjoken.utility.TaskType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -16,7 +17,7 @@ public class PlanTemplateTask {
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "id", nullable = false)
     private Integer id;
-    private Utility.TaskType type;
+    private TaskType type;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "plan_template_id", nullable = false)
@@ -29,18 +30,18 @@ public class PlanTemplateTask {
     public PlanTemplateTask() {
     }
 
-    public PlanTemplateTask(Utility.TaskType type, PlanTemplate planTemplate, Integer daysFromStart, Integer sequence) {
+    public PlanTemplateTask(TaskType type, PlanTemplate planTemplate, Integer daysFromStart, Integer sequence) {
         this.type = type;
         this.planTemplate = planTemplate;
         this.daysFromStart = daysFromStart;
         this.sequence = sequence;
     }
 
-    public Utility.TaskType getType() {
+    public TaskType getType() {
         return type;
     }
 
-    public void setType(Utility.TaskType type) {
+    public void setType(TaskType type) {
         this.type = type;
     }
 

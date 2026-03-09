@@ -3,6 +3,7 @@ package ca.jusjoken.data.entity;
 import java.time.LocalDate;
 
 import ca.jusjoken.data.Utility;
+import ca.jusjoken.utility.TaskType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -18,7 +19,7 @@ public class Task {
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "id", nullable = false)
     private Integer id;
-    private Utility.TaskType type;
+    private TaskType type;
     private String name;
     private LocalDate date;
     private Utility.TaskLinkType linkType;
@@ -34,7 +35,7 @@ public class Task {
     public Task() {
     }
 
-    public Task(Utility.TaskType type, String name, LocalDate date, Utility.TaskLinkType linkType, Integer linkBreederId, Integer linkLitterId) {
+    public Task(TaskType type, String name, LocalDate date, Utility.TaskLinkType linkType, Integer linkBreederId, Integer linkLitterId) {
         this.type = type;
         this.name = name;
         this.date = date;
@@ -51,11 +52,11 @@ public class Task {
         this.id = id;
     }
 
-    public Utility.TaskType getType() {
+    public TaskType getType() {
         return type;
     }
 
-    public void setType(Utility.TaskType type) {
+    public void setType(TaskType type) {
         this.type = type;
     }
 
@@ -114,13 +115,20 @@ public class Task {
     public void setTaskPlan(TaskPlan taskPlan) {
         this.taskPlan = taskPlan;
     }
+
+    public String getPlanName() {
+        if (this.taskPlan != null) {
+            return this.taskPlan.getType().getShortName() + " Plan";
+        }
+        return null;
+    }
     
 
     @Override
     public String toString() {
         return "Task [id=" + id + ", type=" + type + ", name=" + name + ", date=" + date + ", linkType=" + linkType
                 + ", linkBreederId=" + linkBreederId + ", linkLitterId=" + linkLitterId + ", completed=" + completed
-                + "]";
+                + ", taskPlan=" + getPlanName() + "]";
     }
 
     

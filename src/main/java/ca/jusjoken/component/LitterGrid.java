@@ -1,6 +1,7 @@
 package ca.jusjoken.component;
 
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 import com.vaadin.flow.component.AttachEvent;
@@ -8,9 +9,13 @@ import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.card.Card;
 import com.vaadin.flow.component.card.CardVariant;
+import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.grid.GridVariant;
+import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
+import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
+import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.select.Select;
@@ -23,17 +28,19 @@ import com.vaadin.flow.theme.lumo.LumoUtility.FontSize;
 import com.vaadin.flow.theme.lumo.LumoUtility.FontWeight;
 import com.vaadin.flow.theme.lumo.LumoUtility.Padding;
 
+import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
 import ca.jusjoken.data.entity.StockType;
+import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.utility.BadgeVariant;
 
-public class LitterGrid extends Grid<Litter> {
+public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListener{
     private ListDataProvider<Litter> dataProvider;
     private Integer stockId;
     private StockType stockType;
@@ -47,6 +54,15 @@ public class LitterGrid extends Grid<Litter> {
     private String parentNameFilter;
     private LitterDisplayMode litterDisplayMode = LitterDisplayMode.ALL;
     private Select<LitterViewStyle> viewStyleSelect;
+    private Grid.Column<Litter> kitsCountColumn;
+    private Grid.Column<Litter> survivalRateColumn;
+    private Grid.Column<Litter> diedKitsCountColumn;
+    private Grid.Column<Litter> kitsSurvivedCountColumn;
+    private Grid.Column<Litter> bredColumn;
+    private final TaskEditor taskEditor;
+    private final LitterEditor litterEditor;
+    private final List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
+
     public enum LitterDisplayMode {
         ALL,
         ACTIVE,
@@ -91,7 +107,11 @@ public class LitterGrid extends Grid<Litter> {
         this.litterService = Registry.getBean(LitterService.class);
         this.stockTypeService = Registry.getBean(StockTypeService.class);
         this.stockId = stockId;
+        this.taskEditor = new TaskEditor();
+        this.litterEditor = new LitterEditor();
+        this.litterEditor.addListener(this);
         setStockValues();
+        createContextMenu(this);
         createGrid();
     }
 
@@ -133,7 +153,7 @@ public class LitterGrid extends Grid<Litter> {
             return litter.getnameAndPrefix(false,true);
         }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name");
 
-        addColumn(Litter::getParentsFormatted).setHeader("Parents").setSortable(true).setResizable(true);
+        addColumn(Litter::getParentsFormatted).setHeader("Parents").setSortable(true).setResizable(true).setAutoWidth(true);
         Grid.Column<Litter> bornColumn = addColumn(new LocalDateRenderer<>(Litter::getDoB,"MM-dd-YYYY"))
                 .setHeader("Born").setSortable(true).setComparator(Litter::getDoB).setResizable(true);
         bredColumn = addColumn(new LocalDateRenderer<>(Litter::getBred,"MM-dd-YYYY"))
@@ -495,11 +515,79 @@ public class LitterGrid extends Grid<Litter> {
         }
     }
 
-    private Grid.Column<Litter> kitsCountColumn;
-    private Grid.Column<Litter> survivalRateColumn;
-    private Grid.Column<Litter> diedKitsCountColumn;
-    private Grid.Column<Litter> kitsSurvivedCountColumn;
-    private Grid.Column<Litter> bredColumn;
+    private GridContextMenu<Litter> createContextMenu(Grid<Litter> grid) {
+        GridContextMenu<Litter> menu = new GridContextMenu<>(grid);
+
+        menu.setDynamicContentHandler(litterEntity -> {
+            if(litterEntity==null){ //this is when the header row is right clicked
+                return false;
+            }else{
+                menu.removeAll();
+                String litterName = litterEntity.getDisplayName();
+                Div heading = new Div();
+                heading.setText(litterName);
+                heading.getStyle().set("text-align", "center");
+                heading.getStyle().set("font-weight", "bold");
+                heading.getStyle().set("padding", "8px");
+                
+                //add a label at the top with the stock name
+                menu.addComponentAsFirst(heading);
+                menu.addSeparator();
+
+                String addNewMenuTitle = "Add new litter";
+                GridMenuItem<Litter> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+                addNewMenu.addMenuItemClickListener(click -> {
+                    //open litter edit dialog - to be create yet
+                    litterEditor.dialogOpen(new Litter(), LitterEditor.DialogMode.CREATE, litterEntity.getStockType());
+                    
+                });
+
+                GridMenuItem<Litter> addTaskMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+                addTaskMenu.addMenuItemClickListener(click -> {
+                    //open task edit dialog
+                    //create a new task for this litter with default values
+                    Task newTask = new Task();
+                    newTask.setLinkType(Utility.TaskLinkType.LITTER);
+                    newTask.setLinkLitterId(litterEntity.getId());
+
+                    taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, litterEntity.getStockType());
+                    
+                });
+                menu.addSeparator();
+
+                GridMenuItem<Litter> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
+                editMenu.addMenuItemClickListener(click -> {
+                    //open litter edit dialog
+                });
+                menu.addSeparator();
+                GridMenuItem<Litter> deleteMenu = menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
+                deleteMenu.addMenuItemClickListener(click -> {
+                    //ask for confirmation and then delete the litter and all associated kits
+                    ConfirmDialog confirm = new ConfirmDialog();
+                    confirm.setHeader("Delete litter:" + litterEntity.getDisplayName());
+                    confirm.setText("Are you sure you want to delete this litter? This will also delete all associated kits.");
+                    confirm.setCancelable(true);
+                    confirm.setCancelText("No");
+                    confirm.setConfirmText("Yes");
+                    confirm.addConfirmListener(event -> {
+                        System.out.println("Deleting litter with ID: " + litterEntity.getId());
+                        litterService.deleteById(litterEntity.getId());
+                        listRefreshNeeded();
+                        confirm.close();
+                    });
+                    confirm.addCancelListener(event -> {
+                        confirm.close();
+                    });
+                    confirm.open();
+                    return;
+                });
+
+                return true;
+            }
+        });
+
+        return menu;
+    }
 
     public LitterViewStyle getCurrentViewStyle() {
         return currentViewStyle;
@@ -509,5 +597,22 @@ public class LitterGrid extends Grid<Litter> {
         this.currentViewStyle = currentViewStyle;
         viewStyleSelect.setValue(currentViewStyle);
     }
+
+    @Override
+    public void listRefreshNeeded() {
+        refreshGrid();
+        notifyRefreshNeeded();
+    }
+
+    public void addListener(ListRefreshNeededListener listener) {
+        listRefreshNeededListeners.add(listener);
+    }
+
+    private void notifyRefreshNeeded() {
+        for (ListRefreshNeededListener listener : listRefreshNeededListeners) {
+            listener.listRefreshNeeded();
+        }
+    }
+
 
 }

@@ -96,10 +96,12 @@ import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.entity.Generation;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockType;
+import ca.jusjoken.data.service.AppSettingsService;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.views.MainLayout;
 import jakarta.annotation.security.PermitAll;
+import ca.jusjoken.data.entity.AppSettings;
 
 /**
  *
@@ -110,6 +112,7 @@ import jakarta.annotation.security.PermitAll;
 public class StockPedigreeEditor extends Main implements ListRefreshNeededListener, HasDynamicTitle, HasUrlParameter<String>   {
 
     private final StockService stockService;
+    private final AppSettingsService appSettingsService;
     private Stock stock;
     private StockType viewStockType;
     private Stock selectedParent;
@@ -156,12 +159,19 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     private Integer colCounter = 0;
     private Integer tableRows = 5;
 
-    public StockPedigreeEditor(StockService stockService, StockTypeService typeService) {
+    private AppSettings appSettings;
+
+    private final Span includeFieldsCount = UIUtilities.getSuperScriptSpan("0");
+
+    public StockPedigreeEditor(StockService stockService, StockTypeService typeService, AppSettingsService appSettingsService) {
         this.stockService = stockService;
+        this.appSettingsService = appSettingsService;
+        this.appSettings = appSettingsService.getAppSettings();
         this.resourcePedigreeTemplate = new ClassPathResource("Pedigree_Template.docx");
         this.resourceGenderMale = new ClassPathResource("/META-INF/resources/images/gender_male.png");
         this.resourceGenderFemale = new ClassPathResource("/META-INF/resources/images/gender_female.png");
         this.dialogCommon = new DialogCommon();
+
         setupListeners();
         addClassNames(LumoUtility.Display.FLEX, LumoUtility.Height.FULL, LumoUtility.Overflow.HIDDEN);
         System.out.println("Constructor: loading typeList");
@@ -374,7 +384,8 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         HorizontalLayout pdfLayout = UIUtilities.getHorizontalLayout(false, true, false);
         pdfLayout.setThemeVariants(HorizontalLayoutVariant.LUMO_SPACING_XS);
         pdfLayout.setAlignItems(FlexComponent.Alignment.BASELINE);
-        pdfLayout.add(new Span("PDF Settings"), pdfButton);
+        Span pdfSettingsLabel = new Span("PDF Settings");
+        pdfLayout.add(pdfSettingsLabel, includeFieldsCount, pdfButton);
         pdfLayout.setWidthFull();
 
         HorizontalLayout detailSummary = UIUtilities.getHorizontalLayout(false, true, false);
@@ -487,30 +498,50 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         addIncludeField(includeLegs, "includeLegs", "Legs");
         addIncludeField(includeChampNo, "includeChampNo", "ChampNo");
         addIncludeField(includeRegNo, "includeRegNo", "RegNo");
+
+        updateIncludeFieldsCountDisplay();
     }
-    
+
     private void addIncludeField(Checkbox includeBox, String includeId, String label){
         includeBox.setId(includeId);
         includeBox.addValueChangeListener(event -> {
             saveLocalSetting(event.getSource().getId().get(), event.getValue());
+            updateIncludeFieldsCountDisplay();
         });
         settingsForm.addFormItem(includeBox, label);
         setLocalSetting(includeBox);
     }
-    
+
     private void saveLocalSetting(String id, Boolean value){
         WebStorage.setItem(id, value.toString());
         //System.out.println("saveLocalSetting: id:" + id + " value:" + value);
-    }
-    
+    }    
+
     private void setLocalSetting(Checkbox checkbox){
         WebStorage.getItem(checkbox.getId().get(), callback -> {
-            //System.out.println("setLocalSetting: id:" + checkbox.getId() + " value:" + callback + " getBoolean:" + Boolean.valueOf(callback));
             if(callback!=null) checkbox.setValue(Boolean.valueOf(callback));
+            updateIncludeFieldsCountDisplay();
         });
-        
     }
-    
+
+    private void updateIncludeFieldsCountDisplay() {
+        includeFieldsCount.setText(String.valueOf(getCountIncludeFields()));
+    }
+
+    private Integer getCountIncludeFields(){
+        Integer count = 0;
+        if(includeGeno.getValue()) count++;
+        if(includeBreed.getValue()) count++;
+        if(includeChampNo.getValue()) count++;
+        if(includeColor.getValue()) count++;
+        if(includeDob.getValue()) count++;
+        if(includeId.getValue()) count++;
+        if(includeLegs.getValue()) count++;
+        if(includeRegNo.getValue()) count++;
+        if(includeWeight.getValue()) count++;
+        return count;
+    }
+
     private void saveParent(Stock stockToSave, Stock newParent, Gender sex){
         if(stockToSave==null || newParent==null){
             System.out.println("saveParent: Could not change parent as stock or parent was NULL: stock:" + stockToSave + " parent:" + newParent);
@@ -828,10 +859,10 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
 
             //output the Farm name and address
             //TODO: get this info from the database
-            String farmName = "Breza Homestead & Rabbitry";
-            String farmAddressLine1 = "RR5 Site 3 Box 21";
-            String farmAddressLine2 = "Rimbey Alberta T0C 2J0";
-            String farmEmail = "equidances@hotmail.ca";
+            String farmName = appSettings.getFarmName();
+            String farmAddressLine1 = appSettings.getFarmAddressLine1();
+            String farmAddressLine2 = appSettings.getFarmAddressLine2();
+            String farmEmail = appSettings.getFarmEmail();
             bn.moveToBookmark("farm");
             Paragraph paraFarm = getParagraph(document);
             TextRange farmNameTr = paraFarm.appendText(farmName);
@@ -893,7 +924,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
                 //add the name
                 bp.getBodyItems().add(paraName);
                 
-                System.out.println("createPedigreePDF: Geno:" + item.getGenotype());
+                // System.out.println("createPedigreePDF: Geno:" + item.getGenotype());
                 
 
                 //add Geno as a paragraph as it typically takes full width
@@ -945,7 +976,6 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
                     addParagraph(document, counter, bp, "Colour:", item.getColor(),includeColor);
                     addParagraph(document, counter, bp, "Breed:", item.getBreed(),includeBreed);
                     addParagraph(document, counter, bp, "Weight:", item.getWeightInLbsOz(),includeWeight);
-                    addParagraph(document, counter, bp, "Geno:", item.getGenotype(),includeGeno);
                     addParagraph(document, counter, bp, "Legs:", item.getLegs(),includeLegs);
                     addParagraph(document, counter, bp, "ChampNo:", item.getChampNo(),includeChampNo);
                     addParagraph(document, counter, bp, "RegNo:", item.getRegNo(),includeRegNo);
@@ -968,19 +998,6 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
             log.info("createPedigreePDF: FAILED:" + " ERROR:" + e.toString());
         }
         
-    }
-    
-    private Integer getCountIncludeFields(){
-        Integer count = 0;
-        if(includeBreed.getValue()) count++;
-        if(includeChampNo.getValue()) count++;
-        if(includeColor.getValue()) count++;
-        if(includeDob.getValue()) count++;
-        if(includeId.getValue()) count++;
-        if(includeLegs.getValue()) count++;
-        if(includeRegNo.getValue()) count++;
-        if(includeWeight.getValue()) count++;
-        return count;
     }
     
     @SuppressWarnings("unchecked")

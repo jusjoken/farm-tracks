@@ -52,9 +52,6 @@ public class Litter {
     @CsvBindByName(column = "Breed")
     private String breed;
 
-    @CsvBindByName(column = "Cage")
-    private String cage;
-
     @Transient
     @CsvBindByName(column = "Father")
     private String fatherName;  //name of the father for import only
@@ -114,11 +111,11 @@ public class Litter {
     private LocalDate doB;
     
     @CsvBindByName(column = "Total Kits")
-    private Integer kitsCount;   // make a getter and return a count
+    private Integer kitsCount = 0;   // make a getter and return a count
     @CsvBindByName(column = "Sold Kits")
-    private Integer soldKitsCount;   // make a getter and return a count
+    private Integer soldKitsCount = 0;   // make a getter and return a count
     @CsvBindByName(column = "Died Kits")
-    private Integer diedKitsCount;   // make a getter and return a count
+    private Integer diedKitsCount = 0;   // make a getter and return a count
 
     @Transient
     @CsvBindByName(column = "Total Weight")
@@ -130,7 +127,7 @@ public class Litter {
     private LocalDateTime archived;
 
     @CsvBindByName(column = "Notes")
-    private String notes;
+    private String notes = "";
 
     @Transient
     private Boolean needsSaving = Boolean.FALSE;
@@ -165,14 +162,6 @@ public class Litter {
 
     public void setBreed(String breed) {
         this.breed = breed;
-    }
-
-    public String getCage() {
-        return cage;
-    }
-
-    public void setCage(String cage) {
-        this.cage = cage;
     }
 
    public String getFatherName() {
@@ -264,6 +253,7 @@ public class Litter {
     }
 
     public void setDiedKitsCount(Integer diedKitsCount) {
+        if(diedKitsCount==null) diedKitsCount = 0;
         this.diedKitsCount = diedKitsCount;
     }
     
@@ -319,6 +309,7 @@ public class Litter {
     }
 
     public void setNotes(String notes) {
+        if(notes==null) notes = "";
         this.notes = notes;
     }
 
@@ -418,7 +409,6 @@ public class Litter {
         sb.append(", prefix=").append(prefix);
         sb.append(", name=").append(name);
         sb.append(", breed=").append(breed);
-        sb.append(", cage=").append(cage);
         sb.append(", fatherName=").append(fatherName);
         sb.append(", motherName=").append(motherName);
         sb.append(", father=").append(father);

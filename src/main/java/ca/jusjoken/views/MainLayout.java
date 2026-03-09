@@ -138,27 +138,38 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         );           
 
         ftIcon.getStyle().set("object-fit", "contain");
-        ftIcon.setWidth("40px");
+        ftIcon.setWidth("44px");
         
         if(authContext.isAuthenticated()){
             ftSignin = new Button(ftIcon);
+            styleFtSigninButton(ftSignin);
             menu = new ContextMenu(ftSignin);
             buildContextMenu();
             userMenu.addToEnd(ftSignin);  
             return userMenu;
         }else{
-            //avatar.setName("Farm Tracks Signin");
             ftSignin = new Button(ftIcon);
+            styleFtSigninButton(ftSignin);
             ftSignin.addClickListener(click -> {
                 click.getSource().getUI().ifPresent(ui -> ui.navigate("/login"));
             });
             userMenu.addToEnd(ftSignin);
             userMenu.setAlignItems(FlexComponent.Alignment.END);
             userMenu.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-            //avatar.setTooltipEnabled(true);
             return userMenu;
         }
+    }
 
+    private void styleFtSigninButton(Button button) {
+        button.getStyle().set("border-radius", "50%");
+        button.getStyle().set("width", "40px");
+        button.getStyle().set("height", "40px");
+        button.getStyle().set("min-width", "40px");
+        button.getStyle().set("padding", "0");
+        button.getStyle().set("display", "inline-flex");
+        button.getStyle().set("align-items", "center");
+        button.getStyle().set("justify-content", "center");
+        button.getStyle().set("overflow", "hidden");
     }
 
     private void buildContextMenu(){

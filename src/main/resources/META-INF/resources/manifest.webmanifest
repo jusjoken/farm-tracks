@@ -1,0 +1,16 @@
+{
+  "name": "Farm Tracks",
+  "short_name": "FT",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "icons/ft-icon-filled.png",
+      "type": "image/png",
+      "sizes": "any",
+      "purpose": "maskable"
+    }
+  ]
+}

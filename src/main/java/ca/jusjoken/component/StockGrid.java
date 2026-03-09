@@ -80,6 +80,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private final TaskEditor taskEditor;
     private final PlanEditor planEditor;
     private List<Column<Stock>> columnList;
+    private Boolean menuCreated = false;
     public static enum StockGridType {
         LITTER, STOCK, KITS
     }
@@ -122,7 +123,10 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                 columnList = getCleanColumnList(event.getColumns());
                 notifySidebarChanged(true);
             });
-            createContextMenu(this);
+            if(!menuCreated){
+                createContextMenu(this);
+                menuCreated = true;
+            }
         }
     }
 
@@ -520,16 +524,9 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             }else{
                 menu.removeAll();
                 String stockName = stockEntity.getDisplayName();
-                Div heading = new Div();
-                heading.setText(stockName);
-                heading.getStyle().set("text-align", "center");
-                heading.getStyle().set("font-weight", "bold");
-                heading.getStyle().set("padding", "8px");
-                //menu.setOpenOnClick(true);
                 
                 //add a label at the top with the stock name
-                menu.addComponentAsFirst(heading);
-                menu.addSeparator();
+                menu.addComponentAsFirst(UIUtilities.getContextMenuHeader(stockName));
 
                 String addNewMenuTitle = "Add new " + stockEntity.getStockType().getNameSingular();
                 GridMenuItem<Stock> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));

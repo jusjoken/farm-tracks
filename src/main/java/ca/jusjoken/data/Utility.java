@@ -42,38 +42,6 @@ public class Utility {
     
     public static final LocalDateTime nullDate = LocalDateTime.of(1970, 1, 1, 0, 0);
 
-    //Note: TaskTypeConverter class is used to convert these so the shortname is stored in the database
-    public static enum TaskType{
-        BREED("Breed"), NESTBOX("Nestbox"), BIRTH("Birth"), CLEAN_NESTBOX("Clean Nestbox"), REMOVE_NESTBOX("Remove Nestbox"), 
-        REBREED("Rebreed"), WEAN("Wean"), BUTCHER("Butcher"), PREGNANCY_CHECK("Pregnancy Check"), MEDICAL("Medical"), CUSTOM("Custom");
-
-        private final String shortName;
-        private static final Map<String, TaskType> LOOKUP = new HashMap<>();
-        
-        static {
-            for (TaskType type : TaskType.values()) {
-                LOOKUP.put(type.name(), type);       // supports "BREED"
-                LOOKUP.put(type.shortName, type);    // supports "Breed"
-            }
-        }
-        
-        private TaskType(String shortName) {
-            this.shortName = shortName;
-        }
-        
-        public String getShortName(){
-            return shortName != null ? shortName : "";
-        }
-        
-        public static TaskType fromShortName(String shortName){
-            TaskType type = LOOKUP.get(shortName);
-            if (type != null) {
-                return type;
-            }
-            throw new IllegalArgumentException("ShortName [" + shortName + "] not supported.");
-        }
-    }
-
     //Note: TaskLinkTypeConverter class is used to convert these so the shortname is stored in the database
     public static enum TaskLinkType{
         GENERAL("General"), BREEDER("Breeder"), LITTER("Litter");
@@ -382,5 +350,4 @@ public class Utility {
         String retVal = "<p>" + pounds.toString() + sub + "lbs" + subEnd + " " + remainingOunces.toString() + sub + "oz" + subEnd + "</p>";
         return retVal;        
     }
-    
 }

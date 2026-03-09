@@ -19,7 +19,6 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
 
-import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.Utility.TaskLinkType;
 import ca.jusjoken.data.entity.PlanTemplate;
@@ -34,11 +33,12 @@ import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.TaskPlanService;
 import ca.jusjoken.data.service.TaskService;
+import ca.jusjoken.utility.TaskType;
 
 public class PlanEditor {
 
     public enum DialogMode {
-        EDIT, CREATE
+        EDIT, CREATE, DISPLAY
     }
 
     private DialogMode dialogMode = DialogMode.CREATE;
@@ -67,8 +67,9 @@ public class PlanEditor {
     private TaskPlan editingTaskPlan;
     private final TaskService taskService;
     private final TaskPlanService taskPlanService;
-    private final Grid<GeneratedTaskRow> taskGrid = new Grid<>(GeneratedTaskRow.class, false);
-    private final List<GeneratedTaskRow> generatedTaskRows = new ArrayList<>();
+    private final Grid<GeneratedTaskRow> taskTemplatesGrid = new Grid<>(GeneratedTaskRow.class, false);
+    private final List<GeneratedTaskRow> generatedTemplateTaskRows = new ArrayList<>();
+    private final TaskGrid taskGrid;
 
     public PlanEditor() {
         this.planTemplateService = Registry.getBean(PlanTemplateService.class);
@@ -76,6 +77,7 @@ public class PlanEditor {
         this.stockService = Registry.getBean(StockService.class);
         this.taskService = Registry.getBean(TaskService.class);
         this.taskPlanService = Registry.getBean(TaskPlanService.class);
+        this.taskGrid = new TaskGrid(null, false, true); // disable plan actions to avoid recursion
         dialogConfigure();
     }
 
@@ -124,7 +126,7 @@ public class PlanEditor {
                 planTemplateSelect.clear();
             }
             editingTaskPlan.setType(selectedTaskLinkType);
-            refreshGeneratedTasks();
+            refreshGeneratedTemplateTasks();
             valuesChanged();
         });
 
@@ -136,7 +138,7 @@ public class PlanEditor {
             } else {
                 selectedPlanTemplate = null;
             }
-            refreshGeneratedTasks();
+            refreshGeneratedTemplateTasks();
             valuesChanged();
         });
         femaleStockSelect.setWidthFull();
@@ -154,30 +156,30 @@ public class PlanEditor {
         startDatePicker.setWidthFull();
         startDatePicker.setRequired(true);
         startDatePicker.addValueChangeListener(e -> {
-            refreshGeneratedTasks();
+            refreshGeneratedTemplateTasks();
             valuesChanged();
         });
 
-        configureTaskGrid();
+        configureTemplateTaskGrid();
     }
 
-    private void configureTaskGrid() {
-        taskGrid.addColumn(GeneratedTaskRow::getName).setHeader("Task");
-        taskGrid.addComponentColumn(row -> {
+    private void configureTemplateTaskGrid() {
+        taskTemplatesGrid.addColumn(GeneratedTaskRow::getName).setHeader("Task");
+        taskTemplatesGrid.addComponentColumn(row -> {
             DatePicker datePicker = new DatePicker();
             datePicker.setValue(row.getTaskDate());
             datePicker.addValueChangeListener(e -> row.setTaskDate(e.getValue()));
             return datePicker;
         }).setHeader("Date");
-        taskGrid.setWidthFull();
-        taskGrid.setAllRowsVisible(true);
+        taskTemplatesGrid.setWidthFull();
+        taskTemplatesGrid.setAllRowsVisible(true);
     }
 
-    private void refreshGeneratedTasks() {
-        generatedTaskRows.clear();
+    private void refreshGeneratedTemplateTasks() {
+        generatedTemplateTaskRows.clear();
 
         if (selectedPlanTemplate == null || startDatePicker.getValue() == null) {
-            taskGrid.setItems(generatedTaskRows);
+            taskTemplatesGrid.setItems(generatedTemplateTaskRows);
             return;
         }
 
@@ -186,14 +188,14 @@ public class PlanEditor {
 
         for (PlanTemplateTask templateTask : templateTasks) {
             Integer daysFromStart = templateTask.getDaysFromStart() == null ? 0 : templateTask.getDaysFromStart();
-            generatedTaskRows.add(new GeneratedTaskRow(
+            generatedTemplateTaskRows.add(new GeneratedTaskRow(
                 templateTask.getDisplayName(),
                 startDate.plusDays(daysFromStart),
                 templateTask.getType()
             ));
         }
 
-        taskGrid.setItems(generatedTaskRows);
+        taskTemplatesGrid.setItems(generatedTemplateTaskRows);
     }
 
     public void dialogOpen(TaskLinkType taskLinkType) {
@@ -237,7 +239,19 @@ public class PlanEditor {
             planTemplateSelect.clear();
         }
 
-        dialogTitle = dialogMode == DialogMode.CREATE ? "Create plan" : "Edit plan";
+        if(dialogMode == DialogMode.DISPLAY) {
+            dialogTitle = "View plan";
+            dialogOkButton.setVisible(false);
+            dialogCancelButton.setVisible(true);
+        } else if(dialogMode == DialogMode.EDIT) {
+            dialogTitle = "Edit plan";
+            dialogOkButton.setVisible(true);
+            dialogCancelButton.setVisible(true);
+        } else {
+            dialogTitle = "Create plan";
+            dialogOkButton.setVisible(true);
+            dialogCancelButton.setVisible(true);
+        }
 
         dialog.setHeaderTitle(dialogTitle);
         dialog.getElement().setAttribute("aria-label", dialogTitle);
@@ -265,7 +279,7 @@ public class PlanEditor {
             femaleStockSelect.setItems(femaleStocks);
             maleStockSelect.setItems(maleStocks);
 
-            if(dialogMode == DialogMode.EDIT && editingTaskPlan.getId() != null) {
+            if((dialogMode == DialogMode.EDIT || dialogMode == DialogMode.DISPLAY) && editingTaskPlan.getId() != null) {
                 //if we're editing an existing plan, set the selected mother and father based on the linkMotherId and linkFatherId of the task plan
                 if(editingTaskPlan.getLinkMotherId() != null) {
                     Stock linkedMother = stockService.findById(editingTaskPlan.getLinkMotherId());
@@ -298,7 +312,7 @@ public class PlanEditor {
         maleStockSelect.setItemLabelGenerator(Stock::getDisplayName);
 
         startDatePicker.setRequired(true);
-        if(dialogMode == DialogMode.EDIT && editingTaskPlan.getId() != null) {
+        if((dialogMode == DialogMode.EDIT || dialogMode == DialogMode.DISPLAY) && editingTaskPlan.getId() != null) {
             //if we're editing an existing plan, set the start date to the earliest task date for the tasks in this plan
             List<Task> existingTasks = taskService.findByPlanId(editingTaskPlan.getId());
             LocalDate earliestDate = existingTasks.stream()
@@ -308,9 +322,28 @@ public class PlanEditor {
             startDatePicker.setValue(earliestDate);
         } else {
             startDatePicker.setValue(LocalDate.now());
-    }
+        }
 
-        refreshGeneratedTasks();
+        //if the dialogmode is DISPLAY the make all fields read-only
+        boolean readOnly = dialogMode == DialogMode.DISPLAY;
+        taskLinkTypeSelect.setReadOnly(readOnly);
+        planTemplateSelect.setReadOnly(readOnly);   
+        femaleStockSelect.setReadOnly(readOnly);
+        maleStockSelect.setReadOnly(readOnly);
+        startDatePicker.setReadOnly(readOnly);
+
+        //if dialogmode is DISPLAY then hide the taskstemplatesgrid and instead show the taskGrid with the tasks for this plan
+        if(dialogMode == DialogMode.DISPLAY) {
+            taskTemplatesGrid.setVisible(false);
+            taskGrid.setVisible(true);
+            taskGrid.setTaskPlanId(editingTaskPlan.getId());
+            taskGrid.setAllRowsVisible(true);
+        } else {
+            taskTemplatesGrid.setVisible(true);
+            taskGrid.setVisible(false);     
+        }
+
+        refreshGeneratedTemplateTasks();
         buildDialogLayout();
         dialog.open();
     }
@@ -322,8 +355,8 @@ public class PlanEditor {
         femaleStockSelect.clear();
         maleStockSelect.clear();
         startDatePicker.clear();
-        generatedTaskRows.clear();
-        taskGrid.setItems(generatedTaskRows);
+        generatedTemplateTaskRows.clear();
+        taskTemplatesGrid.setItems(generatedTemplateTaskRows);
     }
 
     private void buildDialogLayout() {
@@ -339,8 +372,13 @@ public class PlanEditor {
             dialogLayout.add(maleStockSelect);
         }
         dialogLayout.add(startDatePicker);
-        dialogLayout.add(new Span("The following tasks will be created:"));
-        dialogLayout.add(taskGrid);
+        if(dialogMode == DialogMode.DISPLAY) {
+            dialogLayout.add(new Span("The following tasks are included:"));
+            dialogLayout.add(taskGrid);
+        } else {
+            dialogLayout.add(new Span("The following tasks will be created:"));
+            dialogLayout.add(taskTemplatesGrid);
+        }
     }
 
     private void valuesChanged(){
@@ -371,7 +409,7 @@ public class PlanEditor {
         editingTaskPlan.setLinkFatherId(maleStockSelect.getValue() != null ? maleStockSelect.getValue().getId() : null);
         TaskPlan savedTaskPlan = taskPlanService.save(editingTaskPlan);
         System.out.println("Saved TaskPlan: " + savedTaskPlan + " editingTaskPlan: " + editingTaskPlan);
-        for (GeneratedTaskRow row : generatedTaskRows) {
+        for (GeneratedTaskRow row : generatedTemplateTaskRows) {
             Task task = new Task();
             task.setName(row.getName());
             task.setDate(row.getTaskDate());
@@ -403,11 +441,9 @@ public class PlanEditor {
     private static class GeneratedTaskRow {
         private String name;
         private LocalDate taskDate;
-        private Utility.TaskType type;
+        private TaskType type;
 
-
-
-        GeneratedTaskRow(String name, LocalDate taskDate, Utility.TaskType type) {
+        GeneratedTaskRow(String name, LocalDate taskDate, TaskType type) {
             this.name = name;
             this.taskDate = taskDate;
             this.type = type;
@@ -416,6 +452,6 @@ public class PlanEditor {
         public String getName() { return name; }
         public LocalDate getTaskDate() { return taskDate; }
         public void setTaskDate(LocalDate taskDate) { this.taskDate = taskDate; }
-        public Utility.TaskType getType() { return type; }
+        public TaskType getType() { return type; }
     }
 }
