@@ -17,6 +17,7 @@ import java.util.Map;
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 
 import ca.jusjoken.data.Utility.Gender;
+import ca.jusjoken.data.Utility.TaskLinkType;
 import ca.jusjoken.data.service.ColumnNameComparator;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockStatusComparator;
@@ -41,6 +42,39 @@ public class Utility {
     private static final Map<String, ColumnName> stockColumnNameList = new HashMap<>();
     
     public static final LocalDateTime nullDate = LocalDateTime.of(1970, 1, 1, 0, 0);
+
+    //Note: TaskPlanStatusConverter class is used to convert these so the shortname is stored in the database
+    public static enum TaskPlanStatus{
+        ACTIVE("Active"), INACTIVE("Inactive"), INCOMPLETE("Incomplete");
+
+        private final String shortName;
+        private static final Map<String, TaskPlanStatus> LOOKUP = new HashMap<>();
+        
+        static {
+            for (TaskPlanStatus type : TaskPlanStatus.values()) {
+                LOOKUP.put(type.name(), type);      
+                LOOKUP.put(type.shortName, type);  
+            }
+        }
+        
+        private TaskPlanStatus(String shortName) {
+            this.shortName = shortName;
+        }
+        
+        public String getShortName(){
+            return shortName != null ? shortName : "";
+        }
+        
+        public static TaskPlanStatus fromShortName(String shortName){
+            TaskPlanStatus type = LOOKUP.get(shortName);
+            if (type != null) {
+                return type;
+            }
+            throw new IllegalArgumentException("ShortName [" + shortName + "] not supported.");
+        }
+    }
+
+
 
     //Note: TaskLinkTypeConverter class is used to convert these so the shortname is stored in the database
     public static enum TaskLinkType{
@@ -192,6 +226,7 @@ public class Utility {
         ACTION_ADDNEW(FontAwesome.Solid.PLUS.create().getIcon()),
         ACTION_WEIGH(FontAwesome.Solid.BALANCE_SCALE.create().getIcon()),
         ACTION_PEDIGREE(FontAwesome.Solid.SITEMAP.create().getIcon()),
+        ACTION_CHECK(FontAwesome.Solid.CHECK.create().getIcon()),
         GENDER_FEMALE(FontAwesome.Solid.VENUS.create().getIcon()),
         GENDER_MALE(FontAwesome.Solid.MARS.create().getIcon()),
         TYPE_BREEDER(FontAwesome.Solid.VENUS_MARS.create().getIcon());

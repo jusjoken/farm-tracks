@@ -83,6 +83,8 @@ public class TaskEditor {
     private Integer originalLinkLitterId;
     private Boolean originalCompleted;
 
+    private LitterEditor litterEditor = new LitterEditor();
+
     public TaskEditor() {
         taskService = Registry.getBean(TaskService.class);
         litterService = Registry.getBean(LitterService.class);
@@ -112,7 +114,10 @@ public class TaskEditor {
 
         // taskActionButton.setWidthFull();
         taskActionButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        taskActionButton.addClickListener(event -> runTaskAction(type.getValue()));
+        taskActionButton.addClickListener(event -> {
+            litterEditor.runTaskAction(task, currentStockType);
+            updateTaskActionVisibility();
+        });
 
         HorizontalLayout footerLayout = new HorizontalLayout(taskActionButton, dialogCancelButton, dialogOkButton);
 
@@ -318,34 +323,6 @@ public class TaskEditor {
         } else {
             taskActionButton.setText("");
         }
-    }
-
-    private void runTaskAction(TaskType taskType) {
-        if (taskType == null || !taskType.hasAction()) {
-            return;
-        }
-
-        switch (taskType) {
-            case BIRTH -> {
-                // TODO: create litter flow
-            }
-            case WEAN -> {
-                // TODO: wean flow
-            }
-            case BUTCHER -> {
-                // TODO: butcher flow
-            }
-            case CUSTOM -> {
-                // TODO: custom action flow
-            }
-            default -> {
-                // TODO: add action handling as needed
-            }
-        }
-
-        // default post-action behavior for now
-        // completed.setValue(true);
-        updateTaskActionVisibility();
     }
 
     private void changeLinkType(Utility.TaskLinkType newLinkType) {

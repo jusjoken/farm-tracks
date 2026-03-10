@@ -26,6 +26,7 @@ import ca.jusjoken.data.entity.TaskPlan;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.TaskService;
+import ca.jusjoken.utility.TaskType;
 import ca.jusjoken.data.service.TaskPlanService;
 
 public class TaskGrid extends Grid<Task> {
@@ -34,6 +35,7 @@ public class TaskGrid extends Grid<Task> {
     private final StockService stockService;
     private final TaskPlanService taskPlanService;
     private final TaskEditor taskEditor = new TaskEditor();
+    private final LitterEditor litterEditor = new LitterEditor();
     private PlanEditor planEditor; // lazy to avoid constructor recursion
     private final boolean enablePlanActions;
     private Integer stockId;
@@ -65,6 +67,9 @@ public class TaskGrid extends Grid<Task> {
         }
 
         this.stockId = stockId;
+        if(minimalColumns){
+            currentCompletionFilter = Utility.TaskCompletionFilter.ALL.filterName;
+        }
         configureGrid();
     }
 
@@ -192,7 +197,7 @@ public class TaskGrid extends Grid<Task> {
                 editMenu.addMenuItemClickListener(click -> {
                     taskEditor.dialogOpen(menuEntity, TaskEditor.DialogMode.EDIT, null);
                 });
-                //add a menu item to edit the plan if the task has a plan
+                //add a menu item to view the plan if the task has a plan
                 Integer taskPlanId = safeGetTaskPlanId(menuEntity);
                 if (enablePlanActions && taskPlanId != null) {
                     GridMenuItem<Task> editPlanMenu = menu.addItem(new Item("View Plan", Utility.ICONS.ACTION_EDIT.getIconSource()));
@@ -201,7 +206,25 @@ public class TaskGrid extends Grid<Task> {
                         getPlanEditor().dialogOpen(taskPlanId, menuEntity.getLinkType(), stockEntity, PlanEditor.DialogMode.DISPLAY);
                     });
                 }
+                //if the current task type has an action associated with it, show the action in the context menu. For example, if the task type is BIRTH then show a "View Offspring" action that opens the stock list view filtered to show the offspring from this birth task.
+                if (menuEntity.getType() != null && menuEntity.getType().hasAction()) {
+                    if (menuEntity.getType() == TaskType.BIRTH) {
+                        GridMenuItem<Task> actionMenu = menu.addItem(new Item(menuEntity.getType().getAction(), Utility.ICONS.ACTION_BIRTH.getIconSource()));
+                        actionMenu.addMenuItemClickListener(click -> {
+                            litterEditor.runTaskAction(menuEntity, null);
+                        });
 
+                    }
+                } else {
+                    //if no specific action then add a make complete action for active tasks and a mark incomplete action for completed tasks
+                    String actionText = menuEntity.getCompleted() ? "Mark Incomplete" : "Mark Complete";
+                    GridMenuItem<Task> actionMenu = menu.addItem(new Item(actionText, Utility.ICONS.ACTION_CHECK.getIconSource()));
+                    actionMenu.addMenuItemClickListener(click -> {
+                        menuEntity.setCompleted(!menuEntity.getCompleted());
+                        taskService.save(menuEntity);
+                        refreshGrid();
+                    });
+                }
                 return true;
             }
         });

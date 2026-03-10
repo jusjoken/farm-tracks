@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableAsync;
 
+import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.dependency.StyleSheet;
 import com.vaadin.flow.component.page.AppShellConfigurator;
 import com.vaadin.flow.component.page.Push;
@@ -27,6 +28,7 @@ import com.vaadin.flow.theme.lumo.Lumo;
 @StyleSheet(Lumo.UTILITY_STYLESHEET)
 @EnableJpaAuditing
 @PWA(name = "Farm Tracks", shortName = "FT", iconPath="icons/ft-icon-filled.png")
+@JsModule("./overlay-back-button.js")
 public class Application implements AppShellConfigurator {
 
     public static void main(String[] args) {

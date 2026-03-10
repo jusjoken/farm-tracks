@@ -29,9 +29,11 @@ public class TaskService {
     }
 
     public Object getTaskCountForStock(Stock stock) {
+        //add aditional filter to only count tasks where completed is false
         return taskRepository.findAll().stream()
                 .filter(task -> (task.getLinkType() == null || task.getLinkType() == Utility.TaskLinkType.BREEDER) 
-                        && task.getLinkBreederId() != null && task.getLinkBreederId().equals(stock.getId()))
+                        && task.getLinkBreederId() != null && task.getLinkBreederId().equals(stock.getId())
+                        && !task.getCompleted())
                 .count();
     }
 
@@ -51,5 +53,11 @@ public class TaskService {
         return taskRepository.findByTaskPlanId(taskPlanId);
     }
     
+    public void runTaskActions(Task task) {
+        // Intentionally left as non-UI service hook.
+        // UI actions (opening editors/dialogs) are handled in component layer (e.g., LitterEditor).
+        // Keep this method only for future server-side business actions if needed.
+    }
+
 
 }

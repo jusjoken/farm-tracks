@@ -28,6 +28,7 @@ import com.vaadin.flow.theme.lumo.LumoUtility.FontSize;
 import com.vaadin.flow.theme.lumo.LumoUtility.FontWeight;
 import com.vaadin.flow.theme.lumo.LumoUtility.Padding;
 
+import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
@@ -524,15 +525,15 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
             }else{
                 menu.removeAll();
                 String litterName = litterEntity.getDisplayName();
-                Div heading = new Div();
-                heading.setText(litterName);
-                heading.getStyle().set("text-align", "center");
-                heading.getStyle().set("font-weight", "bold");
-                heading.getStyle().set("padding", "8px");
+
+                // Div heading = new Div();
+                // heading.setText(litterName);
+                // heading.getStyle().set("text-align", "center");
+                // heading.getStyle().set("font-weight", "bold");
+                // heading.getStyle().set("padding", "8px");
                 
-                //add a label at the top with the stock name
-                menu.addComponentAsFirst(heading);
-                menu.addSeparator();
+                // //add a label at the top with the stock name
+                menu.addComponentAsFirst(UIUtilities.getContextMenuHeader(litterName));
 
                 String addNewMenuTitle = "Add new litter";
                 GridMenuItem<Litter> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));

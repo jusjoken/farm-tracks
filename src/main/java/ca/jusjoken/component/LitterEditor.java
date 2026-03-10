@@ -67,7 +67,6 @@ public class LitterEditor {
     private final ComboBox<Stock> mother = new ComboBox<>("Mother");
     private final IntegerField kitsCount = new IntegerField("Total Kits");
     private final IntegerField diedKitsCount = new IntegerField("Died Kits");
-    private final IntegerField litterWeight = new IntegerField("Total Weight (oz)");
     private final TextArea notes = new TextArea("Notes");
     private final Select<TaskPlan> taskPlanSelect = new Select<>("Incomplete Breed Plans");
     private final TaskPlanService taskPlanService;
@@ -130,7 +129,6 @@ public class LitterEditor {
 
         kitsCount.setMin(0);
         diedKitsCount.setMin(0);
-        litterWeight.setMin(0);
 
         notes.setMaxLength(4000);
 
@@ -143,7 +141,6 @@ public class LitterEditor {
         mother.setWidthFull();
         kitsCount.setWidthFull();
         diedKitsCount.setWidthFull();
-        litterWeight.setWidthFull();
         notes.setWidthFull();
         taskPlanSelect.setWidthFull();
 
@@ -157,6 +154,10 @@ public class LitterEditor {
         mother.addValueChangeListener(e -> updateSaveEnabled());
         kitsCount.addValueChangeListener(e -> updateSaveEnabled());
         diedKitsCount.addValueChangeListener(e -> updateSaveEnabled());
+
+        kitsCount.setAutoselect(true);
+        diedKitsCount.setAutoselect(true);
+
     }
 
     public void dialogOpen() {
@@ -206,19 +207,21 @@ public class LitterEditor {
         mother.setValue(litter.getMother());
         kitsCount.setValue(litter.getKitsCount() == null ? 0 : litter.getKitsCount());
         diedKitsCount.setValue(litter.getDiedKitsCount() == null ? 0 : litter.getDiedKitsCount());
-        litterWeight.setValue(litter.getLitterWeight() == null ? 0 : litter.getLitterWeight());
         notes.setValue(litter.getNotes() == null ? "" : litter.getNotes());
 
         if (taskPlan != null) {
-            taskPlanSelect.setValue(taskPlan); // triggers applyTaskPlanSelection
+            TaskPlan matchingPlan = breedPlans.stream()
+                    .filter(p -> Objects.equals(p.getId(), taskPlan.getId()))
+                    .findFirst()
+                    .orElse(null);
+            taskPlanSelect.setValue(matchingPlan);
+            taskPlanSelect.setReadOnly(true);
+            kitsCount.setAutofocus(true);
         }
 
         kitsCount.setReadOnly(dialogMode == DialogMode.EDIT);
 
-        // VerticalLayout fieldsLayout = UIUtilities.getVerticalLayout(false, true, false);
-        // fieldsLayout.add(taskPlanSelect, prefix, name, breed, bred, doB, father, mother, kitsCount, diedKitsCount, litterWeight, notes);
-
-        dialogLayout.add(new Hr(), taskPlanSelect, prefix, name, breed, bred, doB, father, mother, kitsCount, diedKitsCount, litterWeight, notes);
+        dialogLayout.add(new Hr(), taskPlanSelect, prefix, name, breed, bred, doB, father, mother, kitsCount, diedKitsCount, notes);
         updateSaveEnabled();
         dialog.open();
     }
@@ -267,7 +270,6 @@ public class LitterEditor {
         litter.setMother(mother.getValue());
         litter.setKitsCount(zeroIfNull(kitsCount.getValue()));
         litter.setDiedKitsCount(zeroIfNull(diedKitsCount.getValue()));
-        litter.setLitterWeight(zeroIfNull(litterWeight.getValue()));
         litter.setNotes(trimOrNull(notes.getValue()));
 
         if (dialogMode == DialogMode.CREATE) {
@@ -424,4 +426,47 @@ public class LitterEditor {
         return null;
     }
 
+    public void runTaskAction(Task task, StockType stockType) {
+        if (task == null || task.getType() == null || !task.getType().hasAction()) {
+            return;
+        }
+
+        switch (task.getType()) {
+            case BIRTH -> openForBirthTask(task, stockType);
+            default -> {
+                // future task actions
+            }
+        }
+    }
+
+    private void openForBirthTask(Task task, StockType stockType) {
+        TaskPlan taskPlan = null;
+        Integer taskPlanId = null;
+
+        try {
+            if (task.getTaskPlan() != null) {
+                taskPlanId = task.getTaskPlan().getId();
+            }
+        } catch (Exception ignored) {
+            // lazy proxy fallback below
+        }
+
+        if (taskPlanId == null) {
+            try {
+                var method = task.getClass().getMethod("getTaskPlanId");
+                Object value = method.invoke(task);
+                if (value instanceof Integer id) {
+                    taskPlanId = id;
+                }
+            } catch (Exception ignored) {
+                // no plan id available
+            }
+        }
+
+        if (taskPlanId != null) {
+            taskPlan = taskPlanService.findById(taskPlanId).orElse(null);
+        }
+
+        dialogOpen(new Litter(), DialogMode.CREATE, stockType, taskPlan);
+    }
 }
