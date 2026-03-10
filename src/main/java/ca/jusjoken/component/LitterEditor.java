@@ -66,7 +66,7 @@ public class LitterEditor {
     private final ComboBox<Stock> father = new ComboBox<>("Father");
     private final ComboBox<Stock> mother = new ComboBox<>("Mother");
     private final IntegerField kitsCount = new IntegerField("Total Kits");
-    private final IntegerField diedKitsCount = new IntegerField("Died Kits");
+    private final IntegerField diedKitsCount = new IntegerField("Dead Kits");
     private final TextArea notes = new TextArea("Notes");
     private final Select<TaskPlan> taskPlanSelect = new Select<>("Incomplete Breed Plans");
     private final TaskPlanService taskPlanService;
@@ -275,7 +275,7 @@ public class LitterEditor {
         if (dialogMode == DialogMode.CREATE) {
             ConfirmDialog confirm = new ConfirmDialog();
             confirm.setHeader("Create litter:");
-            confirm.setText("This will record the birth as complete, create the litter as well as create the " + litter.getKitsCount() + " stock record(s) for this litter (" + litter.getDiedKitsCount() + " marked as Died).");
+            confirm.setText("This will record the birth as complete, create the litter as well as create the " + litter.getKitsCount() + " stock record(s) for this litter (" + litter.getDiedKitsCount() + " marked as Dead).");
             confirm.setCancelable(true);
             confirm.setCancelText("No");
             confirm.setConfirmText("Yes");

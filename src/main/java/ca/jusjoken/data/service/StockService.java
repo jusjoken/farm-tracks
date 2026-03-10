@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 
 import org.springframework.data.domain.Example;
 import org.springframework.data.domain.ExampleMatcher;
@@ -34,7 +35,6 @@ import ca.jusjoken.data.entity.StockType;
  * @author birch
  */
 @Service
-//@Transactional(readOnly = true)
 @Transactional
 public class StockService {
     private final StockRepository stockRepository;
@@ -93,29 +93,30 @@ public class StockService {
         stock.setName(name);
         stock.setStockType(savedQuery.getStockType());
         stock.setBreeder(savedQuery.getBreeder());
+
+        List<String> ignoreFieldList = new ArrayList<>(Arrays.asList(ignoreFields));
+
         if(savedQuery.getStockStatus().getName().equals("active")){
-            // System.out.println("getExample: stockStatus Active selected");
-            stock.setActive(Boolean.TRUE);
-            stock.setStatus("active");
-        }else if(savedQuery.getStockStatus().getName().equals("inactive")){
-            // System.out.println("getExample: stockStatus Inactive selected");
-            stock.setActive(Boolean.FALSE);
-            stock.setStatus(null);
-        }else if(savedQuery.getStockStatus().getName().equals("all")){
-            // System.out.println("getExample: stockStatus All selected");
+            // handled by applyStatusFilter: status in [active, deposit]
             stock.setActive(null);
             stock.setStatus(null);
-
-            List<String> list = new ArrayList<>(Arrays.asList(ignoreFields));
-            list.add("active");
-            ignoreFields = list.toArray(new String[list.size()]);            
+            ignoreFieldList.add("active");
+        }else if(savedQuery.getStockStatus().getName().equals("inactive")){
+            // handled by applyStatusFilter: status NOT in [active, deposit]
+            stock.setActive(null);
+            stock.setStatus(null);
+            ignoreFieldList.add("active");
+        }else if(savedQuery.getStockStatus().getName().equals("all")){
+            stock.setActive(null);
+            stock.setStatus(null);
+            ignoreFieldList.add("active");
         }else{
             stock.setStatus(savedQuery.getStockStatus().getName());
             stock.setActive(null);
         }
-        // System.out.println("getExample: stock:" + stock);
-        
-        // Create a custom ExampleMatcher
+
+        ignoreFields = ignoreFieldList.toArray(new String[0]);
+
         ExampleMatcher matcher = matchingAll()
                 .withIgnoreCase()                          // Ignore case for all string matches
                 .withStringMatcher(StringMatcher.CONTAINING)// Use LIKE %value% for strings
@@ -123,29 +124,85 @@ public class StockService {
                 .withIgnorePaths(ignoreFields)
                 .withMatcher("name", ExampleMatcher.GenericPropertyMatchers.startsWith()); // make name startsWith
         
-        Example<Stock> example = Example.of(stock, matcher);
-        return example;
+        return Example.of(stock, matcher);
     }
-    
+
+    private List<Stock> applyStatusFilter(List<Stock> input, StockSavedQuery savedQuery) {
+        if (savedQuery == null || savedQuery.getStockStatus() == null) {
+            return input;
+        }
+
+        String queryStatus = savedQuery.getStockStatus().getName();
+
+        if ("active".equals(queryStatus)) {
+            return input.stream()
+                    .filter(s -> Objects.equals("active", s.getStatus()) || Objects.equals("deposit", s.getStatus()) || Objects.equals("forsale", s.getStatus()))
+                    .toList();
+        }
+
+        if ("inactive".equals(queryStatus)) {
+            return input.stream()
+                    .filter(s -> !Objects.equals("active", s.getStatus()) && !Objects.equals("deposit", s.getStatus()) && !Objects.equals("forsale", s.getStatus()))
+                    .toList();
+        }
+
+        return input;
+    }
+
     private Sort getSort(StockSavedQuery savedQuery){
         Sort thisSort;
-        if(savedQuery.getSort2()==null || savedQuery.getSort2().getSortOrder()==null){
+        if(savedQuery.getSort2() == null || savedQuery.getSort2().getSortOrder() == null){
             thisSort = Sort.by(savedQuery.getSort1().getSortOrder());
         }else{
             thisSort = Sort.by(savedQuery.getSort1().getSortOrder(), savedQuery.getSort2().getSortOrder());
         }
         return thisSort;
     }
-    
+
+    private boolean isPrimarySortByName(StockSavedQuery savedQuery) {
+        return savedQuery != null
+                && savedQuery.getSort1() != null
+                && savedQuery.getSort1().getSortOrder() != null
+                && "name".equals(savedQuery.getSort1().getSortOrder().getProperty());
+    }
+
+    private List<Stock> moveBlankNamesToEnd(List<Stock> input, StockSavedQuery savedQuery) {
+        if (!isPrimarySortByName(savedQuery) || input == null || input.isEmpty()) {
+            return input;
+        }
+
+        List<Stock> withName = new ArrayList<>();
+        List<Stock> blankName = new ArrayList<>();
+
+        for (Stock s : input) {
+            String n = (s == null) ? null : s.getName();
+            if (n == null || n.trim().isEmpty()) {
+                blankName.add(s);
+            } else {
+                withName.add(s);
+            }
+        }
+
+        withName.addAll(blankName);
+        return withName;
+    }
+
     public List<Stock> findStockWithCustomMatcherPageable(Pageable pageable, String name, StockSavedQuery savedQuery) {
         Instant start = Instant.now();
 
-        Pageable newPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),getSort(savedQuery));
-        // System.out.println("findStockWithCustomMatcher: pageNumber:" + pageable.getPageNumber() + " pageSize:" + pageable.getPageSize());
-        Page<Stock> page = stockRepository.findAll(getExample(name, savedQuery), newPageable);
-        List<Stock> returnList = page.getContent();
-        //System.out.println("findStockWithCustomMatcher: first stock item:" + returnList.get(0));
-        
+        Pageable newPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), getSort(savedQuery));
+
+        List<Stock> filtered = applyStatusFilter(
+                stockRepository.findAll(getExample(name, savedQuery), getSort(savedQuery)),
+                savedQuery
+        );
+
+        filtered = moveBlankNamesToEnd(filtered, savedQuery);
+
+        int fromIndex = Math.min((int) newPageable.getOffset(), filtered.size());
+        int toIndex = Math.min(fromIndex + newPageable.getPageSize(), filtered.size());
+        List<Stock> returnList = filtered.subList(fromIndex, toIndex);
+
         Instant end = Instant.now();
         Duration duration = Duration.between(start, end);
         // System.out.println("***Stock query time:" + duration.toMillis() + " milliseconds");
@@ -153,12 +210,18 @@ public class StockService {
     }
 
     public Long findStockWithCustomMatcherCount(String name, StockSavedQuery savedQuery) {
-        return stockRepository.count(getExample(name, savedQuery));
-        
+        return (long) applyStatusFilter(
+                stockRepository.findAll(getExample(name, savedQuery), getSort(savedQuery)),
+                savedQuery
+        ).size();
     }
 
     public List<Stock> listByExample(String name, StockSavedQuery savedQuery){
-        return stockRepository.findAll(getExample(name, savedQuery), getSort(savedQuery));
+        List<Stock> filtered = applyStatusFilter(
+                stockRepository.findAll(getExample(name, savedQuery), getSort(savedQuery)),
+                savedQuery
+        );
+        return moveBlankNamesToEnd(filtered, savedQuery);
     }
     
 

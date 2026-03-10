@@ -6,7 +6,7 @@ import java.util.Map;
 public enum TaskType {
     BREED("Breed"),
     NESTBOX("Nestbox"),
-    BIRTH("Birth", "Create Litter"),
+    BIRTH("Due Date", "Create Litter"),
     CLEAN_NESTBOX("Clean Nestbox"),
     REMOVE_NESTBOX("Remove Nestbox"),
     REBREED("Rebreed"),
