@@ -49,7 +49,7 @@ public class PlanTemplateTask {
         if (customName != null && !customName.isEmpty()) {
             return customName;
         }
-        return type != null ? type.getShortName() : "Unnamed Task";
+        return type != null ? type.getDisplayName() : "Unnamed Task";
     }
 
     public Integer getDaysFromStart() {

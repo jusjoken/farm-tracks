@@ -26,6 +26,7 @@ import ca.jusjoken.data.entity.TaskPlan;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.TaskService;
+import ca.jusjoken.utility.BadgeVariant;
 import ca.jusjoken.utility.TaskType;
 import ca.jusjoken.data.service.TaskPlanService;
 
@@ -144,17 +145,15 @@ public class TaskGrid extends Grid<Task> {
         });
 
         this.addComponentColumn(item -> {
+            Badge statusBadge = new Badge();
             if(item.getCompleted()){
-                Icon completedIcon = new Icon(FontAwesome.Regular.SQUARE_CHECK.create().getIcon());
-                completedIcon.setColor("green");
-                completedIcon.setTooltipText("Completed");
-                HorizontalLayout statusLayout = new HorizontalLayout(completedIcon, new Span("Completed"));
-                return statusLayout;
+                statusBadge.setText("Completed");
+                statusBadge.addThemeVariants(BadgeVariant.ERROR);
+                return statusBadge;
             }else{
-                Icon incompleteIcon = new Icon(FontAwesome.Regular.SQUARE.create().getIcon());
-                incompleteIcon.setTooltipText("Active");
-                HorizontalLayout statusLayout = new HorizontalLayout(incompleteIcon, new Span("Active"));
-                return statusLayout;
+                statusBadge.setText("Active");
+                statusBadge.addThemeVariants(BadgeVariant.SUCCESS);
+                return statusBadge;
             }
         }).setHeader(completionFilter);
 
@@ -192,6 +191,10 @@ public class TaskGrid extends Grid<Task> {
                     }
                 });
                 menu.addSeparator();
+                //create a submenu that allows selection of the view style
+                
+
+
                 // Context menu opened on a task, show option to edit
                 GridMenuItem<Task> editMenu = menu.addItem(new Item("Edit Task", Utility.ICONS.ACTION_EDIT.getIconSource()));
                 editMenu.addMenuItemClickListener(click -> {

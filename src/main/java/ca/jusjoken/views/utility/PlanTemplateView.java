@@ -221,7 +221,7 @@ public class PlanTemplateView extends MasterDetailLayout{
 
         //templateTaskTypeSelect.setLabel("Task type");
         templateTaskTypeSelect.setItems(TaskType.values());
-        templateTaskTypeSelect.setItemLabelGenerator(TaskType::getShortName);
+        templateTaskTypeSelect.setItemLabelGenerator(TaskType::getDisplayName);
         templateTaskTypeSelect.setWidthFull();
 
         taskSequence.setStepButtonsVisible(true);
@@ -270,7 +270,7 @@ public class PlanTemplateView extends MasterDetailLayout{
             return detailsDeleteIcon;
         }).setWidth("50px").setFlexGrow(0).setFrozen(true);
 
-        taskGrid.addColumn(task -> task.getType().getShortName()).setHeader("Type").setAutoWidth(true).setEditorComponent(templateTaskTypeSelect);
+        taskGrid.addColumn(task -> task.getType().getDisplayName()).setHeader("Type").setAutoWidth(true).setEditorComponent(templateTaskTypeSelect);
         taskGrid.addColumn(PlanTemplateTask::getDisplayName).setHeader("Name").setAutoWidth(true).setEditorComponent(taskCustomNamField);
         taskGrid.addColumn(task -> task.getDaysFromStart()).setHeader("Days From Start").setFlexGrow(1).setEditorComponent(taskDaysFromStart);
         taskGrid.addColumn(task -> task.getSequence()).setHeader("Sequence").setFlexGrow(1).setEditorComponent(taskSequence);

@@ -15,9 +15,8 @@ import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
-import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.grid.contextmenu.GridSubMenu;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.provider.SortDirection;
@@ -122,6 +121,8 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
     private void configureGrid() {
         removeAllColumns();
+        removeAllHeaderRows();
+        removeAllFooterRows();
         
         if(null == currentViewStyle){
             configureListView(); // Default to list view if style is unrecognized
@@ -137,12 +138,10 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
         setLitterDataProvider();
 
-        getHeaderRows().get(0).getCell(getColumnByKey("name")).setComponent(getViewSelectLayout());
-        
     }
 
     private void configureTileView() {
-        addColumn(litterCardRenderer).setKey("name").setHeader("Name");
+        addColumn(litterCardRenderer).setKey("name");
     }
 
     private void configureListView() {
@@ -246,32 +245,6 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         badge.addThemeVariants(BadgeVariant.PILL);
         badge.addThemeVariants(variants);
         return badge;
-    }
-
-    private HorizontalLayout getViewSelectLayout() {
-
-        viewStyleSelect = new Select<>();
-        viewStyleSelect.setWidth("100px");
-        viewStyleSelect.setItems(LitterViewStyle.values());
-        viewStyleSelect.setItemLabelGenerator(style -> style.getShortName());
-        viewStyleSelect.setValue(currentViewStyle != null ? currentViewStyle : LitterViewStyle.LIST);
-
-        viewStyleSelect.addValueChangeListener(event -> {
-            if (!event.isFromClient() || event.getValue() == null || event.getValue() == currentViewStyle) {
-                return;
-            }
-            currentViewStyle = event.getValue();
-            configureGrid();
-            refreshGrid();
-        });
-
-        HorizontalLayout leftAlignedHeader = new HorizontalLayout(new Span("View Style: "), viewStyleSelect);
-        leftAlignedHeader.setWidthFull();
-        leftAlignedHeader.setPadding(false);
-        leftAlignedHeader.setSpacing(false);
-        leftAlignedHeader.setJustifyContentMode(HorizontalLayout.JustifyContentMode.START);
-        leftAlignedHeader.setAlignItems(HorizontalLayout.Alignment.BASELINE);
-        return leftAlignedHeader;
     }
 
     private void setStockValues() {
@@ -526,12 +499,6 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
                 menu.removeAll();
                 String litterName = litterEntity.getDisplayName();
 
-                // Div heading = new Div();
-                // heading.setText(litterName);
-                // heading.getStyle().set("text-align", "center");
-                // heading.getStyle().set("font-weight", "bold");
-                // heading.getStyle().set("padding", "8px");
-                
                 // //add a label at the top with the stock name
                 menu.addComponentAsFirst(UIUtilities.getContextMenuHeader(litterName));
 
@@ -553,6 +520,36 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
                     taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, litterEntity.getStockType());
                     
+                });
+                menu.addSeparator();
+
+                GridMenuItem<Litter> viewStyleMenu = menu.addItem(new Item("View Style: (" + currentViewStyle.getShortName() + ")", Utility.ICONS.ACTION_VIEW.getIconSource()));
+                GridSubMenu<Litter> viewStyleSubMenu = viewStyleMenu.getSubMenu();
+
+                GridMenuItem<Litter> tileViewMenu = viewStyleSubMenu.addItem("Tile View");
+                tileViewMenu.setCheckable(true);
+
+                GridMenuItem<Litter> listViewMenu = viewStyleSubMenu.addItem("List View");
+                listViewMenu.setCheckable(true);
+
+                // reflect current state when submenu is built/opened
+                tileViewMenu.setChecked(currentViewStyle == LitterViewStyle.TILE);
+                listViewMenu.setChecked(currentViewStyle == LitterViewStyle.LIST);
+
+                tileViewMenu.addMenuItemClickListener(click -> {
+                    currentViewStyle = LitterViewStyle.TILE;
+                    tileViewMenu.setChecked(true);
+                    listViewMenu.setChecked(false);
+                    configureGrid();
+                    refreshGrid();
+                });
+
+                listViewMenu.addMenuItemClickListener(click -> {
+                    currentViewStyle = LitterViewStyle.LIST;
+                    listViewMenu.setChecked(true);
+                    tileViewMenu.setChecked(false);
+                    configureGrid();
+                    refreshGrid();
                 });
                 menu.addSeparator();
 
@@ -596,7 +593,8 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
     public void setCurrentViewStyle(LitterViewStyle currentViewStyle) {
         this.currentViewStyle = currentViewStyle;
-        viewStyleSelect.setValue(currentViewStyle);
+        configureGrid();
+        refreshGrid();
     }
 
     @Override

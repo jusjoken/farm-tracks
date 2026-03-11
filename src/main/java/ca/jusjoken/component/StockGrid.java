@@ -23,14 +23,13 @@ import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
+import com.vaadin.flow.component.grid.contextmenu.GridSubMenu;
 import com.vaadin.flow.component.html.Div;
-import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
@@ -144,6 +143,8 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
     private void configureGrid() {
         removeAllColumns();
+        removeAllHeaderRows();
+        removeAllFooterRows();
 
         if(null == currentViewStyle){
             configureListView(); // Default to list view if style is unrecognized
@@ -156,8 +157,6 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         }
 
         setEmptyStateText("No data available to display");
-
-        getHeaderRows().get(0).getCell(getColumnByKey("name")).setComponent(getViewSelectLayout());
 
     }
 
@@ -212,7 +211,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
 
     private void configureTileView() {
-        addColumn(stockCardRenderer).setKey("name").setHeader("Name");
+        addColumn(stockCardRenderer).setKey("name");
     }
 
     private void configureListView() {
@@ -387,37 +386,6 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         this.currentViewStyle = currentViewStyle;
     }
 
-    private HorizontalLayout getViewSelectLayout() {
-
-        Select<StockSavedQuery.StockViewStyle> viewStyleSelect = new Select<>();
-        viewStyleSelect.setWidth("100px");
-        viewStyleSelect.setItems(StockSavedQuery.StockViewStyle.values());
-        viewStyleSelect.setItemLabelGenerator(style -> style.getShortName());
-        viewStyleSelect.setValue(currentViewStyle != null ? currentViewStyle : StockSavedQuery.StockViewStyle.LIST);
-
-        viewStyleSelect.addValueChangeListener(event -> {
-            if (!event.isFromClient() || event.getValue() == null || event.getValue() == currentViewStyle) {
-                return;
-            }
-            currentViewStyle = event.getValue();
-            showAllColumns();
-            if(currentStockSavedQuery != null){
-                currentStockSavedQuery.setVisibleColumns(null);
-            }
-            configureGrid();
-            refreshGrid();
-            notifySidebarChanged(true);
-        });
-
-        HorizontalLayout leftAlignedHeader = new HorizontalLayout(new Span("View Style: "), viewStyleSelect);
-        leftAlignedHeader.setWidthFull();
-        leftAlignedHeader.setPadding(false);
-        leftAlignedHeader.setSpacing(false);
-        leftAlignedHeader.setJustifyContentMode(HorizontalLayout.JustifyContentMode.START);
-        leftAlignedHeader.setAlignItems(HorizontalLayout.Alignment.BASELINE);
-        return leftAlignedHeader;
-    }
-
     private void showAllColumns(){
         for(Column<Stock> column: getColumns()){
             getColumnByKey(column.getKey()).setVisible(true);
@@ -555,6 +523,49 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
                     taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, stockEntity.getStockType());
                     
+                });
+                menu.addSeparator();
+
+                GridMenuItem<Stock> viewStyleMenu = menu.addItem(new Item("View Style: (" + currentViewStyle.getShortName() + ")", Utility.ICONS.ACTION_VIEW.getIconSource()));
+                GridSubMenu<Stock> viewStyleSubMenu = viewStyleMenu.getSubMenu();
+
+                GridMenuItem<Stock> tileViewMenu = viewStyleSubMenu.addItem("Tile View");
+                tileViewMenu.setCheckable(true);
+
+                GridMenuItem<Stock> listViewMenu = viewStyleSubMenu.addItem("List View");
+                listViewMenu.setCheckable(true);
+
+                GridMenuItem<Stock> valueViewMenu = viewStyleSubMenu.addItem("Value View");
+                valueViewMenu.setCheckable(true);
+
+                // reflect current state when submenu is built/opened
+                tileViewMenu.setChecked(currentViewStyle == StockViewStyle.TILE);
+                listViewMenu.setChecked(currentViewStyle == StockViewStyle.LIST);
+                valueViewMenu.setChecked(currentViewStyle == StockViewStyle.VALUE);
+
+                tileViewMenu.addMenuItemClickListener(click -> {
+                    currentViewStyle = StockViewStyle.TILE;
+                    tileViewMenu.setChecked(true);
+                    listViewMenu.setChecked(false);
+                    configureGrid();
+                    refreshGrid();
+                });
+
+                listViewMenu.addMenuItemClickListener(click -> {
+                    currentViewStyle = StockViewStyle.LIST;
+                    listViewMenu.setChecked(true);
+                    tileViewMenu.setChecked(false);
+                    configureGrid();
+                    refreshGrid();
+                });
+
+                valueViewMenu.addMenuItemClickListener(click -> {
+                    currentViewStyle = StockViewStyle.VALUE;
+                    valueViewMenu.setChecked(true);
+                    tileViewMenu.setChecked(false);
+                    listViewMenu.setChecked(false);
+                    configureGrid();
+                    refreshGrid();
                 });
                 menu.addSeparator();
 

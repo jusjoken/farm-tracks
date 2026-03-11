@@ -224,6 +224,7 @@ public class Utility {
         ACTION_EDIT(FontAwesome.Solid.PENCIL_ALT.create().getIcon()),
         ACTION_EDIT_IMAGE(FontAwesome.Solid.IMAGE.create().getIcon()),
         ACTION_ADDNEW(FontAwesome.Solid.PLUS.create().getIcon()),
+        ACTION_VIEW(FontAwesome.Solid.EYE.create().getIcon()),
         ACTION_WEIGH(FontAwesome.Solid.BALANCE_SCALE.create().getIcon()),
         ACTION_PEDIGREE(FontAwesome.Solid.SITEMAP.create().getIcon()),
         ACTION_CHECK(FontAwesome.Solid.CHECK.create().getIcon()),

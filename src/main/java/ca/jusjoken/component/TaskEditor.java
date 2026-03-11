@@ -131,7 +131,7 @@ public class TaskEditor {
 
         type.setLabel("Task type");
         type.setItems(TaskType.values());
-        type.setItemLabelGenerator(TaskType::getShortName);
+        type.setItemLabelGenerator(TaskType::getDisplayName);
         type.setRequired(true);
         type.setWidthFull();
 

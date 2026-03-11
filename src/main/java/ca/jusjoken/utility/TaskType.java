@@ -6,7 +6,7 @@ import java.util.Map;
 public enum TaskType {
     BREED("Breed"),
     NESTBOX("Nestbox"),
-    BIRTH("Due Date", "Create Litter"),
+    BIRTH("Birth", "Due Date", "Create Litter"),
     CLEAN_NESTBOX("Clean Nestbox"),
     REMOVE_NESTBOX("Remove Nestbox"),
     REBREED("Rebreed"),
@@ -16,7 +16,8 @@ public enum TaskType {
     MEDICAL("Medical"),
     CUSTOM("Custom");
 
-    private final String shortName;
+    private final String shortName;   // persisted value
+    private final String displayName; // UI label
     private final String action;
     private static final Map<String, TaskType> LOOKUP = new HashMap<>();
 
@@ -24,20 +25,30 @@ public enum TaskType {
         for (TaskType type : TaskType.values()) {
             LOOKUP.put(type.name(), type);
             LOOKUP.put(type.shortName, type);
+            LOOKUP.put(type.displayName, type);
         }
     }
 
     TaskType(String shortName) {
-        this(shortName, null);
+        this(shortName, shortName, null);
     }
 
     TaskType(String shortName, String action) {
+        this(shortName, shortName, action);
+    }
+
+    TaskType(String shortName, String displayName, String action) {
         this.shortName = shortName;
+        this.displayName = displayName;
         this.action = action;
     }
 
     public String getShortName() {
         return shortName != null ? shortName : "";
+    }
+
+    public String getDisplayName() {
+        return displayName != null ? displayName : getShortName();
     }
 
     public String getAction() {
