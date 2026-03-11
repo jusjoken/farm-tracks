@@ -35,8 +35,6 @@ import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
 import com.vaadin.flow.data.renderer.NumberRenderer;
-import com.vaadin.flow.theme.lumo.LumoUtility.FontSize;
-import com.vaadin.flow.theme.lumo.LumoUtility.FontWeight;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility;
@@ -80,6 +78,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private final PlanEditor planEditor;
     private List<Column<Stock>> columnList;
     private Boolean menuCreated = false;
+
     public static enum StockGridType {
         LITTER, STOCK, KITS
     }
@@ -153,6 +152,9 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                 case LIST -> configureListView();
                 case TILE -> configureTileView();
                 case VALUE -> configureValueView();
+                case VALUE_TILE -> {
+                    configureValueTileView();
+                }
                 default -> configureListView(); // Default to list view if style is unrecognized
         }
 
@@ -172,6 +174,11 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
         addColumn(Stock::getStatus)
                 .setHeader("Status").setResizable(true).setAutoWidth(true).setKey("status");
+
+        addComponentColumn(stockEntity -> { return stockEntity.getSaleStatusBadge(false); }).setHeader("Sale Status").setResizable(true).setAutoWidth(true).setKey("salestatus");
+
+        addColumn(Stock::getInvoiceNumber)
+                .setHeader("Invoice").setResizable(true).setAutoWidth(true).setKey("invoice");
 
         addColumn(new LocalDateTimeRenderer<>(Stock::getStatusDate,"MM-dd-YYYY HHmm"))
                 .setHeader("Status Date").setResizable(true).setAutoWidth(true).setKey("statusdate");
@@ -212,6 +219,10 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
     private void configureTileView() {
         addColumn(stockCardRenderer).setKey("name");
+    }
+
+    private void configureValueTileView() {
+        addColumn(stockValueCardRenderer).setKey("name").setFooter(getValueFooter());
     }
 
     private void configureListView() {
@@ -291,41 +302,63 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
         String stockTattoo = stock.getTattoo();
         if(!stockTattoo.isEmpty() && !stockTattoo.equals(stock.getDisplayName())){
-            card.addToFooter(createBadge(null,stockTattoo, BadgeVariant.SUCCESS));
+            card.addToFooter(UIUtilities.createBadge(null,stockTattoo, BadgeVariant.SUCCESS));
         }
 
-        Badge breedBadge = createBadge(null,stock.getBreed(), BadgeVariant.SUCCESS);
+        Badge breedBadge = UIUtilities.createBadge(null,stock.getBreed(), BadgeVariant.SUCCESS);
         if(!breedBadge.getText().isEmpty()){
             card.addToFooter(breedBadge);
         }
 
-        Badge colorBadge = createBadge(null,stock.getColor(), BadgeVariant.SUCCESS);
+        Badge colorBadge = UIUtilities.createBadge(null,stock.getColor(), BadgeVariant.SUCCESS);
         if(!colorBadge.getText().isEmpty()){
             card.addToFooter(colorBadge);
         }
 
         if(stock.getBreeder()){
-            card.addToFooter(createBadge("Litters",litterService.getLitterCountForParent(stock).toString(), BadgeVariant.CONTRAST));
-            card.addToFooter(createBadge(stock.getStockType().getNonBreederName(), stockService.getKitCountForParent(stock).toString(), BadgeVariant.CONTRAST));
+            card.addToFooter(UIUtilities.createBadge("Litters",litterService.getLitterCountForParent(stock).toString(), BadgeVariant.CONTRAST));
+            card.addToFooter(UIUtilities.createBadge(stock.getStockType().getNonBreederName(), stockService.getKitCountForParent(stock).toString(), BadgeVariant.CONTRAST));
         }
 
-        card.addToFooter(createBadge(null,stock.getAge().getAgeFormattedString()));
-        card.addToFooter(createBadge(null,stock.getWeightInLbsOzAsString()));
+        card.addToFooter(UIUtilities.createBadge(null,stock.getAge().getAgeFormattedString()));
+        card.addToFooter(UIUtilities.createBadge(null,stock.getWeightInLbsOzAsString()));
 
         UIUtilities.setCardBorders(card, stock);
 
         return card;
     }
 
-    private Badge createBadge(String prefix, String text, BadgeVariant... variants){
-        if(prefix!=null){
-            text = prefix + ": " + text;
-        }
-        Badge badge = new Badge(text);
-        badge.addClassNames(FontSize.SMALL, FontWeight.MEDIUM);
-        badge.addThemeVariants(BadgeVariant.PILL);
-        badge.addThemeVariants(variants);
-        return badge;
+    private final ComponentRenderer<Component, Stock> stockValueCardRenderer = new ComponentRenderer<>(
+            stockEntity -> {
+                return createListItemValueCard(stockEntity);
+            });    
+
+    private Card createListItemValueCard(Stock stock){
+        Card card = new Card();
+        card.setWidthFull();
+        Avatar avatar = stock.getAvatar(false).getAvatar();
+        avatar.getElement().addEventListener("click", click -> {
+            //open image dialog
+            dialogCommon.setDialogTitle("Edit Profile Image");
+            dialogCommon.dialogOpen(stock,DialogCommon.DisplayMode.PROFILE_IMAGE);
+        }).addEventData("event.stopPropagation()");  
+        
+        card.addThemeVariants(CardVariant.LUMO_ELEVATED);
+
+        card.setHeaderPrefix(avatar);
+        card.setHeader(stock.getHeader());
+
+        card.addToFooter(stock.getStatusBadge());
+
+        card.addToFooter(stock.getSaleStatusBadge(true));
+
+        card.addToFooter(UIUtilities.createBadge("Invoice", stock.getInvoiceNumber(),BadgeVariant.CONTRAST));
+
+        card.addToFooter(UIUtilities.createBadge("Value", stock.getStockValueFormatted(), BadgeVariant.SUCCESS));
+
+        UIUtilities.setCardBorders(card, stock);
+
+        return card;
     }
 
     private void setStockValues() {
@@ -538,16 +571,23 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                 GridMenuItem<Stock> valueViewMenu = viewStyleSubMenu.addItem("Value View");
                 valueViewMenu.setCheckable(true);
 
+                GridMenuItem<Stock> valueTileViewMenu = viewStyleSubMenu.addItem("Value Tile View");
+                valueTileViewMenu.setCheckable(true);
+
                 // reflect current state when submenu is built/opened
                 tileViewMenu.setChecked(currentViewStyle == StockViewStyle.TILE);
                 listViewMenu.setChecked(currentViewStyle == StockViewStyle.LIST);
                 valueViewMenu.setChecked(currentViewStyle == StockViewStyle.VALUE);
+                valueTileViewMenu.setChecked(currentViewStyle == StockViewStyle.VALUE_TILE);
 
                 tileViewMenu.addMenuItemClickListener(click -> {
                     currentViewStyle = StockViewStyle.TILE;
                     tileViewMenu.setChecked(true);
                     listViewMenu.setChecked(false);
+                    valueViewMenu.setChecked(false);
+                    valueTileViewMenu.setChecked(false);
                     configureGrid();
+                    notifySidebarChanged(true);
                     refreshGrid();
                 });
 
@@ -555,7 +595,9 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                     currentViewStyle = StockViewStyle.LIST;
                     listViewMenu.setChecked(true);
                     tileViewMenu.setChecked(false);
+                    valueTileViewMenu.setChecked(false);
                     configureGrid();
+                    notifySidebarChanged(true);
                     refreshGrid();
                 });
 
@@ -564,7 +606,19 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                     valueViewMenu.setChecked(true);
                     tileViewMenu.setChecked(false);
                     listViewMenu.setChecked(false);
+                    valueTileViewMenu.setChecked(false);
                     configureGrid();
+                    notifySidebarChanged(true);
+                    refreshGrid();
+                });
+                valueTileViewMenu.addMenuItemClickListener(click -> {
+                    currentViewStyle = StockViewStyle.VALUE_TILE;
+                    valueTileViewMenu.setChecked(true);
+                    tileViewMenu.setChecked(false);
+                    listViewMenu.setChecked(false);
+                    valueViewMenu.setChecked(false);
+                    configureGrid();
+                    notifySidebarChanged(true);
                     refreshGrid();
                 });
                 menu.addSeparator();

@@ -19,11 +19,14 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.textfield.TextFieldVariant;
+import com.vaadin.flow.theme.lumo.LumoUtility.FontSize;
+import com.vaadin.flow.theme.lumo.LumoUtility.FontWeight;
 
 import ca.jusjoken.component.Badge;
 import ca.jusjoken.component.ButtonNumberField;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Stock;
+import ca.jusjoken.utility.BadgeVariant;
 
 /**
  *
@@ -246,14 +249,6 @@ public class UIUtilities {
         return span;
     } 
 
-    public static Div getContextMenuHeaderOld(String text){
-        Div header = new Div(new Text(text));
-        header.getStyle().set("font-weight", "bold");
-        header.getStyle().set("padding", "var(--lumo-space-s)");
-        header.getStyle().set("text-align", "center");
-        return header;
-    }
-
     public static Component getContextMenuHeader(String text){
         //return a layout with the text centered and bold, and with a bottom border
         HorizontalLayout header = new HorizontalLayout(new Text(text));
@@ -268,6 +263,15 @@ public class UIUtilities {
         return header;
     }
 
-
+    public static Badge createBadge(String prefix, String text, BadgeVariant... variants){
+        if(prefix!=null){
+            text = prefix + ": " + text;
+        }
+        Badge badge = new Badge(text);
+        badge.addClassNames(FontSize.SMALL, FontWeight.MEDIUM);
+        badge.addThemeVariants(BadgeVariant.PILL);
+        badge.addThemeVariants(variants);
+        return badge;
+    }
 
 }

@@ -18,6 +18,7 @@ import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 
 import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.Utility.TaskLinkType;
+import ca.jusjoken.data.Utility.TaskPlanStatus;
 import ca.jusjoken.data.service.ColumnNameComparator;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockStatusComparator;
@@ -42,6 +43,38 @@ public class Utility {
     private static final Map<String, ColumnName> stockColumnNameList = new HashMap<>();
     
     public static final LocalDateTime nullDate = LocalDateTime.of(1970, 1, 1, 0, 0);
+
+    //Note: StockSaleStatusConverter class is used to convert these so the shortname is stored in the database
+    public static enum StockSaleStatus{
+        LISTED("Listed"), DEPOSIT("Deposit"), SOLD("Sold"), NONE("None");
+
+        private final String shortName;
+        private static final Map<String, StockSaleStatus> LOOKUP = new HashMap<>();
+        
+        static {
+            for (StockSaleStatus type : StockSaleStatus.values()) {
+                LOOKUP.put(type.name(), type);      
+                LOOKUP.put(type.shortName, type);  
+            }
+        }
+        
+        private StockSaleStatus(String shortName) {
+            this.shortName = shortName;
+        }
+        
+        public String getShortName(){
+            return shortName != null ? shortName : "";
+        }
+        
+        public static StockSaleStatus fromShortName(String shortName){
+            StockSaleStatus type = LOOKUP.get(shortName);
+            if (type != null) {
+                return type;
+            }
+            throw new IllegalArgumentException("ShortName [" + shortName + "] not supported.");
+        }
+    }
+
 
     //Note: TaskPlanStatusConverter class is used to convert these so the shortname is stored in the database
     public static enum TaskPlanStatus{

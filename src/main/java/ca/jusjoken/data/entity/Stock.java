@@ -30,6 +30,7 @@ import ca.jusjoken.component.Badge;
 import ca.jusjoken.component.Layout;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.Gender;
+import ca.jusjoken.data.Utility.StockSaleStatus;
 import ca.jusjoken.data.service.LocalDateCsvConverter;
 import ca.jusjoken.data.service.LocalDateCsvConverterDDMMYYYY;
 import ca.jusjoken.data.service.StockStatus;
@@ -238,26 +239,10 @@ public class Stock {
     //Genotype fields
     @CsvBindByName(column = "Genotype")
     private String genotype = ""; 
-    // private String genoSegValue1A = "";
-    // private String genoSegValue2A = "";
-    // private String genoSegValue3A = "";
-    // private String genoSegValue4A = "";
-    // private String genoSegValue5A = "";
-    // private String genoSegValue6A = "";
-    // private String genoSegValue7A = "";
-    // private String genoSegValue8A = "";
-    // private String genoSegValue9A = "";
-    // private String genoSegValue10A = "";
-    // private String genoSegValue1B = "";
-    // private String genoSegValue2B = "";
-    // private String genoSegValue3B = "";
-    // private String genoSegValue4B = "";
-    // private String genoSegValue5B = "";
-    // private String genoSegValue6B = "";
-    // private String genoSegValue7B = "";
-    // private String genoSegValue8B = "";
-    // private String genoSegValue9B = "";
-    // private String genoSegValue10B = "";
+
+    private String invoiceNumber = "";
+
+    private StockSaleStatus saleStatus = StockSaleStatus.NONE;
 
     public Stock() {
         //this.active = getActive();
@@ -450,14 +435,15 @@ public class Stock {
 
     @Access(AccessType.PROPERTY)
     public String getStatus() {
-        /*
-        if(status==null || status.isEmpty()){
-            System.out.println("Stock.getStatus: status blank converted to active" + " for:" + getDisplayName());
-            return "active";
-        }
-        System.out.println("Stock.getStatus: status:" + status + " for:" + getDisplayName());
-        */
         return status;
+    }
+
+    public Badge getStatusBadge() {
+        String status = getStatus();
+        if(status==null || status.isEmpty()){
+            status = "active";
+        }
+        return UIUtilities.createBadge(null,status, BadgeVariant.SUCCESS);
     }
 
     @Access(AccessType.PROPERTY)
@@ -1003,6 +989,57 @@ public class Stock {
             genotypeValuePairs.add(new GenotypeValuePair(genoList.get(i),genoList.get(i+1)));
         }
         return genotypeValuePairs;
+    }
+
+    public String getStockValueFormatted() {
+        Double value = getStockValue();
+        if(value == null){
+            value = 0.0;
+        }
+        return "$" + String.format("%.2f", value);
+    }
+
+    public String getInvoiceNumber() {
+        if(invoiceNumber==null) return "";
+        return invoiceNumber;
+    }
+
+    public void setInvoiceNumber(String invoiceNumber) {
+        this.invoiceNumber = invoiceNumber;
+    }
+
+    public StockSaleStatus getSaleStatus() {
+        return saleStatus;
+    }
+
+    public void setSaleStatus(StockSaleStatus saleStatus) {
+        this.saleStatus = saleStatus;
+    }
+
+    public Badge getSaleStatusBadge(Boolean includePrefix) {
+        String prefix = "Sale status";
+        if(!includePrefix){
+            prefix = null;
+        }
+        if(null == saleStatus){
+            return UIUtilities.createBadge(prefix,"Not for sale", BadgeVariant.CONTRAST);
+        }else switch (saleStatus) {
+            case NONE -> {
+                return UIUtilities.createBadge(prefix,"Not for sale", BadgeVariant.CONTRAST);
+            }
+            case LISTED -> {
+                return UIUtilities.createBadge(prefix,saleStatus.toString(), BadgeVariant.SUCCESS);
+            }
+            case SOLD -> {
+                return UIUtilities.createBadge(prefix,saleStatus.toString(), BadgeVariant.ERROR);
+            }
+            case DEPOSIT -> {
+                return UIUtilities.createBadge(prefix,saleStatus.toString(), BadgeVariant.WARNING);
+            }
+            default -> {
+            }
+        }
+        return UIUtilities.createBadge(prefix,"Not for sale", BadgeVariant.CONTRAST);
     }
 
 }

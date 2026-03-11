@@ -4,22 +4,24 @@
  */
 package ca.jusjoken.data.entity;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.springframework.data.domain.Sort.Direction;
+
 import ca.jusjoken.data.ColumnSort;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.service.StockStatus;
+import ca.jusjoken.data.service.StockViewStyleConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Transient;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-import org.springframework.data.domain.Sort.Direction;
 
 /**
  *
@@ -56,7 +58,7 @@ public class StockSavedQuery {
 
     //Note: StockViewStyleConverter class is used to convert these so the shortname is stored in the database
     public static enum StockViewStyle{
-        TILE("Tile"), LIST("List"), VALUE("Value");
+        TILE("Tile"), LIST("List"), VALUE("Value"), VALUE_TILE("ValueTile");
 
         private final String shortName;
         
@@ -79,11 +81,15 @@ public class StockSavedQuery {
                 case "Value" -> {
                     return StockViewStyle.VALUE;
                 }
+                case "ValueTile" -> {
+                    return StockViewStyle.VALUE_TILE;
+                }
                 default -> throw new IllegalArgumentException("ShortName [" + shortName + "] not supported.");
             }
         }
     }
 
+    @Convert(converter = StockViewStyleConverter.class)
     private StockViewStyle viewStyle = StockViewStyle.TILE;
 
 
