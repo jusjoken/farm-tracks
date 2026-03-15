@@ -30,6 +30,7 @@ public class LitterListView extends Main implements ListRefreshNeededListener{
 
     public LitterListView(StockTypeService stockTypeService) {
         this.stockTypeService = stockTypeService;
+        applyDeviceScopedPreferenceKey();
 
         setSizeFull();
         getStyle().set("display", "flex");
@@ -111,9 +112,14 @@ public class LitterListView extends Main implements ListRefreshNeededListener{
         System.out.println("Window width: " + width + "px. Mobile breakpoint: " + MOBILE_BREAKPOINT_PX + "px. isMobileNow: " + isMobileNow);
         if (this.mobileDevice != isMobileNow) {
             this.mobileDevice = isMobileNow;
+            applyDeviceScopedPreferenceKey();
             System.out.println("Mobile device flag updated to: " + mobileDevice + " calling listRefreshNeeded to update grid view style.");
             listRefreshNeeded();
         }
+    }
+
+    private void applyDeviceScopedPreferenceKey() {
+        litterGrid.setPreferenceScopeKey("litter-list" + (mobileDevice ? ".mobile" : ".desktop"));
     }
 
     
@@ -146,11 +152,9 @@ public class LitterListView extends Main implements ListRefreshNeededListener{
     @Override
     public void listRefreshNeeded() {
         System.out.println("listRefreshNeeded. MobileDevice: " + mobileDevice );
-        if(mobileDevice){
-            litterGrid.setDisplayAsTile(true);
-        } else {
-            litterGrid.setDisplayAsTile(false);
-        }
+        // Use mobile as the default only when no saved preference exists.
+        litterGrid.setDisplayAsTile(mobileDevice);
+        litterGrid.loadDisplayAsTilePreference();
 
         litterGrid.createGrid();
     }

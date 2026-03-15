@@ -178,8 +178,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         this.statusService = statusService;
         this.weightService = weightService;
         this.taskService = taskService;
-        
-        //this.defaultStockSort.addOrder(new SortOrder(currentSortDirection.name(), "tattoo"));
+        applyDeviceScopedGridPreferenceKeys();
         this.dialogCommon = new DialogCommon();
         this.statusEditor = new StatusEditor();
         this.weightEditor = new WeightEditor();
@@ -212,6 +211,15 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         Hr hr = new Hr();
         hr.addClassNames(Margin.NONE);
         return hr;
+    }
+
+    private void applyDeviceScopedGridPreferenceKeys() {
+        taskGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.tasks"));
+        litterGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.litters"));
+    }
+
+    private String getDeviceScopedPreferenceKey(String baseKey) {
+        return baseKey + (mobileDevice ? ".mobile" : ".desktop");
     }
     
     private Section createSidebar() {
@@ -309,7 +317,6 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         Layout filterForm = new Layout(stockTypeChoice, breederFilter, stockStatusFilter);
         filterForm.addClassNames(Padding.Horizontal.LARGE);
         filterForm.setFlexDirection(Layout.FlexDirection.COLUMN);
-
         stockSort1Column.setAriaLabel("Sort by (first column)");
         stockSort1Column.setLabel("Sort by (first column)");
         stockSort1Column.addClassNames(MinWidth.NONE);
@@ -827,11 +834,12 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         litterGrid.setStockId(stock.getId());
         // litterGrid.setHeight("270px");
         System.out.println("createTabLitters: mobileDevice:" + mobileDevice);
+        // Use mobile as the default only when no saved preference exists.
+        litterGrid.setDisplayAsTile(mobileDevice);
+        litterGrid.loadDisplayAsTilePreference();
         if(mobileDevice){
-            litterGrid.setDisplayAsTile(true);
             litterGrid.setHeight("500px");
-        }else{      
-            litterGrid.setDisplayAsTile(false);
+        }else{
             litterGrid.setHeight("270px");
         }
         litterGrid.createGrid();
@@ -842,9 +850,11 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     private LazyComponent createTabKits(Stock stock) {
         StockGrid stockGrid = new StockGrid();
         stockGrid.setId(stock.getId(), StockGrid.StockGridType.KITS);
+        stockGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.kits"));
 
-        //if this is being viewed on a mobile device set the view style to tile otherwise set it to list 
+        // Use mobile as the default only when no saved preference exists.
         stockGrid.setDisplayAsTile(mobileDevice);
+        stockGrid.loadDisplayAsTilePreference();
 
         if(mobileDevice){
             stockGrid.setHeight("500px");
@@ -1110,6 +1120,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         boolean isMobileNow = width < MOBILE_BREAKPOINT_PX;
         if (this.mobileDevice != isMobileNow) {
             this.mobileDevice = isMobileNow;
+            applyDeviceScopedGridPreferenceKeys();
             listRefreshNeeded();
         }
     }
@@ -1134,9 +1145,22 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         return currentStockSavedQuery.getSavedQueryName();
     }
 
+    public String getCurrentSavedQueryId() {
+        if (currentSavedQueryId != null && !currentSavedQueryId.isBlank()) {
+            return currentSavedQueryId;
+        }
+        if (currentStockSavedQuery != null && currentStockSavedQuery.getId() != null) {
+            return currentStockSavedQuery.getId().toString();
+        }
+        return null;
+    }
+
     private Component createTabTasks(Stock stock) {
         //taskGrid = new TaskGrid(stock.getId());
         taskGrid.setStockId(stock.getId());
+        // Use mobile as the default only when no saved preference exists.
+        taskGrid.setDisplayAsTile(mobileDevice);
+        taskGrid.applyDisplayAsTilePreference();
         // taskGrid.setHeight("270px");
         if(mobileDevice){
             taskGrid.setHeight("500px");

@@ -257,8 +257,9 @@ public class UIUtilities {
         header.setAlignItems(FlexComponent.Alignment.CENTER);
         header.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
         header.getStyle().set("font-weight", "bold");
-        // match SVG: linearGradient x1="0" y1="0" x2="1" y2="1" with 2 stops
-        header.getStyle().set("background", "linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)");
+        // Use Lumo variables so contrast works in both light and dark modes.
+        header.getStyle().set("background", "var(--lumo-contrast-10pct)");
+        header.getStyle().set("color", "var(--lumo-body-text-color)");
         header.getStyle().set("border-radius", "0 0 0.25em 0.25em");
         return header;
     }

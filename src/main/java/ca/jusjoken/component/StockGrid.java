@@ -49,6 +49,7 @@ import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.data.service.StockWeightHistoryService;
+import ca.jusjoken.data.service.UserUiSettingsService;
 import ca.jusjoken.utility.BadgeVariant;
 import ca.jusjoken.views.stock.StockPedigreeEditor;
 
@@ -62,6 +63,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private final StockService stockService;
     private final StockTypeService stockTypeService;
     private final LitterService litterService;
+    private final UserUiSettingsService userUiSettingsService;
     private StockSavedQuery currentStockSavedQuery;
     private String currentSearchName;
     private final DialogCommon dialogCommon;
@@ -78,6 +80,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private Boolean menuCreated = false;
     private Boolean displayAsTile = false;
     private Boolean valueLayout = false;
+    private String preferenceScopeKey;
 
     public static enum StockGridType {
         LITTER, STOCK, KITS
@@ -90,6 +93,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         this.stockService = Registry.getBean(StockService.class);
         this.stockTypeService = Registry.getBean(StockTypeService.class);
         this.litterService = Registry.getBean(LitterService.class);
+        this.userUiSettingsService = Registry.getBean(UserUiSettingsService.class);
         this.statusService = Registry.getBean(StockStatusHistoryService.class);
         this.weightService = Registry.getBean(StockWeightHistoryService.class);
         this.displayAsTile = false;
@@ -522,6 +526,8 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                     displayAsTile = displayAsTileMenu.isChecked();
                     if(currentStockSavedQuery != null){
                         currentStockSavedQuery.setDisplayAsTile(displayAsTile);
+                    } else {
+                        saveDisplayAsTilePreference();
                     }
                     configureGrid();
                     notifySidebarChanged(true);
@@ -535,6 +541,8 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                     valueLayout = valueLayoutMenu.isChecked();
                     if(currentStockSavedQuery != null){
                         currentStockSavedQuery.setValueLayout(valueLayout);
+                    } else {
+                        saveValueLayoutPreference();
                     }
                     configureGrid();
                     notifySidebarChanged(true);
@@ -725,15 +733,72 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     }
 
     public void setDisplayAsTile(Boolean displayAsTile) {
-        this.displayAsTile = displayAsTile;
+        this.displayAsTile = Boolean.TRUE.equals(displayAsTile);
+    }
+
+    public void setPreferenceScopeKey(String preferenceScopeKey) {
+        this.preferenceScopeKey = preferenceScopeKey;
+        loadDisplayAsTilePreference();
+        loadValueLayoutPreference();
+        createGrid();
+    }
+
+    public String getPreferenceScopeKey() {
+        return preferenceScopeKey;
+    }
+
+    public void loadDisplayAsTilePreference() {
+        String settingsKey = getDisplayAsTilePreferenceKey();
+        if (settingsKey == null) {
+            return;
+        }
+        displayAsTile = userUiSettingsService.getBooleanForCurrentUser(settingsKey, Boolean.TRUE.equals(displayAsTile));
     }
 
     public Boolean getValueLayout() {
         return valueLayout;
     }
 
+    public void loadValueLayoutPreference() {
+        String settingsKey = getValueLayoutPreferenceKey();
+        if (settingsKey == null) {
+            return;
+        }
+        valueLayout = userUiSettingsService.getBooleanForCurrentUser(settingsKey, Boolean.TRUE.equals(valueLayout));
+    }
+
+    private void saveDisplayAsTilePreference() {
+        String settingsKey = getDisplayAsTilePreferenceKey();
+        if (settingsKey == null) {
+            return;
+        }
+        userUiSettingsService.setBooleanForCurrentUser(settingsKey, Boolean.TRUE.equals(displayAsTile));
+    }
+
+    private void saveValueLayoutPreference() {
+        String settingsKey = getValueLayoutPreferenceKey();
+        if (settingsKey == null) {
+            return;
+        }
+        userUiSettingsService.setBooleanForCurrentUser(settingsKey, Boolean.TRUE.equals(valueLayout));
+    }
+
+    private String getDisplayAsTilePreferenceKey() {
+        if (preferenceScopeKey == null || preferenceScopeKey.isBlank()) {
+            return null;
+        }
+        return "grid." + getClass().getSimpleName() + "." + preferenceScopeKey + ".displayAsTile";
+    }
+
+    private String getValueLayoutPreferenceKey() {
+        if (preferenceScopeKey == null || preferenceScopeKey.isBlank()) {
+            return null;
+        }
+        return "grid." + getClass().getSimpleName() + "." + preferenceScopeKey + ".valueLayout";
+    }
+
     public void setValueLayout(Boolean valueLayout) {
-        this.valueLayout = valueLayout;
+        this.valueLayout = Boolean.TRUE.equals(valueLayout);
     }
 
     @Override

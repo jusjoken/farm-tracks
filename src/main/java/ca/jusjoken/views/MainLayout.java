@@ -1,6 +1,7 @@
 package ca.jusjoken.views;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -52,6 +53,7 @@ import ca.jusjoken.data.service.PlanTemplateService;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockTypeService;
+import ca.jusjoken.data.service.UserUiSettingsService;
 import ca.jusjoken.views.stock.StockPedigreeEditor;
 import ca.jusjoken.views.stock.StockTypeView;
 import ca.jusjoken.views.stock.StockView;
@@ -71,6 +73,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     private final StockSavedQueryService queryService;
     private final StockTypeService typeService;
     private final PlanTemplateService planTemplateService;
+    private final UserUiSettingsService userUiSettingsService;
     
     private Registration planRefreshRegistration;
     private ContextMenu menu;
@@ -82,11 +85,15 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     private final PlanEditor planEditor;
 
     private H1 viewTitle;
+    private static final String DARK_MODE_PREFERENCE_KEY = "main-layout.dark-mode";
+    private static final String LAST_STOCK_QUERY_PREFERENCE_KEY = "main-layout.last-stock-saved-query-id";
+    private boolean welcomeAutoRedirectPending = true;
 
     public MainLayout(AuthenticationContext authContext, AccessAnnotationChecker accessChecker) {
         this.queryService = Registry.getBean(StockSavedQueryService.class);
         this.typeService = Registry.getBean(StockTypeService.class);
         this.planTemplateService = Registry.getBean(PlanTemplateService.class);
+        this.userUiSettingsService = Registry.getBean(UserUiSettingsService.class);
         this.authContext = authContext;
         this.accessChecker = accessChecker;
         this.dialogCommon = new DialogCommon();
@@ -95,6 +102,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         
         //StockView.class.addListener(this);
         setPrimarySection(Section.DRAWER);
+        applySavedColorScheme(UI.getCurrent());
         addDrawerContent();
         addHeaderContent();
         //createHeader();
@@ -216,17 +224,16 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         }
 
         menu.addSeparator();
-        MenuItem mode = menu.addItem("Switch mode", event -> {
-            if(ColorScheme.Value.DARK==UI.getCurrentOrThrow().getPage().getColorScheme()){
-                UI.getCurrentOrThrow().getPage().setColorScheme(Value.LIGHT);
-            }else{
-                UI.getCurrentOrThrow().getPage().setColorScheme(Value.DARK);
+        MenuItem mode = menu.addItem("Switch mode");
+        mode.addClickListener(event -> {
+            boolean useDarkMode = ColorScheme.Value.DARK != UI.getCurrentOrThrow().getPage().getColorScheme();
+            UI.getCurrentOrThrow().getPage().setColorScheme(useDarkMode ? Value.DARK : Value.LIGHT);
+            if (authContext.isAuthenticated()) {
+                userUiSettingsService.setBooleanForCurrentUser(DARK_MODE_PREFERENCE_KEY, useDarkMode);
             }
-        });
-        setModeText(mode);
-        mode.addClickListener(listener -> {
             setModeText(mode);
         });
+        setModeText(mode);
 
         menu.addItem("Sign out", event -> {
             authContext.logout();
@@ -328,6 +335,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent); 
         System.out.println("MainLayout: onAttach");
+        applySavedColorScheme(attachEvent.getUI());
         ComponentUtil.addListener(attachEvent.getUI(), ComponentConfirmEvent.class, event ->{
             createNavigation();
             if(event.getSource().getId().isPresent()){
@@ -351,6 +359,16 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         }
 
         Component content = getContent();
+        if (content instanceof StockView stockView) {
+            welcomeAutoRedirectPending = false;
+            saveLastUsedStockSavedQueryId(stockView.getCurrentSavedQueryId());
+        } else if (content instanceof WelcomeView) {
+            if (welcomeAutoRedirectPending) {
+                welcomeAutoRedirectPending = false;
+                navigateToLastUsedStockSavedQueryIfAvailable();
+            }
+        }
+
         if (content instanceof PlanTemplateView planTemplateView) {
             planRefreshRegistration = planTemplateView.addListRefreshNeededListener(e -> {
                 // handle refresh event in layout
@@ -390,6 +408,47 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         branding.setPadding(true);
         //branding.setAlignItems(FlexComponent.Alignment.START);
         return branding;
+    }
+
+    private void applySavedColorScheme(UI ui) {
+        if (ui == null || !authContext.isAuthenticated()) {
+            return;
+        }
+        boolean useDarkMode = userUiSettingsService.getBooleanForCurrentUser(DARK_MODE_PREFERENCE_KEY, false);
+        ui.getPage().setColorScheme(useDarkMode ? Value.DARK : Value.LIGHT);
+    }
+
+    private void saveLastUsedStockSavedQueryId(String queryId) {
+        if (!authContext.isAuthenticated() || queryId == null || queryId.isBlank()) {
+            return;
+        }
+        userUiSettingsService.setValueForCurrentUser(LAST_STOCK_QUERY_PREFERENCE_KEY, queryId);
+    }
+
+    private Optional<String> getLastUsedStockSavedQueryId() {
+        if (!authContext.isAuthenticated()) {
+            return Optional.empty();
+        }
+        return userUiSettingsService.getValueForCurrentUser(LAST_STOCK_QUERY_PREFERENCE_KEY)
+                .map(String::valueOf)
+                .filter(id -> !id.isBlank());
+    }
+
+    private void navigateToLastUsedStockSavedQueryIfAvailable() {
+        Optional<String> lastUsedQueryId = getLastUsedStockSavedQueryId();
+        if (lastUsedQueryId.isEmpty()) {
+            return;
+        }
+
+        String queryId = lastUsedQueryId.get();
+        boolean exists = queryService.getSavedQueryList().stream()
+                .anyMatch(query -> query.getId() != null && query.getId().toString().equals(queryId));
+
+        if (exists) {
+            UI.getCurrent().navigate(StockView.class, queryId);
+        } else {
+            userUiSettingsService.setValueForCurrentUser(LAST_STOCK_QUERY_PREFERENCE_KEY, "");
+        }
     }
 
 }

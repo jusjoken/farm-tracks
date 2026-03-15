@@ -26,6 +26,7 @@ import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.TaskPlanService;
 import ca.jusjoken.data.service.TaskService;
+import ca.jusjoken.data.service.UserUiSettingsService;
 import ca.jusjoken.utility.TaskType;
 
 public class TaskGrid extends Grid<Task> {
@@ -33,6 +34,7 @@ public class TaskGrid extends Grid<Task> {
     private final TaskService taskService;
     private final StockService stockService;
     private final TaskPlanService taskPlanService;
+    private final UserUiSettingsService userUiSettingsService;
     private final TaskEditor taskEditor = new TaskEditor();
     private final LitterEditor litterEditor = new LitterEditor();
     private PlanEditor planEditor; // lazy to avoid constructor recursion
@@ -44,6 +46,7 @@ public class TaskGrid extends Grid<Task> {
     private Boolean menuCreated = false;
     private Boolean minimalColumns = false;
     private Boolean displayAsTile = false;
+    private String preferenceScopeKey;
 
     public TaskGrid() {
         this(null, true, false);
@@ -58,6 +61,7 @@ public class TaskGrid extends Grid<Task> {
         this.taskService = Registry.getBean(TaskService.class);
         this.stockService = Registry.getBean(StockService.class);
         this.taskPlanService = Registry.getBean(TaskPlanService.class);
+        this.userUiSettingsService = Registry.getBean(UserUiSettingsService.class);
         this.enablePlanActions = enablePlanActions;
         this.minimalColumns = minimalColumns;
 
@@ -192,6 +196,7 @@ public class TaskGrid extends Grid<Task> {
                 displayAsTileMenu.setChecked(displayAsTile);
                 displayAsTileMenu.addMenuItemClickListener(click -> {
                     displayAsTile = displayAsTileMenu.isChecked();
+                    saveDisplayAsTilePreference();
                     configureGrid();
                     refreshGrid();
                 });
@@ -360,12 +365,50 @@ public class TaskGrid extends Grid<Task> {
         return minimalColumns;
     }
 
+    public void setPreferenceScopeKey(String preferenceScopeKey) {
+        this.preferenceScopeKey = preferenceScopeKey;
+        loadDisplayAsTilePreference();
+        configureGrid();
+    }
+
+    public String getPreferenceScopeKey() {
+        return preferenceScopeKey;
+    }
+
+    public void loadDisplayAsTilePreference() {
+        String settingsKey = getDisplayAsTilePreferenceKey();
+        if (settingsKey == null) {
+            return;
+        }
+        displayAsTile = userUiSettingsService.getBooleanForCurrentUser(settingsKey, Boolean.TRUE.equals(displayAsTile));
+    }
+
+    public void applyDisplayAsTilePreference() {
+        loadDisplayAsTilePreference();
+        configureGrid();
+    }
+
     public Boolean getDisplayAsTile() {
         return displayAsTile;
     }
 
     public void setDisplayAsTile(Boolean displayAsTile) {
-        this.displayAsTile = displayAsTile;
+        this.displayAsTile = Boolean.TRUE.equals(displayAsTile);
+    }
+
+    private void saveDisplayAsTilePreference() {
+        String settingsKey = getDisplayAsTilePreferenceKey();
+        if (settingsKey == null) {
+            return;
+        }
+        userUiSettingsService.setBooleanForCurrentUser(settingsKey, Boolean.TRUE.equals(displayAsTile));
+    }
+
+    private String getDisplayAsTilePreferenceKey() {
+        if (preferenceScopeKey == null || preferenceScopeKey.isBlank()) {
+            return null;
+        }
+        return "grid." + getClass().getSimpleName() + "." + preferenceScopeKey + ".displayAsTile";
     }
 
 }

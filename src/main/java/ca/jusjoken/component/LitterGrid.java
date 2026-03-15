@@ -33,6 +33,7 @@ import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockTypeService;
+import ca.jusjoken.data.service.UserUiSettingsService;
 import ca.jusjoken.utility.BadgeVariant;
 
 public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListener{
@@ -43,6 +44,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     private final StockService stockService;
     private final LitterService litterService;
     private final StockTypeService stockTypeService;
+    private final UserUiSettingsService userUiSettingsService;
     private boolean mobileDevice = false;
     private static final int MOBILE_BREAKPOINT_PX = 768;   
     private Registration resizeRegistration;
@@ -57,6 +59,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     private final LitterEditor litterEditor;
     private final List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
     private Boolean displayAsTile = false;
+    private String preferenceScopeKey;
 
     public enum LitterDisplayMode {
         ALL,
@@ -73,6 +76,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         this.stockService = Registry.getBean(StockService.class);
         this.litterService = Registry.getBean(LitterService.class);
         this.stockTypeService = Registry.getBean(StockTypeService.class);
+        this.userUiSettingsService = Registry.getBean(UserUiSettingsService.class);
         this.stockId = stockId;
         this.taskEditor = new TaskEditor();
         this.litterEditor = new LitterEditor();
@@ -451,6 +455,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
                 displayAsTileMenu.setChecked(displayAsTile);
                 displayAsTileMenu.addMenuItemClickListener(click -> {
                     displayAsTile = displayAsTileMenu.isChecked();
+                    saveDisplayAsTilePreference();
                     configureGrid();
                     listRefreshNeeded();
                 });
@@ -521,7 +526,25 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     }
 
     public void setDisplayAsTile(Boolean displayAsTile) {
-        this.displayAsTile = displayAsTile;
+        this.displayAsTile = Boolean.TRUE.equals(displayAsTile);
+    }
+
+    public void setPreferenceScopeKey(String preferenceScopeKey) {
+        this.preferenceScopeKey = preferenceScopeKey;
+        loadDisplayAsTilePreference();
+        configureGrid();
+    }
+
+    public String getPreferenceScopeKey() {
+        return preferenceScopeKey;
+    }
+
+    public void loadDisplayAsTilePreference() {
+        String settingsKey = getDisplayAsTilePreferenceKey();
+        if (settingsKey == null) {
+            return;
+        }
+        displayAsTile = userUiSettingsService.getBooleanForCurrentUser(settingsKey, Boolean.TRUE.equals(displayAsTile));
     }
 
     @Override
@@ -538,6 +561,21 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         for (ListRefreshNeededListener listener : listRefreshNeededListeners) {
             listener.listRefreshNeeded();
         }
+    }
+
+    private void saveDisplayAsTilePreference() {
+        String settingsKey = getDisplayAsTilePreferenceKey();
+        if (settingsKey == null) {
+            return;
+        }
+        userUiSettingsService.setBooleanForCurrentUser(settingsKey, Boolean.TRUE.equals(displayAsTile));
+    }
+
+    private String getDisplayAsTilePreferenceKey() {
+        if (preferenceScopeKey == null || preferenceScopeKey.isBlank()) {
+            return null;
+        }
+        return "grid." + getClass().getSimpleName() + "." + preferenceScopeKey + ".displayAsTile";
     }
 
 

@@ -78,6 +78,7 @@ public class PlanEditor {
         this.taskService = Registry.getBean(TaskService.class);
         this.taskPlanService = Registry.getBean(TaskPlanService.class);
         this.taskGrid = new TaskGrid(null, false, true); // disable plan actions to avoid recursion
+        this.taskGrid.setPreferenceScopeKey("plan-editor.tasks");
         dialogConfigure();
     }
 
