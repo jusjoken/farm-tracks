@@ -50,6 +50,8 @@ public class StockSavedQuery {
     private String sort2Direction = Direction.ASC.name();
     private Boolean defaultQuery = false;
     private String visibleColumns = null;
+    private Boolean displayAsTile = false;
+    private Boolean valueLayout = false;
     
     @Transient
     private Boolean dirty = false;
@@ -269,6 +271,22 @@ public class StockSavedQuery {
         String[] elements = visibleColumns.split(",\\s*"); // Split and trim whitespace
         List<String> fixedList = Arrays.asList(elements);
         return fixedList;
+    }
+
+    public Boolean getDisplayAsTile() {
+        return displayAsTile;
+    }
+
+    public Boolean getValueLayout() {
+        return valueLayout;
+    }
+
+    public void setValueLayout(Boolean valueLayout) {
+        this.valueLayout = valueLayout;
+    }
+
+    public void setDisplayAsTile(Boolean displayAsTile) {
+        this.displayAsTile = displayAsTile;
     }
 
 }

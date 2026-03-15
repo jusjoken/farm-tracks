@@ -272,6 +272,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
                 }
                 for(StockSavedQuery query: stockQueryList){
                     SideNavItem sn = new SideNavItem(query.getSavedQueryName(), StockView.class, query.getId().toString());
+                    sn.setTooltipText(query.getSavedQueryName());
                     stockGroupItem.addItem(sn);
                     sn.setPrefixComponent(FontAwesome.Solid.PAW.create());
                     sn.getElement().addEventListener("click", click -> {

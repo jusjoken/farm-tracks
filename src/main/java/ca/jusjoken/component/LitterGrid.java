@@ -15,9 +15,7 @@ import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
-import com.vaadin.flow.component.grid.contextmenu.GridSubMenu;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
@@ -31,7 +29,6 @@ import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
-import ca.jusjoken.data.entity.StockSavedQuery;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.service.LitterService;
@@ -53,7 +50,6 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     private Registration resizeRegistration;
     private String parentNameFilter;
     private LitterDisplayMode litterDisplayMode = LitterDisplayMode.ALL;
-    private Select<LitterViewStyle> viewStyleSelect;
     private Grid.Column<Litter> kitsCountColumn;
     private Grid.Column<Litter> survivalRateColumn;
     private Grid.Column<Litter> diedKitsCountColumn;
@@ -62,40 +58,13 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     private final TaskEditor taskEditor;
     private final LitterEditor litterEditor;
     private final List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
+    private Boolean displayAsTile = false;
 
     public enum LitterDisplayMode {
         ALL,
         ACTIVE,
         ARCHIVED
     }
-
-    public static enum LitterViewStyle{
-        TILE("Tile"), LIST("List");
-
-        private final String shortName;
-        
-        private LitterViewStyle(String shortName) {
-            this.shortName = shortName;
-        }
-        
-        public String getShortName(){
-            return shortName;
-        }
-        
-        public static LitterViewStyle fromShortName(String shortName){
-            switch (shortName){
-                case "Tile" -> {
-                    return LitterViewStyle.TILE;
-                }
-                case "List" -> {
-                    return LitterViewStyle.LIST;
-                }
-                default -> throw new IllegalArgumentException("ShortName [" + shortName + "] not supported.");
-            }
-        }
-    }
-
-    private LitterViewStyle currentViewStyle = LitterViewStyle.TILE;
 
     public LitterGrid() {
         this(null);
@@ -124,13 +93,10 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         removeAllHeaderRows();
         removeAllFooterRows();
         
-        if(null == currentViewStyle){
-            configureListView(); // Default to list view if style is unrecognized
-        }else // Configuration logic for the KitGrid
-            switch (currentViewStyle) {
-                case LIST -> configureListView();
-                case TILE -> configureTileView();
-                default -> configureListView(); // Default to list view if style is unrecognized
+        if(displayAsTile){
+            configureTileView();
+        }else{
+            configureListView();
         }
 
         setEmptyStateText("No litters available to display");
@@ -186,11 +152,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         stockGrid.setId(litter.getId(), StockGrid.StockGridType.LITTER);
 
         //if this is being viewed on a mobile device set the view style to tile otherwise set it to list 
-        stockGrid.setCurrentViewStyle(
-            mobileDevice
-                ? StockSavedQuery.StockViewStyle.TILE
-                : StockSavedQuery.StockViewStyle.LIST
-        );
+        stockGrid.setDisplayAsTile(mobileDevice);
         stockGrid.setHeight("270px");
         stockGrid.createGrid();
         Layout kitListLayoutForOffset = new Layout(stockGrid);
@@ -214,37 +176,26 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
         String born = litter.getDoB().format(DateTimeFormatter.ofPattern("MM-dd-YYYY"));
         if(!born.isEmpty()){
-            card.addToFooter(createBadge("Born: ",born, BadgeVariant.SUCCESS));
+            card.addToFooter(UIUtilities.createBadge("Born: ",born, BadgeVariant.SUCCESS));
         }
 
         String bred = litter.getBred().format(DateTimeFormatter.ofPattern("MM-dd-YYYY"));
         if(!bred.isEmpty()){
-            card.addToFooter(createBadge("Bred: ",bred, BadgeVariant.SUCCESS));
+            card.addToFooter(UIUtilities.createBadge("Bred: ",bred, BadgeVariant.SUCCESS));
         }
 
         card.addToFooter(litter.getActiveBadge());
 
-        card.addToFooter(createBadge("Kits: ",litter.getKitsCount().toString(), BadgeVariant.CONTRAST));
-        card.addToFooter(createBadge("Died: ",litter.getDiedKitsCount().toString(), BadgeVariant.CONTRAST));
-        card.addToFooter(createBadge("Survived: ",litter.getKitsSurvivedCount().toString(), BadgeVariant.CONTRAST));
-        card.addToFooter(createBadge("Rate: ",litter.getSurvivalRate().toString(), BadgeVariant.CONTRAST));
+        card.addToFooter(UIUtilities.createBadge("Kits: ",litter.getKitsCount().toString(), BadgeVariant.CONTRAST));
+        card.addToFooter(UIUtilities.createBadge("Died: ",litter.getDiedKitsCount().toString(), BadgeVariant.CONTRAST));
+        card.addToFooter(UIUtilities.createBadge("Survived: ",litter.getKitsSurvivedCount().toString(), BadgeVariant.CONTRAST));
+        card.addToFooter(UIUtilities.createBadge("Rate: ",litter.getSurvivalRate().toString(), BadgeVariant.CONTRAST));
 
         setItemDetailsRenderer(new ComponentRenderer<>(item -> {
             return createKitsInLitterLayout(item);
         }));        
 
         return card;
-    }
-
-    private Badge createBadge(String prefix, String text, BadgeVariant... variants){
-        if(prefix!=null){
-            text = prefix + ": " + text;
-        }
-        Badge badge = new Badge(text);
-        badge.addClassNames(FontSize.SMALL, FontWeight.MEDIUM);
-        badge.addThemeVariants(BadgeVariant.PILL);
-        badge.addThemeVariants(variants);
-        return badge;
     }
 
     private void setStockValues() {
@@ -395,7 +346,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
             }
         }
 
-        if(currentViewStyle == LitterViewStyle.LIST){
+        if(!displayAsTile){
             if (kitsCountColumn == null || survivalRateColumn == null || diedKitsCountColumn == null
                     || kitsSurvivedCountColumn == null || dataProvider == null || bredColumn == null) {
                 return;
@@ -523,33 +474,13 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
                 });
                 menu.addSeparator();
 
-                GridMenuItem<Litter> viewStyleMenu = menu.addItem(new Item("View Style: (" + currentViewStyle.getShortName() + ")", Utility.ICONS.ACTION_VIEW.getIconSource()));
-                GridSubMenu<Litter> viewStyleSubMenu = viewStyleMenu.getSubMenu();
-
-                GridMenuItem<Litter> tileViewMenu = viewStyleSubMenu.addItem("Tile View");
-                tileViewMenu.setCheckable(true);
-
-                GridMenuItem<Litter> listViewMenu = viewStyleSubMenu.addItem("List View");
-                listViewMenu.setCheckable(true);
-
-                // reflect current state when submenu is built/opened
-                tileViewMenu.setChecked(currentViewStyle == LitterViewStyle.TILE);
-                listViewMenu.setChecked(currentViewStyle == LitterViewStyle.LIST);
-
-                tileViewMenu.addMenuItemClickListener(click -> {
-                    currentViewStyle = LitterViewStyle.TILE;
-                    tileViewMenu.setChecked(true);
-                    listViewMenu.setChecked(false);
+                GridMenuItem<Litter> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
+                displayAsTileMenu.setCheckable(true);
+                displayAsTileMenu.setChecked(displayAsTile);
+                displayAsTileMenu.addMenuItemClickListener(click -> {
+                    displayAsTile = displayAsTileMenu.isChecked();
                     configureGrid();
-                    refreshGrid();
-                });
-
-                listViewMenu.addMenuItemClickListener(click -> {
-                    currentViewStyle = LitterViewStyle.LIST;
-                    listViewMenu.setChecked(true);
-                    tileViewMenu.setChecked(false);
-                    configureGrid();
-                    refreshGrid();
+                    listRefreshNeeded();
                 });
                 menu.addSeparator();
 
@@ -587,14 +518,12 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         return menu;
     }
 
-    public LitterViewStyle getCurrentViewStyle() {
-        return currentViewStyle;
+    public Boolean getDisplayAsTile() {
+        return displayAsTile;
     }
 
-    public void setCurrentViewStyle(LitterViewStyle currentViewStyle) {
-        this.currentViewStyle = currentViewStyle;
-        configureGrid();
-        refreshGrid();
+    public void setDisplayAsTile(Boolean displayAsTile) {
+        this.displayAsTile = displayAsTile;
     }
 
     @Override

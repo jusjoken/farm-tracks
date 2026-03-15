@@ -4,15 +4,16 @@
  */
 package ca.jusjoken.data.service;
 
-import ca.jusjoken.data.ColumnSort;
-import ca.jusjoken.data.entity.StockSavedQuery;
-import ca.jusjoken.data.entity.StockType;
-
 import java.util.List;
 import java.util.Optional;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+
+import ca.jusjoken.data.ColumnSort;
+import ca.jusjoken.data.entity.StockSavedQuery;
+import ca.jusjoken.data.entity.StockType;
 
 /**
  *
@@ -87,6 +88,8 @@ public class StockSavedQueryService {
             newQuery.setStockType(query.getStockType());
             newQuery.setViewStyle(query.getViewStyle());
             newQuery.setVisibleColumns(query.getVisibleColumns());
+            newQuery.setDisplayAsTile(query.getDisplayAsTile());
+            newQuery.setValueLayout(query.getValueLayout());
             StockSavedQuery addedQuery = queryRepository.save(newQuery);
             return addedQuery.getId();
         }else{

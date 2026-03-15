@@ -17,6 +17,7 @@ import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.contextmenu.MenuItem;
 import com.vaadin.flow.component.grid.Grid;
@@ -94,7 +95,6 @@ import ca.jusjoken.data.Utility.TabType;
 import ca.jusjoken.data.entity.GenotypeSegment;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
-import ca.jusjoken.data.entity.StockSavedQuery.StockViewStyle;
 import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.entity.StockWeightHistory;
@@ -158,6 +158,8 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     private RadioButtonGroup<String> sort1Direction = new RadioButtonGroup<>();
     private Select<ColumnName> stockSort2Column = new Select<>();
     private RadioButtonGroup<String> sort2Direction = new RadioButtonGroup<>();
+    private Checkbox displayAsTileCheckbox = new Checkbox("Display as Tile");
+    private Checkbox valueLayoutCheckbox = new Checkbox("Use Value Layout");
     private Boolean skipSidebarUpdates = Boolean.FALSE;
     private Integer selectedTabIndex = 0;
     private TaskGrid taskGrid = new TaskGrid();
@@ -361,7 +363,20 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         sortForm.addClassNames(Padding.Horizontal.LARGE);
         sortForm.setFlexDirection(Layout.FlexDirection.COLUMN);
 
-        this.sidebar = new Section(header, createSectionHeader("Filter options", false), filterForm, createSectionHeader("Sort options", true), sortForm);
+        displayAsTileCheckbox.addValueChangeListener(event -> {
+            currentStockSavedQuery.setDisplayAsTile(event.getValue());
+            sidebarChanged(Boolean.TRUE);
+        });
+        valueLayoutCheckbox.addValueChangeListener(event -> {
+            currentStockSavedQuery.setValueLayout(event.getValue());
+            sidebarChanged(Boolean.TRUE);
+        });
+
+        Layout displayOptionsForm = new Layout(displayAsTileCheckbox,valueLayoutCheckbox);
+        displayOptionsForm.addClassNames(Padding.Horizontal.LARGE);
+        displayOptionsForm.setFlexDirection(Layout.FlexDirection.COLUMN);
+
+        this.sidebar = new Section(header, createSectionHeader("Filter options", false), filterForm, createSectionHeader("Sort options", true), sortForm, createSectionHeader("Display options", true), displayOptionsForm);
         this.sidebar.addClassNames("backdrop-blur-3xl", "var(--lumo-tint-90pct)", Border.RIGHT,
                 Display.FLEX, FlexDirection.COLUMN, Position.ABSOLUTE, "lg:static", "bottom-1", "top-0",
                 "transition-all", "z-10");
@@ -400,6 +415,8 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         if(currentStockSavedQuery.getSort2()!=null){
             sort2Direction.setValue(currentStockSavedQuery.getSort2Direction());
         }
+        displayAsTileCheckbox.setValue(Boolean.TRUE.equals(currentStockSavedQuery.getDisplayAsTile()));
+        valueLayoutCheckbox.setValue(Boolean.TRUE.equals(currentStockSavedQuery.getValueLayout()));
         skipSidebarUpdates = Boolean.FALSE;
     }
     
@@ -424,11 +441,11 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         saveQueryDialog.addConfirmListener(event -> {
             //save the item
             if(currentStockSavedQuery.getSavedQueryName().equals(saveQueryName.getValue())){
-                //get the viewStyle from the StockGrid and set it to the currentStockSavedQuery
-                currentStockSavedQuery.setViewStyle(list.getCurrentViewStyle());
+                currentStockSavedQuery.setDisplayAsTile(displayAsTileCheckbox.getValue());
+                currentStockSavedQuery.setValueLayout(valueLayoutCheckbox.getValue());
 
                 //set the visiblecolumns for the saved query if not a Tile view
-                if(!list.getCurrentViewStyle().equals(StockViewStyle.TILE)){
+                if(!list.getDisplayAsTile()){
                     currentStockSavedQuery.setVisibleColumns(String.join(",", list.getVisibleColumnKeys()));
                 }else{
                     currentStockSavedQuery.setVisibleColumns(null);
@@ -442,12 +459,13 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
                 loadFilters();
                 applyFilters();
                 sidebarChanged(Boolean.FALSE);
-            }else{
+            }else{  //save as
                 //get the viewStyle from the StockGrid and set it to the currentStockSavedQuery
-                currentStockSavedQuery.setViewStyle(list.getCurrentViewStyle());
+                currentStockSavedQuery.setDisplayAsTile(displayAsTileCheckbox.getValue());
+                currentStockSavedQuery.setValueLayout(valueLayoutCheckbox.getValue());
 
                 //set the visiblecolumns for the saved query
-                if(!list.getCurrentViewStyle().equals(StockViewStyle.TILE)){
+                if(!list.getDisplayAsTile()){
                     currentStockSavedQuery.setVisibleColumns(String.join(",", list.getVisibleColumnKeys()));
                 }else{
                     currentStockSavedQuery.setVisibleColumns(null);
@@ -655,7 +673,9 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         }
 
         list.setStockGridType(StockGrid.StockGridType.STOCK);
-        list.setCurrentViewStyle(currentStockSavedQuery.getViewStyle());
+        list.setDisplayAsTile(Boolean.TRUE.equals(currentStockSavedQuery.getDisplayAsTile()));
+        list.setValueLayout(Boolean.TRUE.equals(currentStockSavedQuery.getValueLayout()));
+
         list.setCurrentStockSavedQuery(currentStockSavedQuery); 
         list.setCurrentSearchName(currentSearchName);
 
@@ -808,10 +828,10 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         // litterGrid.setHeight("270px");
         System.out.println("createTabLitters: mobileDevice:" + mobileDevice);
         if(mobileDevice){
-            litterGrid.setCurrentViewStyle(LitterGrid.LitterViewStyle.TILE);
+            litterGrid.setDisplayAsTile(true);
             litterGrid.setHeight("500px");
         }else{      
-            litterGrid.setCurrentViewStyle(LitterGrid.LitterViewStyle.LIST);
+            litterGrid.setDisplayAsTile(false);
             litterGrid.setHeight("270px");
         }
         litterGrid.createGrid();
@@ -824,11 +844,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         stockGrid.setId(stock.getId(), StockGrid.StockGridType.KITS);
 
         //if this is being viewed on a mobile device set the view style to tile otherwise set it to list 
-        stockGrid.setCurrentViewStyle(
-            mobileDevice
-                ? StockSavedQuery.StockViewStyle.TILE
-                : StockSavedQuery.StockViewStyle.LIST
-        );
+        stockGrid.setDisplayAsTile(mobileDevice);
 
         if(mobileDevice){
             stockGrid.setHeight("500px");

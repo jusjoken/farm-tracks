@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
+import com.vaadin.flow.component.icon.Icon;
 
 import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.Utility.TaskLinkType;
@@ -22,6 +23,7 @@ import ca.jusjoken.data.Utility.TaskPlanStatus;
 import ca.jusjoken.data.service.ColumnNameComparator;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockStatusComparator;
+import ca.jusjoken.utility.TaskType;
 
 /**
  *
@@ -263,7 +265,12 @@ public class Utility {
         ACTION_CHECK(FontAwesome.Solid.CHECK.create().getIcon()),
         GENDER_FEMALE(FontAwesome.Solid.VENUS.create().getIcon()),
         GENDER_MALE(FontAwesome.Solid.MARS.create().getIcon()),
-        TYPE_BREEDER(FontAwesome.Solid.VENUS_MARS.create().getIcon());
+        TYPE_BREEDER(FontAwesome.Solid.VENUS_MARS.create().getIcon()),
+        TYPE_WEAN(FontAwesome.Solid.STOP_CIRCLE.create().getIcon()),
+        TYPE_MEDICAL(FontAwesome.Solid.MEDKIT.create().getIcon()),
+        TYPE_PREGNANCY_CHECK(FontAwesome.Solid.STETHOSCOPE.create().getIcon()),
+        TYPE_CUSTOM(FontAwesome.Solid.EXCLAMATION.create().getIcon()),
+        TYPE_NESTBOX(FontAwesome.Solid.INBOX.create().getIcon());
 
         private final String iconSource;
 
@@ -273,6 +280,33 @@ public class Utility {
 
         public String getIconSource() {
             return this.iconSource;
+        }
+
+        public static Icon getIconForTaskType(TaskType taskType) {
+            switch (taskType) {
+                case NESTBOX:
+                    return new Icon(TYPE_NESTBOX.getIconSource());
+                case BIRTH:
+                    return new Icon(ACTION_BIRTH.getIconSource());
+                case CLEAN_NESTBOX:
+                    return new Icon(TYPE_NESTBOX.getIconSource());
+                case REMOVE_NESTBOX:
+                    return new Icon(TYPE_NESTBOX.getIconSource());
+                case REBREED:
+                    return new Icon(TYPE_BREEDER.getIconSource());
+                case WEAN:
+                    return new Icon(TYPE_WEAN.getIconSource());
+                case BUTCHER:
+                    return new Icon(STATUS_BUTCHERED.getIconSource());
+                case PREGNANCY_CHECK:
+                    return new Icon(TYPE_PREGNANCY_CHECK.getIconSource());
+                case MEDICAL:
+                    return new Icon(TYPE_MEDICAL.getIconSource());
+                case CUSTOM:
+                    return new Icon(TYPE_CUSTOM.getIconSource());
+                default:
+                    return null;
+            }
         }
     }
     

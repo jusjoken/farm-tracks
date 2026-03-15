@@ -3,6 +3,10 @@ package ca.jusjoken.utility;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.vaadin.flow.component.icon.Icon;
+
+import ca.jusjoken.data.Utility;
+
 public enum TaskType {
     BREED("Breed"),
     NESTBOX("Nestbox"),
@@ -65,5 +69,10 @@ public enum TaskType {
             return type;
         }
         throw new IllegalArgumentException("ShortName [" + shortName + "] not supported.");
+    }
+
+    public Icon getIcon() {
+        // Lazy resolution avoids enum initialization recursion at startup.
+        return Utility.ICONS.getIconForTaskType(this);
     }
 }

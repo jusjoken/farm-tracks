@@ -58,7 +58,7 @@ public class LitterListView extends Main implements ListRefreshNeededListener{
 
         //add a vaadin radiobuttongroup to filter the littergrid by active, inactive or all litters
         Select<LitterGrid.LitterDisplayMode> displayModeSelect = new Select<>();
-        displayModeSelect.setLabel("Display Mode");
+        displayModeSelect.setLabel("Include Litters");
         displayModeSelect.setItems(
             LitterGrid.LitterDisplayMode.ALL,
             LitterGrid.LitterDisplayMode.ACTIVE,
@@ -104,7 +104,6 @@ public class LitterListView extends Main implements ListRefreshNeededListener{
 
         // litterGrid.createGrid();
         listRefreshNeeded();
-        System.out.println("LitterListView initialized. Grid created with view style: " + litterGrid.getCurrentViewStyle() + " MobileDevice: " + mobileDevice  );
     }
 
     private void updateMobileFlag(int width) {
@@ -148,11 +147,10 @@ public class LitterListView extends Main implements ListRefreshNeededListener{
     public void listRefreshNeeded() {
         System.out.println("listRefreshNeeded. MobileDevice: " + mobileDevice );
         if(mobileDevice){
-            litterGrid.setCurrentViewStyle(LitterGrid.LitterViewStyle.TILE);
+            litterGrid.setDisplayAsTile(true);
         } else {
-            litterGrid.setCurrentViewStyle(LitterGrid.LitterViewStyle.LIST);
+            litterGrid.setDisplayAsTile(false);
         }
-        System.out.println("listRefreshNeeded. CurrentViewStyle: " + litterGrid.getCurrentViewStyle());
 
         litterGrid.createGrid();
     }

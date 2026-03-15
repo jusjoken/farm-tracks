@@ -1,22 +1,21 @@
 package ca.jusjoken.component;
 
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
-import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.card.Card;
+import com.vaadin.flow.component.card.CardVariant;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.icon.Icon;
-import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.provider.SortDirection;
+import com.vaadin.flow.data.renderer.ComponentRenderer;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility;
@@ -25,10 +24,9 @@ import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.entity.TaskPlan;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
-import ca.jusjoken.data.service.TaskService;
-import ca.jusjoken.utility.BadgeVariant;
-import ca.jusjoken.utility.TaskType;
 import ca.jusjoken.data.service.TaskPlanService;
+import ca.jusjoken.data.service.TaskService;
+import ca.jusjoken.utility.TaskType;
 
 public class TaskGrid extends Grid<Task> {
     private ListDataProvider<Task> dataProvider;
@@ -45,6 +43,7 @@ public class TaskGrid extends Grid<Task> {
     Grid.Column<Task> dateColumn;
     private Boolean menuCreated = false;
     private Boolean minimalColumns = false;
+    private Boolean displayAsTile = false;
 
     public TaskGrid() {
         this(null, true, false);
@@ -81,56 +80,68 @@ public class TaskGrid extends Grid<Task> {
         return planEditor;
     }
 
+    private final ComponentRenderer<Component, Task> taskCardRenderer = new ComponentRenderer<>(
+            taskEntity -> {
+                // return createListItemLayout(taskEntity);
+                return createListItemCard(taskEntity);
+    });    
+
+    private String getTaskFor(Task task) {
+        if (task.getLinkType() == null) {
+            return "";
+        }
+        return switch (task.getLinkType()) {
+            case BREEDER -> stockService.findById(task.getLinkBreederId()).getName();
+            case LITTER -> stockService.findById(task.getLinkLitterId()).getName();
+            default -> "";
+        };
+    }
+
+
     private void configureGrid() {
-        // System.out.println("Configuring TaskGrid with stockId: " + stockId);
+        removeAllColumns();
+        removeAllHeaderRows();
+        removeAllFooterRows();
 
         setDataProvider();
+        
+        if(displayAsTile){
+            configureTileView();
+        }else{
+            configureListView();
+        }
+
+        setEmptyStateText("No litters available to display");
+
+
+
+        // System.out.println("Configuring TaskGrid with stockId: " + stockId);
+
+        if(!menuCreated){
+            createContextMenu(this);
+            menuCreated = true;
+        }
+
+    }
+
+    private void configureListView() {
         addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
 
         this.addColumn(Task::getName).setHeader("Name").setSortable(true).setFrozen(true);
         if(!minimalColumns) {
             this.addColumn(task -> { return task.getLinkType().getShortName(); }).setHeader("Type").setSortable(true);
             //add a column to show either the linked breeder or the linked litter based on the link type, if the link type is breeder show the breeder name, if the link type is litter show the litter name
-            this.addColumn(task -> {
-                if(null == task.getLinkType()){
-                    return "";
-                } else return switch (task.getLinkType()) {
-                    case BREEDER -> stockService.findById(task.getLinkBreederId()).getName();
-                    case LITTER -> stockService.findById(task.getLinkLitterId()).getName();
-                    default -> "";
-                };
-            }).setHeader("Task for:").setSortable(true);
+            this.addColumn(this::getTaskFor).setHeader("Task for:").setSortable(true);
         }
 
         final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MM-dd-yyyy");
         dateColumn = this.addComponentColumn(task -> {
-            LocalDate date = task.getDate();
-            Span dateText = new Span(date != null ? date.format(dateFormatter) : "");
-
-            //for completed tasks, show the date in the default text color with a strikethrough. For active tasks, show overdue dates in red and upcoming dates in green.
-            if (date != null && Boolean.TRUE.equals(task.getCompleted())) {
-                dateText.getStyle().set("text-decoration", "line-through");
-            }
-            if (date != null && !Boolean.TRUE.equals(task.getCompleted())) {
-                if (date.isBefore(LocalDate.now())) {
-                    dateText.getStyle().set("color", "var(--lumo-error-text-color)");
-                } else if (date.isAfter(LocalDate.now())) {
-                    dateText.getStyle().set("color", "var(--lumo-success-text-color)");
-                }
-                // today => default color
-            }
-            // completed => default color
-
-            return dateText;
+            return task.getDueDateBadge();
         }).setHeader("Date").setSortable(true).setComparator(Task::getDate);
 
         if(!minimalColumns){
             this.addComponentColumn(item -> {
-                Badge planName = safeGetPlanName(item);
-                if (planName != null) {
-                    return planName;
-                }
-                return new Span("");
+                return getPlanNameComponent(item);
             }).setHeader("Plan");       
         }
 
@@ -144,29 +155,40 @@ public class TaskGrid extends Grid<Task> {
             updateCompletionFilter(event.getValue());
         });
 
-        this.addComponentColumn(item -> {
-            Badge statusBadge = new Badge();
-            if(item.getCompleted()){
-                statusBadge.setText("Completed");
-                statusBadge.addThemeVariants(BadgeVariant.ERROR);
-                return statusBadge;
-            }else{
-                statusBadge.setText("Active");
-                statusBadge.addThemeVariants(BadgeVariant.SUCCESS);
-                return statusBadge;
-            }
-        }).setHeader(completionFilter);
+        this.addComponentColumn(Task::getStatusBadge).setHeader(completionFilter);
 
         setMultiSort(true);
         completionFilter.setValue(currentCompletionFilter);
         updateCompletionFilter(currentCompletionFilter);
         updateSortOrder();
+    }
 
-        if(!menuCreated){
-            createContextMenu(this);
-            menuCreated = true;
+    private void configureTileView() {
+        addColumn(taskCardRenderer).setKey("name");
+    }
+
+    private Component getPlanNameComponent(Task task) {
+        Badge planName = safeGetPlanName(task);
+        if (planName != null) {
+            return planName;
+            
         }
+        return new Span("");
+    }
 
+    private Component createListItemCard(Task taskEntity) {
+        Card card = new Card();
+        card.setWidthFull();
+        card.addThemeVariants(CardVariant.LUMO_ELEVATED);
+
+        card.setHeader(taskEntity.getHeader());
+        card.setHeaderSuffix(new Span(this.getTaskFor(taskEntity)));
+
+        card.addToFooter(taskEntity.getDueDateBadge());
+        card.addToFooter(taskEntity.getStatusBadge());
+        
+        card.addToFooter(getPlanNameComponent(taskEntity));
+        return card;
     }
 
     private GridContextMenu<Task> createContextMenu(Grid<Task> grid) {
@@ -176,6 +198,17 @@ public class TaskGrid extends Grid<Task> {
                 return false;
             } else {
                 menu.removeAll();
+                GridMenuItem<Task> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
+                displayAsTileMenu.setCheckable(true);
+                displayAsTileMenu.setChecked(displayAsTile);
+                displayAsTileMenu.addMenuItemClickListener(click -> {
+                    displayAsTile = displayAsTileMenu.isChecked();
+                    configureGrid();
+                    refreshGrid();
+                });
+                menu.addSeparator();
+
+
                 menu.addComponentAsFirst(UIUtilities.getContextMenuHeader("Task: " + menuEntity.getName()));
 
                 GridMenuItem<Task> addNewMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
@@ -325,6 +358,14 @@ public class TaskGrid extends Grid<Task> {
 
     public Boolean getMinimalColumns() {
         return minimalColumns;
+    }
+
+    public Boolean getDisplayAsTile() {
+        return displayAsTile;
+    }
+
+    public void setDisplayAsTile(Boolean displayAsTile) {
+        this.displayAsTile = displayAsTile;
     }
 
 }
