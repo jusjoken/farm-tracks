@@ -21,8 +21,6 @@ import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.shared.Registration;
-import com.vaadin.flow.theme.lumo.LumoUtility.FontSize;
-import com.vaadin.flow.theme.lumo.LumoUtility.FontWeight;
 import com.vaadin.flow.theme.lumo.LumoUtility.Padding;
 
 import ca.jusjoken.UIUtilities;
@@ -448,6 +446,16 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
                 return false;
             }else{
                 menu.removeAll();
+                GridMenuItem<Litter> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
+                displayAsTileMenu.setCheckable(true);
+                displayAsTileMenu.setChecked(displayAsTile);
+                displayAsTileMenu.addMenuItemClickListener(click -> {
+                    displayAsTile = displayAsTileMenu.isChecked();
+                    configureGrid();
+                    listRefreshNeeded();
+                });
+                menu.addSeparator();
+
                 String litterName = litterEntity.getDisplayName();
 
                 // //add a label at the top with the stock name
@@ -471,16 +479,6 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
                     taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, litterEntity.getStockType());
                     
-                });
-                menu.addSeparator();
-
-                GridMenuItem<Litter> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
-                displayAsTileMenu.setCheckable(true);
-                displayAsTileMenu.setChecked(displayAsTile);
-                displayAsTileMenu.addMenuItemClickListener(click -> {
-                    displayAsTile = displayAsTileMenu.isChecked();
-                    configureGrid();
-                    listRefreshNeeded();
                 });
                 menu.addSeparator();
 

@@ -263,6 +263,7 @@ public class Utility {
         ACTION_WEIGH(FontAwesome.Solid.BALANCE_SCALE.create().getIcon()),
         ACTION_PEDIGREE(FontAwesome.Solid.SITEMAP.create().getIcon()),
         ACTION_CHECK(FontAwesome.Solid.CHECK.create().getIcon()),
+        ACTION_FILTER(FontAwesome.Solid.FILTER.create().getIcon()),
         GENDER_FEMALE(FontAwesome.Solid.VENUS.create().getIcon()),
         GENDER_MALE(FontAwesome.Solid.MARS.create().getIcon()),
         TYPE_BREEDER(FontAwesome.Solid.VENUS_MARS.create().getIcon()),
@@ -270,7 +271,7 @@ public class Utility {
         TYPE_MEDICAL(FontAwesome.Solid.MEDKIT.create().getIcon()),
         TYPE_PREGNANCY_CHECK(FontAwesome.Solid.STETHOSCOPE.create().getIcon()),
         TYPE_CUSTOM(FontAwesome.Solid.EXCLAMATION.create().getIcon()),
-        TYPE_NESTBOX(FontAwesome.Solid.INBOX.create().getIcon());
+        TYPE_NESTBOX(FontAwesome.Solid.BED.create().getIcon());
 
         private final String iconSource;
 
@@ -284,6 +285,8 @@ public class Utility {
 
         public static Icon getIconForTaskType(TaskType taskType) {
             switch (taskType) {
+                case BREED:
+                    return new Icon(TYPE_BREEDER.getIconSource());
                 case NESTBOX:
                     return new Icon(TYPE_NESTBOX.getIconSource());
                 case BIRTH:

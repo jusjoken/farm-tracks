@@ -1,12 +1,12 @@
 package ca.jusjoken.data.service;
 
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
 import ca.jusjoken.component.Badge;
-import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.entity.TaskPlan;
@@ -93,7 +93,7 @@ public class TaskPlanService {
         if (!tasks.isEmpty()) {
             var firstTask = tasks.get(0);
             if (firstTask.getDate() != null) {
-                dateInfo = firstTask.getDate().toString();
+                dateInfo = firstTask.getDate().format(DateTimeFormatter.ofPattern("MM-dd-yyyy"));
             }
         }
         Badge badge = new Badge(linkTypeInfo + " Plan: " + dateInfo);

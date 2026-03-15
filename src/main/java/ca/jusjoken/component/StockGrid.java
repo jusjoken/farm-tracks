@@ -515,6 +515,33 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
             }else{
                 menu.removeAll();
+                GridMenuItem<Stock> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
+                displayAsTileMenu.setCheckable(true);
+                displayAsTileMenu.setChecked(displayAsTile);
+                displayAsTileMenu.addMenuItemClickListener(click -> {
+                    displayAsTile = displayAsTileMenu.isChecked();
+                    if(currentStockSavedQuery != null){
+                        currentStockSavedQuery.setDisplayAsTile(displayAsTile);
+                    }
+                    configureGrid();
+                    notifySidebarChanged(true);
+                    refreshGrid();
+                });
+
+                GridMenuItem<Stock> valueLayoutMenu = menu.addItem(new Item("Display as Value Layout", Utility.ICONS.ACTION_VIEW.getIconSource()));
+                valueLayoutMenu.setCheckable(true);
+                valueLayoutMenu.setChecked(valueLayout);
+                valueLayoutMenu.addMenuItemClickListener(click -> {
+                    valueLayout = valueLayoutMenu.isChecked();
+                    if(currentStockSavedQuery != null){
+                        currentStockSavedQuery.setValueLayout(valueLayout);
+                    }
+                    configureGrid();
+                    notifySidebarChanged(true);
+                    refreshGrid();
+                });
+                menu.addSeparator();
+
                 String stockName = stockEntity.getDisplayName();
                 
                 //add a label at the top with the stock name
@@ -549,34 +576,6 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                     
                 });
                 menu.addSeparator();
-
-                System.out.println("Context menu opened for stock: " + stockEntity.getDisplayName() + ", displayAsTile: " + displayAsTile + ", valueLayout: " + valueLayout);
-                GridMenuItem<Stock> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
-                displayAsTileMenu.setCheckable(true);
-                displayAsTileMenu.setChecked(displayAsTile);
-                displayAsTileMenu.addMenuItemClickListener(click -> {
-                    displayAsTile = displayAsTileMenu.isChecked();
-                    if(currentStockSavedQuery != null){
-                        currentStockSavedQuery.setDisplayAsTile(displayAsTile);
-                    }
-                    configureGrid();
-                    notifySidebarChanged(true);
-                    refreshGrid();
-                });
-                menu.addSeparator();
-
-                GridMenuItem<Stock> valueLayoutMenu = menu.addItem(new Item("Display as Value Layout", Utility.ICONS.ACTION_VIEW.getIconSource()));
-                valueLayoutMenu.setCheckable(true);
-                valueLayoutMenu.setChecked(valueLayout);
-                valueLayoutMenu.addMenuItemClickListener(click -> {
-                    valueLayout = valueLayoutMenu.isChecked();
-                    if(currentStockSavedQuery != null){
-                        currentStockSavedQuery.setValueLayout(valueLayout);
-                    }
-                    configureGrid();
-                    notifySidebarChanged(true);
-                    refreshGrid();
-                });
 
                 GridMenuItem<Stock> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
                 editMenu.addMenuItemClickListener(click -> {

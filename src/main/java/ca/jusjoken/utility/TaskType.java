@@ -73,6 +73,7 @@ public enum TaskType {
 
     public Icon getIcon() {
         // Lazy resolution avoids enum initialization recursion at startup.
+        System.out.println("Resolving icon for TaskType: " + this.name());
         return Utility.ICONS.getIconForTaskType(this);
     }
 }

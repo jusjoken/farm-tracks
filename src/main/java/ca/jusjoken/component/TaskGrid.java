@@ -11,8 +11,8 @@ import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
+import com.vaadin.flow.component.grid.contextmenu.GridSubMenu;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
@@ -127,12 +127,14 @@ public class TaskGrid extends Grid<Task> {
     private void configureListView() {
         addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
 
-        this.addColumn(Task::getName).setHeader("Name").setSortable(true).setFrozen(true);
+        this.addComponentColumn(Task::getHeader).setHeader("Name").setSortable(true).setFrozen(true);
         if(!minimalColumns) {
             this.addColumn(task -> { return task.getLinkType().getShortName(); }).setHeader("Type").setSortable(true);
             //add a column to show either the linked breeder or the linked litter based on the link type, if the link type is breeder show the breeder name, if the link type is litter show the litter name
             this.addColumn(this::getTaskFor).setHeader("Task for:").setSortable(true);
         }
+
+        this.addComponentColumn(Task::getStatusBadge).setHeader("Status").setSortable(true).setComparator(Task::getCompleted);
 
         final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MM-dd-yyyy");
         dateColumn = this.addComponentColumn(task -> {
@@ -145,20 +147,7 @@ public class TaskGrid extends Grid<Task> {
             }).setHeader("Plan");       
         }
 
-        Select<String> completionFilter = new Select<>();
-        completionFilter.setItems(Utility.TaskCompletionFilter.ALL.filterName, Utility.TaskCompletionFilter.COMPLETED.filterName, Utility.TaskCompletionFilter.ACTIVE.filterName);
-        completionFilter.setWidthFull();
-        completionFilter.setTooltipText("Filter by completion status");
-
-        completionFilter.addValueChangeListener(event -> {
-            currentCompletionFilter = event.getValue();
-            updateCompletionFilter(event.getValue());
-        });
-
-        this.addComponentColumn(Task::getStatusBadge).setHeader(completionFilter);
-
         setMultiSort(true);
-        completionFilter.setValue(currentCompletionFilter);
         updateCompletionFilter(currentCompletionFilter);
         updateSortOrder();
     }
@@ -184,8 +173,8 @@ public class TaskGrid extends Grid<Task> {
         card.setHeader(taskEntity.getHeader());
         card.setHeaderSuffix(new Span(this.getTaskFor(taskEntity)));
 
-        card.addToFooter(taskEntity.getDueDateBadge());
         card.addToFooter(taskEntity.getStatusBadge());
+        card.addToFooter(taskEntity.getDueDateBadge());
         
         card.addToFooter(getPlanNameComponent(taskEntity));
         return card;
@@ -208,6 +197,20 @@ public class TaskGrid extends Grid<Task> {
                 });
                 menu.addSeparator();
 
+                //add a submenu to filter by completion status
+                GridMenuItem<Task> filterByCompletionMenu = menu.addItem(new Item("Filter by Completion", Utility.ICONS.ACTION_FILTER.getIconSource()));
+                GridSubMenu<Task> filterSubMenu = filterByCompletionMenu.getSubMenu();
+                //for each taskcompletionfilter option, add a menu item to the submenu and set it to checked if it is the current filter
+                for (Utility.TaskCompletionFilter filter : Utility.TaskCompletionFilter.values()) {
+                    GridMenuItem<Task> menuItem = filterSubMenu.addItem(filter.filterName);
+                    menuItem.setCheckable(true);
+                    menuItem.setChecked(currentCompletionFilter.equals(filter.filterName));
+                    menuItem.addMenuItemClickListener(click -> {
+                        currentCompletionFilter = filter.filterName;
+                        updateCompletionFilter(currentCompletionFilter);
+                        updateSortOrder();
+                    });
+                }
 
                 menu.addComponentAsFirst(UIUtilities.getContextMenuHeader("Task: " + menuEntity.getName()));
 
@@ -224,9 +227,6 @@ public class TaskGrid extends Grid<Task> {
                     }
                 });
                 menu.addSeparator();
-                //create a submenu that allows selection of the view style
-                
-
 
                 // Context menu opened on a task, show option to edit
                 GridMenuItem<Task> editMenu = menu.addItem(new Item("Edit Task", Utility.ICONS.ACTION_EDIT.getIconSource()));
