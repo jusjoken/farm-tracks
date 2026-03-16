@@ -84,6 +84,7 @@ public class StockSavedQueryService {
             newQuery.setSavedQueryName(newName);
             newQuery.setSort1(query.getSort1());
             newQuery.setSort2(query.getSort2());
+            newQuery.setSortOrders(query.getSortOrders());
             newQuery.setStockStatus(query.getStockStatus());
             newQuery.setStockType(query.getStockType());
             newQuery.setViewStyle(query.getViewStyle());

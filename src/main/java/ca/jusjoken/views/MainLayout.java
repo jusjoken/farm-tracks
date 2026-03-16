@@ -340,6 +340,9 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
             createNavigation();
             if(event.getSource().getId().isPresent()){
                 String currentId = event.getSource().getId().get();
+                  if (currentId.isBlank()) {
+                      return;
+                  }
                 System.out.println("MainLayout: onAttach: listener: dialog id:" + currentId);
                 UI.getCurrent().navigate(StockView.class,currentId);
                 viewTitle.setText(queryService.getSavedQueryById(currentId).getSavedQueryName());

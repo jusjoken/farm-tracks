@@ -1,7 +1,9 @@
 package ca.jusjoken.component;
 
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.card.Card;
@@ -16,6 +18,7 @@ import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
+import com.vaadin.flow.shared.Registration;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility;
@@ -43,6 +46,7 @@ public class TaskGrid extends Grid<Task> {
     private Integer taskPlanId;
     private String currentCompletionFilter = Utility.TaskCompletionFilter.ACTIVE.filterName;
     Grid.Column<Task> dateColumn;
+    private Registration sortListenerRegistration;
     private Boolean menuCreated = false;
     private Boolean minimalColumns = false;
     private Boolean displayAsTile = false;
@@ -131,19 +135,19 @@ public class TaskGrid extends Grid<Task> {
     private void configureListView() {
         addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
 
-        this.addComponentColumn(Task::getHeader).setHeader("Name").setSortable(true).setFrozen(true);
+        this.addComponentColumn(Task::getHeader).setHeader("Name").setSortable(true).setFrozen(true).setKey("name");
         if(!minimalColumns) {
-            this.addColumn(task -> { return task.getLinkType().getShortName(); }).setHeader("Type").setSortable(true);
+            this.addColumn(task -> { return task.getLinkType().getShortName(); }).setHeader("Type").setSortable(true).setKey("type");
             //add a column to show either the linked breeder or the linked litter based on the link type, if the link type is breeder show the breeder name, if the link type is litter show the litter name
-            this.addColumn(this::getTaskFor).setHeader("Task for:").setSortable(true);
+            this.addColumn(this::getTaskFor).setHeader("Task for:").setSortable(true).setKey("taskfor");
         }
 
-        this.addComponentColumn(Task::getStatusBadge).setHeader("Status").setSortable(true).setComparator(Task::getCompleted);
+        this.addComponentColumn(Task::getStatusBadge).setHeader("Status").setSortable(true).setComparator(Task::getCompleted).setKey("status");
 
         final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("MM-dd-yyyy");
         dateColumn = this.addComponentColumn(task -> {
             return task.getDueDateBadge();
-        }).setHeader("Date").setSortable(true).setComparator(Task::getDate);
+        }).setHeader("Date").setSortable(true).setComparator(Task::getDate).setKey("date");
 
         if(!minimalColumns){
             this.addComponentColumn(item -> {
@@ -152,6 +156,8 @@ public class TaskGrid extends Grid<Task> {
         }
 
         setMultiSort(true);
+        if (sortListenerRegistration != null) sortListenerRegistration.remove();
+        sortListenerRegistration = addSortListener(e -> saveSortPreference(e.getSortOrder()));
         updateCompletionFilter(currentCompletionFilter);
         updateSortOrder();
     }
@@ -337,8 +343,15 @@ public class TaskGrid extends Grid<Task> {
     }
 
     private void updateSortOrder(){
-            //System.out.println("Re-applying sort order after data provider refresh");
+        if (getColumns().isEmpty()) {
+            return;
+        }
+        List<GridSortOrder<Task>> saved = loadSortPreference();
+        if (saved != null && !saved.isEmpty()) {
+            this.sort(saved);
+        } else if (dateColumn != null) {
             this.sort(List.of(new GridSortOrder<>(dateColumn, SortDirection.ASCENDING)));
+        }
     }
 
     private void setDataProvider() {
@@ -409,6 +422,49 @@ public class TaskGrid extends Grid<Task> {
             return null;
         }
         return "grid." + getClass().getSimpleName() + "." + preferenceScopeKey + ".displayAsTile";
+    }
+
+    private void saveSortPreference(List<GridSortOrder<Task>> sortOrders) {
+        String settingsKey = getSortPreferenceKey();
+        if (settingsKey == null) return;
+        if (sortOrders == null || sortOrders.isEmpty()) return;
+        StringBuilder sb = new StringBuilder();
+        for (GridSortOrder<Task> order : sortOrders) {
+            String key = order.getSorted().getKey();
+            if (key == null) continue;
+            if (sb.length() > 0) sb.append(",");
+            sb.append(key).append(":").append(order.getDirection().name());
+        }
+        if (sb.isEmpty()) return;
+        userUiSettingsService.setValueForCurrentUser(settingsKey, sb.toString());
+    }
+
+    private List<GridSortOrder<Task>> loadSortPreference() {
+        String settingsKey = getSortPreferenceKey();
+        if (settingsKey == null) return null;
+        Optional<Object> value = userUiSettingsService.getValueForCurrentUser(settingsKey);
+        if (value.isEmpty()) return null;
+        String serialized = String.valueOf(value.get());
+        if (serialized.isBlank()) return null;
+        List<GridSortOrder<Task>> result = new ArrayList<>();
+        for (String part : serialized.split(",")) {
+            String[] kv = part.split(":", 2);
+            if (kv.length != 2) continue;
+            Grid.Column<Task> col = getColumnByKey(kv[0]);
+            if (col == null) continue;
+            try {
+                SortDirection dir = SortDirection.valueOf(kv[1]);
+                result.add(new GridSortOrder<>(col, dir));
+            } catch (IllegalArgumentException ignored) {
+                // Ignore malformed saved sort directions.
+            }
+        }
+        return result.isEmpty() ? null : result;
+    }
+
+    private String getSortPreferenceKey() {
+        if (preferenceScopeKey == null || preferenceScopeKey.isBlank()) return null;
+        return "grid." + getClass().getSimpleName() + "." + preferenceScopeKey + ".sortOrder";
     }
 
 }

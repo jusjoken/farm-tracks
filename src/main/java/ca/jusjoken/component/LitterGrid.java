@@ -3,6 +3,7 @@ package ca.jusjoken.component;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
@@ -55,6 +56,8 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     private Grid.Column<Litter> diedKitsCountColumn;
     private Grid.Column<Litter> kitsSurvivedCountColumn;
     private Grid.Column<Litter> bredColumn;
+    private Grid.Column<Litter> bornColumn;
+    private Registration sortListenerRegistration;
     private final TaskEditor taskEditor;
     private final LitterEditor litterEditor;
     private final List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
@@ -121,15 +124,15 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
             return litter.getnameAndPrefix(false,true);
         }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name");
 
-        addColumn(Litter::getParentsFormatted).setHeader("Parents").setSortable(true).setResizable(true).setAutoWidth(true);
-        Grid.Column<Litter> bornColumn = addColumn(new LocalDateRenderer<>(Litter::getDoB,"MM-dd-YYYY"))
-                .setHeader("Born").setSortable(true).setComparator(Litter::getDoB).setResizable(true);
+        addColumn(Litter::getParentsFormatted).setHeader("Parents").setSortable(true).setResizable(true).setAutoWidth(true).setKey("parents");
+        bornColumn = addColumn(new LocalDateRenderer<>(Litter::getDoB,"MM-dd-YYYY"))
+            .setHeader("Born").setSortable(true).setComparator(Litter::getDoB).setResizable(true).setKey("born");
         bredColumn = addColumn(new LocalDateRenderer<>(Litter::getBred,"MM-dd-YYYY"))
-                .setHeader("Bred").setSortable(true).setComparator(Litter::getBred).setResizable(true);
-        kitsCountColumn = addColumn(item -> item.getKitsCount()).setHeader(stockType.getNonBreederName()).setSortable(true).setResizable(true);
-        diedKitsCountColumn = addColumn(item -> item.getDiedKitsCount()).setHeader("Died").setSortable(true).setResizable(true);
-        kitsSurvivedCountColumn = addColumn(item -> item.getKitsSurvivedCount()).setHeader("Survived").setSortable(true).setResizable(true);
-        survivalRateColumn = addColumn(item -> item.getSurvivalRate()).setHeader("Survival Rate").setSortable(true).setResizable(true);
+            .setHeader("Bred").setSortable(true).setComparator(Litter::getBred).setResizable(true).setKey("bred");
+        kitsCountColumn = addColumn(item -> item.getKitsCount()).setHeader(stockType.getNonBreederName()).setSortable(true).setResizable(true).setKey("kits");
+        diedKitsCountColumn = addColumn(item -> item.getDiedKitsCount()).setHeader("Died").setSortable(true).setResizable(true).setKey("died");
+        kitsSurvivedCountColumn = addColumn(item -> item.getKitsSurvivedCount()).setHeader("Survived").setSortable(true).setResizable(true).setKey("survived");
+        survivalRateColumn = addColumn(item -> item.getSurvivalRate()).setHeader("Survival Rate").setSortable(true).setResizable(true).setKey("survival");
         Grid.Column<Litter> statusColumn = addComponentColumn(litter -> {
             return litter.getActiveBadge();
         }).setHeader("Status")
@@ -145,7 +148,9 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         }));        
 
         setMultiSort(true);
-        sort(List.of(new GridSortOrder<>(bornColumn, SortDirection.DESCENDING)));
+        if (sortListenerRegistration != null) sortListenerRegistration.remove();
+        sortListenerRegistration = addSortListener(e -> saveSortPreference(e.getSortOrder()));
+        updateSortOrder();
         updateFooterStats();
     }
 
@@ -232,7 +237,20 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
     public void refreshGrid() {
         setLitterDataProvider();
-        dataProvider.refreshAll();
+        updateSortOrder();
+        updateFooterStats();
+    }
+
+    private void updateSortOrder() {
+        if (getColumns().isEmpty()) {
+            return;
+        }
+        List<GridSortOrder<Litter>> savedSort = loadSortPreference();
+        if (savedSort != null && !savedSort.isEmpty()) {
+            sort(savedSort);
+        } else if (bornColumn != null) {
+            sort(List.of(new GridSortOrder<>(bornColumn, SortDirection.DESCENDING)));
+        }
     }
 
     @Override
@@ -578,5 +596,47 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         return "grid." + getClass().getSimpleName() + "." + preferenceScopeKey + ".displayAsTile";
     }
 
+    private void saveSortPreference(List<GridSortOrder<Litter>> sortOrders) {
+        String settingsKey = getSortPreferenceKey();
+        if (settingsKey == null) return;
+        if (sortOrders == null || sortOrders.isEmpty()) return;
+        StringBuilder sb = new StringBuilder();
+        for (GridSortOrder<Litter> order : sortOrders) {
+            String key = order.getSorted().getKey();
+            if (key == null) continue;
+            if (sb.length() > 0) sb.append(",");
+            sb.append(key).append(":").append(order.getDirection().name());
+        }
+        if (sb.isEmpty()) return;
+        userUiSettingsService.setValueForCurrentUser(settingsKey, sb.toString());
+    }
+
+    private List<GridSortOrder<Litter>> loadSortPreference() {
+        String settingsKey = getSortPreferenceKey();
+        if (settingsKey == null) return null;
+        Optional<Object> value = userUiSettingsService.getValueForCurrentUser(settingsKey);
+        if (value.isEmpty()) return null;
+        String serialized = String.valueOf(value.get());
+        if (serialized.isBlank()) return null;
+        List<GridSortOrder<Litter>> result = new ArrayList<>();
+        for (String part : serialized.split(",")) {
+            String[] kv = part.split(":", 2);
+            if (kv.length != 2) continue;
+            Grid.Column<Litter> col = getColumnByKey(kv[0]);
+            if (col == null) continue;
+            try {
+                SortDirection dir = SortDirection.valueOf(kv[1]);
+                result.add(new GridSortOrder<>(col, dir));
+            } catch (IllegalArgumentException ignored) {
+                // Ignore malformed saved sort directions.
+            }
+        }
+        return result.isEmpty() ? null : result;
+    }
+
+    private String getSortPreferenceKey() {
+        if (preferenceScopeKey == null || preferenceScopeKey.isBlank()) return null;
+        return "grid." + getClass().getSimpleName() + "." + preferenceScopeKey + ".sortOrder";
+    }
 
 }

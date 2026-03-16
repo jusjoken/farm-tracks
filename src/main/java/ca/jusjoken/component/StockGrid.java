@@ -1,10 +1,13 @@
 package ca.jusjoken.component;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 
 import com.vaadin.flow.component.Component;
@@ -20,6 +23,7 @@ import com.vaadin.flow.component.checkbox.CheckboxGroupVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.grid.ColumnTextAlign;
 import com.vaadin.flow.component.grid.Grid;
+import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
@@ -30,12 +34,15 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.data.provider.ListDataProvider;
+import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
 import com.vaadin.flow.data.renderer.NumberRenderer;
+import com.vaadin.flow.shared.Registration;
 
 import ca.jusjoken.UIUtilities;
+import ca.jusjoken.data.ColumnSort;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
@@ -81,6 +88,9 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private Boolean displayAsTile = false;
     private Boolean valueLayout = false;
     private String preferenceScopeKey;
+    private Registration sortListenerRegistration;
+    private boolean restoringSortOrder = false;
+    private boolean suppressSortPersistence = false;
 
     public static enum StockGridType {
         LITTER, STOCK, KITS
@@ -121,8 +131,8 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         //only configure grid after stockId or litterId is set and stockType is determined
         if(stockId != null || litterId != null || stockGridType == StockGridType.STOCK){
             configureGrid();
-            refreshGrid();
             setColumns();
+            refreshGrid();
             addColumnReorderListener(event -> {
                 columnList = getCleanColumnList(event.getColumns());
                 notifySidebarChanged(true);
@@ -136,12 +146,12 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
     private void setColumns(){
         columnList = getCleanColumnList(getColumns());
-        // System.out.println("applyFilters: columnList:" + columnList);
-        //retreive the visible columns and set them
-        if(currentStockSavedQuery != null && !currentStockSavedQuery.getVisibleColumnKeyList().isEmpty()){
-            // System.out.println("applyFilters: setting visible columns to:" + currentStockSavedQuery.getVisibleColumnKeyList());
+        List<String> visibleColumnKeys = currentStockSavedQuery != null
+                ? currentStockSavedQuery.getVisibleColumnKeyList()
+                : loadVisibleColumnPreference();
+        if(visibleColumnKeys != null && !visibleColumnKeys.isEmpty()){
             for(Column<Stock> column: columnList){
-                getColumnByKey(column.getKey()).setVisible(currentStockSavedQuery.getVisibleColumnKeyList().contains(column.getKey()));
+                getColumnByKey(column.getKey()).setVisible(visibleColumnKeys.contains(column.getKey()));
             }
         }
     }
@@ -235,7 +245,8 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         setColumnReorderingAllowed(true);
         addComponentColumn(stockEntity -> {
             return stockEntity.getnameAndPrefix(false,true, true);
-        }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(false).setKey("name");
+                }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(false).setKey("name")
+                    .setComparator(Stock::getDisplayName).setSortable(true);
 
         if(stockGridType == StockGridType.STOCK){
             addComponentColumn(stockEntity -> {
@@ -244,25 +255,26 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                         } else {
                             return null;
                         }
-                    }).setHeader("Breeder").setResizable(true).setAutoWidth(true).setKey("breeder");   
+                    }).setHeader("Breeder").setResizable(true).setAutoWidth(true).setKey("breeder")
+                      .setComparator(Stock::getBreeder).setSortable(true);
         }
 
-        addColumn(Stock::getBreed).setHeader("Breed").setResizable(true).setAutoWidth(true).setKey("breed");
-        addColumn(Stock::getColor).setHeader("Colour").setResizable(true).setAutoWidth(true).setKey("color");
-        addColumn(Stock::getGenotype).setHeader("Genotype").setResizable(true).setAutoWidth(true).setKey("genotype");
+        addColumn(Stock::getBreed).setHeader("Breed").setResizable(true).setAutoWidth(true).setKey("breed").setSortable(true);
+        addColumn(Stock::getColor).setHeader("Colour").setResizable(true).setAutoWidth(true).setKey("color").setSortable(true);
+        addColumn(Stock::getGenotype).setHeader("Genotype").setResizable(true).setAutoWidth(true).setKey("genotype").setSortable(true);
 
         if(stockGridType == StockGridType.STOCK){
-            addColumn(Stock::getChampNo).setHeader("ChampNo").setResizable(true).setAutoWidth(true).setKey("champno");
-            addColumn(Stock::getLegs).setHeader("Legs").setResizable(true).setAutoWidth(true).setKey("legs");
-            addColumn(Stock::getRegNo).setHeader("RegNo").setResizable(true).setAutoWidth(true).setKey("regno");
+            addColumn(Stock::getChampNo).setHeader("ChampNo").setResizable(true).setAutoWidth(true).setKey("champno").setSortable(true);
+            addColumn(Stock::getLegs).setHeader("Legs").setResizable(true).setAutoWidth(true).setKey("legs").setSortable(true);
+            addColumn(Stock::getRegNo).setHeader("RegNo").setResizable(true).setAutoWidth(true).setKey("regno").setSortable(true);
         }
 
-        addColumn(Stock::getStatus).setHeader("Status").setResizable(true).setAutoWidth(true).setKey("status");
-        addColumn(new LocalDateTimeRenderer<>(Stock::getStatusDate,"MM-dd-YYYY HHmm")).setHeader("Status Date").setResizable(true).setAutoWidth(true).setKey("statusdate");
-        addColumn(Stock::getTattoo).setHeader("Tattoo").setResizable(true).setAutoWidth(true).setKey("tattoo");
-        addColumn(Stock::getWeightInLbsOzAsString).setHeader("Weight").setResizable(true).setAutoWidth(true).setKey("weight");
-        addColumn(new LocalDateRenderer<>(Stock::getAcquired,"MM-dd-YYYY")).setHeader("Aquired").setResizable(true).setAutoWidth(true).setKey("aquired");
-        addColumn(new LocalDateRenderer<>(Stock::getDoB,"MM-dd-YYYY")).setHeader("DOB").setResizable(true).setAutoWidth(true).setKey("dob");
+        addColumn(Stock::getStatus).setHeader("Status").setResizable(true).setAutoWidth(true).setKey("status").setSortable(true);
+        addColumn(new LocalDateTimeRenderer<>(Stock::getStatusDate,"MM-dd-YYYY HHmm")).setHeader("Status Date").setResizable(true).setAutoWidth(true).setKey("statusdate").setSortable(true);
+        addColumn(Stock::getTattoo).setHeader("Tattoo").setResizable(true).setAutoWidth(true).setKey("tattoo").setSortable(true);
+        addColumn(Stock::getWeightInLbsOzAsString).setHeader("Weight").setResizable(true).setAutoWidth(true).setKey("weight").setComparator(Stock::getWeight).setSortable(true);
+        addColumn(new LocalDateRenderer<>(Stock::getAcquired,"MM-dd-YYYY")).setHeader("Aquired").setResizable(true).setAutoWidth(true).setKey("aquired").setSortable(true);
+        addColumn(new LocalDateRenderer<>(Stock::getDoB,"MM-dd-YYYY")).setHeader("DOB").setResizable(true).setAutoWidth(true).setKey("dob").setSortable(true);
         addColumn(stockEntity -> {
             return stockEntity.getAge().getAgeFormattedString();
         }).setHeader("Age").setResizable(true).setAutoWidth(true).setKey("age");
@@ -277,8 +289,25 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             return parent.getDisplayName();
         }).setHeader("Mother").setResizable(true).setAutoWidth(true).setKey("mother");
         addColumn(stockEntity -> {return stockTypeService.getGenderForType(stockEntity.getSex(), stockEntity.getStockType());}).setHeader("Gender").setResizable(true).setAutoWidth(true).setKey("gender");
-        addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value");
-        addColumn(Stock::getNotes).setHeader("Notes").setResizable(true).setAutoWidth(true).setKey("notes");
+        addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value").setSortable(true);
+        addColumn(Stock::getNotes).setHeader("Notes").setResizable(true).setAutoWidth(true).setKey("notes").setSortable(true);
+
+        setMultiSort(true);
+
+        if (sortListenerRegistration != null) {
+            sortListenerRegistration.remove();
+        }
+        sortListenerRegistration = addSortListener(event -> {
+            if (restoringSortOrder || suppressSortPersistence) {
+                return;
+            }
+            List<ColumnSort> sortOrders = toColumnSortList(event.getSortOrder());
+            persistSortOrders(sortOrders);
+            notifySidebarChanged(true);
+            if (stockGridType == StockGridType.STOCK && getDataProvider() != null) {
+                getDataProvider().refreshAll();
+            }
+        });
 
     }
 
@@ -375,6 +404,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     }
 
     public void setId(Integer id, StockGridType stockGridType) {
+        this.stockGridType = stockGridType;
         if(stockGridType == StockGridType.KITS){
             this.stockId = id;
             this.litterId = null; // Clear litterId when stockId is set
@@ -387,10 +417,10 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
     private void setStockGridDataProvider() {
         if(stockId != null){
-            dataProvider = new ListDataProvider<>(stockService.getKitsForParent(stock));
+            dataProvider = new ListDataProvider<>(getSortedStocks(stockService.getKitsForParent(stock)));
             super.setDataProvider(dataProvider);
         } else if (litterId != null) {
-            dataProvider = new ListDataProvider<>(stockService.getKitsForLitter(litterId));
+            dataProvider = new ListDataProvider<>(getSortedStocks(stockService.getKitsForLitter(litterId)));
             super.setDataProvider(dataProvider);
         }else{
             //dataProvider = new ListDataProvider<>(getListDataView().getItems().collect(Collectors.toList()));
@@ -399,10 +429,133 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
     }
 
+    private List<Stock> getSortedStocks(List<Stock> stocks) {
+        if (stocks == null || stocks.size() < 2) {
+            return stocks;
+        }
+
+        List<ColumnSort> sortOrders = loadPersistedSortOrders();
+        if (sortOrders == null || sortOrders.isEmpty()) {
+            return stocks;
+        }
+
+        List<Stock> sortedStocks = new ArrayList<>(stocks);
+        sortedStocks.sort((left, right) -> compareStocks(left, right, sortOrders));
+        return sortedStocks;
+    }
+
+    private int compareStocks(Stock left, Stock right, List<ColumnSort> sortOrders) {
+        for (ColumnSort sortOrder : sortOrders) {
+            if (sortOrder == null || sortOrder.getColumnName() == null) {
+                continue;
+            }
+
+            int result = compareStocksByProperty(left, right, sortOrder.getColumnName());
+            if (sortOrder.getColumnSortDirection() == org.springframework.data.domain.Sort.Direction.DESC) {
+                result = -result;
+            }
+            if (result != 0) {
+                return result;
+            }
+        }
+        return 0;
+    }
+
+    private int compareStocksByProperty(Stock left, Stock right, String sortProperty) {
+        return switch (sortProperty) {
+            case "name" -> compareStrings(left == null ? null : left.getDisplayName(), right == null ? null : right.getDisplayName());
+            case "breeder" -> compareComparable(left == null ? null : left.getBreeder(), right == null ? null : right.getBreeder());
+            case "breed" -> compareStrings(left == null ? null : left.getBreed(), right == null ? null : right.getBreed());
+            case "color" -> compareStrings(left == null ? null : left.getColor(), right == null ? null : right.getColor());
+            case "genotype" -> compareStrings(left == null ? null : left.getGenotype(), right == null ? null : right.getGenotype());
+            case "champNo" -> compareStrings(left == null ? null : left.getChampNo(), right == null ? null : right.getChampNo());
+            case "legs" -> compareComparable(left == null ? null : left.getLegs(), right == null ? null : right.getLegs());
+            case "regNo" -> compareStrings(left == null ? null : left.getRegNo(), right == null ? null : right.getRegNo());
+            case "status" -> compareStrings(left == null ? null : left.getStatus(), right == null ? null : right.getStatus());
+            case "statusDate" -> compareComparable(left == null ? null : left.getStatusDate(), right == null ? null : right.getStatusDate());
+            case "tattoo" -> compareStrings(left == null ? null : left.getTattoo(), right == null ? null : right.getTattoo());
+            case "weight" -> compareComparable(left == null ? null : left.getWeight(), right == null ? null : right.getWeight());
+            case "acquired" -> compareComparable(left == null ? null : left.getAcquired(), right == null ? null : right.getAcquired());
+            case "doB" -> compareComparable(left == null ? null : left.getDoB(), right == null ? null : right.getDoB());
+            case "stockValue" -> compareComparable(left == null ? null : left.getStockValue(), right == null ? null : right.getStockValue());
+            case "notes" -> compareStrings(left == null ? null : left.getNotes(), right == null ? null : right.getNotes());
+            default -> 0;
+        };
+    }
+
+    private int compareStrings(String left, String right) {
+        if (left == null && right == null) {
+            return 0;
+        }
+        if (left == null) {
+            return 1;
+        }
+        if (right == null) {
+            return -1;
+        }
+        return String.CASE_INSENSITIVE_ORDER.compare(left, right);
+    }
+
+    private <T extends Comparable<? super T>> int compareComparable(T left, T right) {
+        if (left == null && right == null) {
+            return 0;
+        }
+        if (left == null) {
+            return 1;
+        }
+        if (right == null) {
+            return -1;
+        }
+        return left.compareTo(right);
+    }
+
     public void refreshGrid() {
         setStockGridDataProvider();
         if(stockGridType != StockGridType.STOCK){
             dataProvider.refreshAll();
+        }
+        // Data provider resets can clear visual sort state, so restore persisted sort.
+        applySavedSortOrder();
+        if (stockGridType != StockGridType.STOCK) {
+            refreshClientGridState();
+        }
+    }
+
+    private void refreshClientGridState() {
+        getElement().getNode().runWhenAttached(ui -> ui.beforeClientResponse(this, context -> {
+            scrollToStart();
+            getElement().executeJs("if (this.clearCache) { this.clearCache(); }");
+            List<ColumnSort> indicatorSort = loadPersistedSortOrders();
+            if (indicatorSort == null || indicatorSort.isEmpty()) {
+                indicatorSort = List.of(new ColumnSort("name", org.springframework.data.domain.Sort.Direction.ASC));
+            }
+            updateClientSideSortIndicatorsNow(toGridSortOrders(indicatorSort));
+        }));
+    }
+
+    private void updateClientSideSortIndicatorsNow(List<GridSortOrder<Stock>> gridSortOrders) {
+        if (gridSortOrders == null || gridSortOrders.isEmpty()) {
+            return;
+        }
+        try {
+            Method method = Grid.class.getDeclaredMethod("updateClientSideSorterIndicators", List.class);
+            method.setAccessible(true);
+            method.invoke(this, gridSortOrders);
+        } catch (Exception ex) {
+            // Best effort: keep data ordering behavior even if indicator syncing fails.
+        }
+    }
+
+    private void syncServerSortStateWithoutResort(List<GridSortOrder<Stock>> gridSortOrders) {
+        if (gridSortOrders == null || gridSortOrders.isEmpty()) {
+            return;
+        }
+        try {
+            Field sortOrderField = Grid.class.getDeclaredField("sortOrder");
+            sortOrderField.setAccessible(true);
+            sortOrderField.set(this, new ArrayList<>(gridSortOrders));
+        } catch (Exception ex) {
+            // Best effort: indicator state can still be restored client-side.
         }
     }
 
@@ -429,6 +582,10 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
     public void setCurrentStockSavedQuery(StockSavedQuery currentStockSavedQuery) {
         this.currentStockSavedQuery = currentStockSavedQuery;
+    }
+
+    public void restoreSavedSortOrder() {
+        applySavedSortOrder();
     }
 
     public String getCurrentSearchName() {
@@ -477,6 +634,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             for(Column<Stock> column: columnList){
                 getColumnByKey(column.getKey()).setVisible(e.getValue().contains(column.getHeaderText()));
             }
+            saveVisibleColumnPreference(getVisibleColumnKeys());
             notifySidebarChanged(true);
         });
 
@@ -740,7 +898,6 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         this.preferenceScopeKey = preferenceScopeKey;
         loadDisplayAsTilePreference();
         loadValueLayoutPreference();
-        createGrid();
     }
 
     public String getPreferenceScopeKey() {
@@ -795,6 +952,268 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             return null;
         }
         return "grid." + getClass().getSimpleName() + "." + preferenceScopeKey + ".valueLayout";
+    }
+
+    private String getSortPreferenceKey() {
+        if (preferenceScopeKey == null || preferenceScopeKey.isBlank()) {
+            return null;
+        }
+        return "grid." + getClass().getSimpleName() + "." + preferenceScopeKey + ".sortOrder";
+    }
+
+    private String getVisibleColumnsPreferenceKey() {
+        if (preferenceScopeKey == null || preferenceScopeKey.isBlank()) {
+            return null;
+        }
+        return "grid." + getClass().getSimpleName() + "." + preferenceScopeKey + ".visibleColumns";
+    }
+
+    private List<String> loadVisibleColumnPreference() {
+        if (currentStockSavedQuery != null) {
+            return currentStockSavedQuery.getVisibleColumnKeyList();
+        }
+
+        String settingsKey = getVisibleColumnsPreferenceKey();
+        if (settingsKey == null) {
+            return List.of();
+        }
+
+        Optional<Object> value = userUiSettingsService.getValueForCurrentUser(settingsKey);
+        if (value.isEmpty()) {
+            return List.of();
+        }
+
+        String serialized = String.valueOf(value.get());
+        if (serialized.isBlank()) {
+            return List.of();
+        }
+
+        List<String> parsed = new ArrayList<>();
+        for (String part : serialized.split(",")) {
+            if (part == null) {
+                continue;
+            }
+            String key = part.trim();
+            if (!key.isBlank()) {
+                parsed.add(key);
+            }
+        }
+        return parsed;
+    }
+
+    private void saveVisibleColumnPreference(Set<String> visibleColumnKeys) {
+        if (currentStockSavedQuery != null) {
+            return;
+        }
+
+        String settingsKey = getVisibleColumnsPreferenceKey();
+        if (settingsKey == null) {
+            return;
+        }
+
+        if (visibleColumnKeys == null || visibleColumnKeys.isEmpty()) {
+            userUiSettingsService.setValueForCurrentUser(settingsKey, "");
+            return;
+        }
+
+        String serialized = visibleColumnKeys.stream()
+                .filter(key -> key != null && !key.isBlank())
+                .reduce((a, b) -> a + "," + b)
+                .orElse("");
+
+        userUiSettingsService.setValueForCurrentUser(settingsKey, serialized);
+    }
+
+    private void applySavedSortOrder() {
+        if (getColumns().isEmpty()) {
+            return;
+        }
+
+        List<ColumnSort> effectiveSort = loadPersistedSortOrders();
+        if (effectiveSort == null || effectiveSort.isEmpty()) {
+            effectiveSort = List.of(new ColumnSort("name", org.springframework.data.domain.Sort.Direction.ASC));
+        }
+
+        List<GridSortOrder<Stock>> gridSortOrders = toGridSortOrders(effectiveSort);
+        if (gridSortOrders.isEmpty()) {
+            return;
+        }
+
+        if (stockGridType != StockGridType.STOCK) {
+            syncServerSortStateWithoutResort(gridSortOrders);
+            if (getDataProvider() != null) {
+                getDataProvider().refreshAll();
+            }
+            return;
+        }
+
+        suppressSortPersistence = true;
+        getUI().ifPresent(ui -> ui.beforeClientResponse(this, context -> suppressSortPersistence = false));
+
+        restoringSortOrder = true;
+        try {
+            sort(gridSortOrders);
+            if (stockGridType != StockGridType.STOCK && getDataProvider() != null) {
+                getDataProvider().refreshAll();
+            }
+        } finally {
+            restoringSortOrder = false;
+            if (getUI().isEmpty()) {
+                suppressSortPersistence = false;
+            }
+        }
+    }
+
+    private List<ColumnSort> loadPersistedSortOrders() {
+        if (currentStockSavedQuery != null) {
+            return currentStockSavedQuery.getSortOrders();
+        }
+
+        String settingsKey = getSortPreferenceKey();
+        if (settingsKey == null) {
+            return List.of();
+        }
+
+        Optional<Object> value = userUiSettingsService.getValueForCurrentUser(settingsKey);
+        if (value.isEmpty()) {
+            return List.of();
+        }
+
+        String serialized = String.valueOf(value.get());
+        if (serialized.isBlank()) {
+            return List.of();
+        }
+
+        List<ColumnSort> parsed = new ArrayList<>();
+        for (String part : serialized.split(",")) {
+            String[] kv = part.split(":", 2);
+            if (kv.length != 2 || kv[0] == null || kv[0].isBlank()) {
+                continue;
+            }
+            try {
+                parsed.add(new ColumnSort(kv[0], org.springframework.data.domain.Sort.Direction.fromString(kv[1])));
+            } catch (IllegalArgumentException ignored) {
+                // Ignore malformed saved sort directions.
+            }
+        }
+        return parsed;
+    }
+
+    private void persistSortOrders(List<ColumnSort> sortOrders) {
+        if (currentStockSavedQuery != null) {
+            currentStockSavedQuery.setSortOrders(sortOrders);
+            return;
+        }
+
+        String settingsKey = getSortPreferenceKey();
+        if (settingsKey == null) {
+            return;
+        }
+
+        if (sortOrders == null || sortOrders.isEmpty()) {
+            return;
+        }
+
+        String serialized = sortOrders.stream()
+                .filter(order -> order != null && order.getColumnName() != null && !order.getColumnName().isBlank())
+                .map(order -> order.getColumnName() + ":" + order.getColumnSortDirection().name())
+                .reduce((a, b) -> a + "," + b)
+                .orElse("");
+
+        if (serialized.isBlank()) {
+            return;
+        }
+
+        userUiSettingsService.setValueForCurrentUser(settingsKey, serialized);
+    }
+
+    private List<ColumnSort> toColumnSortList(List<GridSortOrder<Stock>> sortOrders) {
+        List<ColumnSort> result = new ArrayList<>();
+        for (GridSortOrder<Stock> order : sortOrders) {
+            String key = order.getSorted() == null ? null : order.getSorted().getKey();
+            String sortProperty = toSortProperty(key);
+            if (sortProperty == null) {
+                continue;
+            }
+            org.springframework.data.domain.Sort.Direction direction =
+                    order.getDirection() == SortDirection.DESCENDING
+                            ? org.springframework.data.domain.Sort.Direction.DESC
+                            : org.springframework.data.domain.Sort.Direction.ASC;
+            result.add(new ColumnSort(sortProperty, direction));
+        }
+        return result;
+    }
+
+    private List<GridSortOrder<Stock>> toGridSortOrders(List<ColumnSort> sortOrders) {
+        List<GridSortOrder<Stock>> result = new ArrayList<>();
+        for (ColumnSort sort : sortOrders) {
+            if (sort == null || sort.getColumnName() == null) {
+                continue;
+            }
+            String key = toColumnKey(sort.getColumnName());
+            if (key == null) {
+                continue;
+            }
+            Column<Stock> column = getColumnByKey(key);
+            if (column == null) {
+                continue;
+            }
+            SortDirection direction = sort.getColumnSortDirection() == org.springframework.data.domain.Sort.Direction.DESC
+                    ? SortDirection.DESCENDING
+                    : SortDirection.ASCENDING;
+            result.add(new GridSortOrder<>(column, direction));
+        }
+        return result;
+    }
+
+    private String toSortProperty(String key) {
+        if (key == null) {
+            return null;
+        }
+        return switch (key) {
+            case "name" -> "name";
+            case "breeder" -> "breeder";
+            case "breed" -> "breed";
+            case "color" -> "color";
+            case "genotype" -> "genotype";
+            case "champno" -> "champNo";
+            case "legs" -> "legs";
+            case "regno" -> "regNo";
+            case "status" -> "status";
+            case "statusdate" -> "statusDate";
+            case "tattoo" -> "tattoo";
+            case "weight" -> "weight";
+            case "aquired" -> "acquired";
+            case "dob" -> "doB";
+            case "value" -> "stockValue";
+            case "notes" -> "notes";
+            default -> null;
+        };
+    }
+
+    private String toColumnKey(String sortProperty) {
+        if (sortProperty == null) {
+            return null;
+        }
+        return switch (sortProperty) {
+            case "name" -> "name";
+            case "breeder" -> "breeder";
+            case "breed" -> "breed";
+            case "color" -> "color";
+            case "genotype" -> "genotype";
+            case "champNo" -> "champno";
+            case "legs" -> "legs";
+            case "regNo" -> "regno";
+            case "status" -> "status";
+            case "statusDate" -> "statusdate";
+            case "tattoo" -> "tattoo";
+            case "weight" -> "weight";
+            case "acquired" -> "aquired";
+            case "doB" -> "dob";
+            case "stockValue" -> "value";
+            case "notes" -> "notes";
+            default -> null;
+        };
     }
 
     public void setValueLayout(Boolean valueLayout) {

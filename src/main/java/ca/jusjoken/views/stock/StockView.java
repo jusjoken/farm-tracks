@@ -5,8 +5,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-import org.springframework.data.domain.Sort;
-
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
@@ -17,7 +15,6 @@ import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
-import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.contextmenu.MenuItem;
 import com.vaadin.flow.component.grid.Grid;
@@ -88,7 +85,6 @@ import ca.jusjoken.component.StockGrid;
 import ca.jusjoken.component.TaskEditor;
 import ca.jusjoken.component.TaskGrid;
 import ca.jusjoken.component.WeightEditor;
-import ca.jusjoken.data.ColumnName;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.BreederFilter;
 import ca.jusjoken.data.Utility.TabType;
@@ -154,12 +150,6 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     private Select<StockType> stockTypeChoice = new Select<>();
     private RadioButtonGroup<BreederFilter> breederFilter = new RadioButtonGroup<>();
     private Select<StockStatus> stockStatusFilter = new Select<>();
-    private Select<ColumnName> stockSort1Column = new Select<>();
-    private RadioButtonGroup<String> sort1Direction = new RadioButtonGroup<>();
-    private Select<ColumnName> stockSort2Column = new Select<>();
-    private RadioButtonGroup<String> sort2Direction = new RadioButtonGroup<>();
-    private Checkbox displayAsTileCheckbox = new Checkbox("Display as Tile");
-    private Checkbox valueLayoutCheckbox = new Checkbox("Use Value Layout");
     private Boolean skipSidebarUpdates = Boolean.FALSE;
     private Integer selectedTabIndex = 0;
     private TaskGrid taskGrid = new TaskGrid();
@@ -317,73 +307,11 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         Layout filterForm = new Layout(stockTypeChoice, breederFilter, stockStatusFilter);
         filterForm.addClassNames(Padding.Horizontal.LARGE);
         filterForm.setFlexDirection(Layout.FlexDirection.COLUMN);
-        stockSort1Column.setAriaLabel("Sort by (first column)");
-        stockSort1Column.setLabel("Sort by (first column)");
-        stockSort1Column.addClassNames(MinWidth.NONE);
-        stockSort1Column.setItems(Utility.getInstance().getStockColumnNameList());
-        stockSort1Column.setItemLabelGenerator(ColumnName::getDisplayName);
-        stockSort1Column.addValueChangeListener(event -> {
-            currentStockSavedQuery.setSort1Column(event.getValue().getColumnName());
-            sidebarChanged(Boolean.TRUE);
-        });
-        
-        sort1Direction.setItems(Sort.Direction.ASC.name(), Sort.Direction.DESC.name());
-        sort1Direction.setLabel("Sort Direction");
-        sort1Direction.setTooltipText("Sort Direction");
-        sort1Direction.addValueChangeListener(event -> {
-            currentStockSavedQuery.setSort1Direction(event.getValue());
-            sidebarChanged(Boolean.TRUE);
-        });
 
-        stockSort2Column.setEmptySelectionAllowed(true);
-        stockSort2Column.setAriaLabel("Sort by (second column)");
-        stockSort2Column.setLabel("Sort by (second column)");
-        stockSort2Column.addClassNames(MinWidth.NONE);
-        stockSort2Column.setItems(Utility.getInstance().getStockColumnNameList());
-        stockSort2Column.setEmptySelectionCaption("None selected");
-        stockSort2Column.setItemLabelGenerator(column -> {
-            if(column==null){
-                return "None selected";
-            }else{
-                return column.getDisplayName();
-            }
-        });
-        stockSort2Column.addValueChangeListener(event -> {
-            if(event.getValue()==null){
-                currentStockSavedQuery.setSort2Column(null);
-            }else{
-                currentStockSavedQuery.setSort2Column(event.getValue().getColumnName());
-            }
-            sidebarChanged(Boolean.TRUE);
-        });
-        
-        sort2Direction.setItems(Sort.Direction.ASC.name(), Sort.Direction.DESC.name());
-        sort2Direction.setLabel("Sort Direction");
-        sort2Direction.setTooltipText("Sort Direction");
-        sort2Direction.addValueChangeListener(event -> {
-            currentStockSavedQuery.setSort2Direction(event.getValue());
-            sidebarChanged(Boolean.TRUE);
-        });
+        Span contextMenuOptionsNote = new Span("Sort and display modes are controlled from the grid context menu and are saved with this query.");
+        contextMenuOptionsNote.addClassNames(Padding.Horizontal.LARGE, Padding.Top.SMALL, Padding.Bottom.SMALL);
 
-        Layout sortForm = new Layout(stockSort1Column, sort1Direction, stockSort2Column, sort2Direction);
-
-        sortForm.addClassNames(Padding.Horizontal.LARGE);
-        sortForm.setFlexDirection(Layout.FlexDirection.COLUMN);
-
-        displayAsTileCheckbox.addValueChangeListener(event -> {
-            currentStockSavedQuery.setDisplayAsTile(event.getValue());
-            sidebarChanged(Boolean.TRUE);
-        });
-        valueLayoutCheckbox.addValueChangeListener(event -> {
-            currentStockSavedQuery.setValueLayout(event.getValue());
-            sidebarChanged(Boolean.TRUE);
-        });
-
-        Layout displayOptionsForm = new Layout(displayAsTileCheckbox,valueLayoutCheckbox);
-        displayOptionsForm.addClassNames(Padding.Horizontal.LARGE);
-        displayOptionsForm.setFlexDirection(Layout.FlexDirection.COLUMN);
-
-        this.sidebar = new Section(header, createSectionHeader("Filter options", false), filterForm, createSectionHeader("Sort options", true), sortForm, createSectionHeader("Display options", true), displayOptionsForm);
+        this.sidebar = new Section(header, createSectionHeader("Filter options", false), filterForm, contextMenuOptionsNote);
         this.sidebar.addClassNames("backdrop-blur-3xl", "var(--lumo-tint-90pct)", Border.RIGHT,
                 Display.FLEX, FlexDirection.COLUMN, Position.ABSOLUTE, "lg:static", "bottom-1", "top-0",
                 "transition-all", "z-10");
@@ -412,18 +340,6 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         }
 
         stockStatusFilter.setValue(currentStockSavedQuery.getStockStatus());
-        stockSort1Column.setValue(Utility.getInstance().getColumnName(currentStockSavedQuery.getSort1().getColumnName()));
-        sort1Direction.setValue(currentStockSavedQuery.getSort1Direction());
-        if(currentStockSavedQuery.getSort2().getColumnName()==null){
-            stockSort2Column.setValue(null);
-        }else{
-            stockSort2Column.setValue(Utility.getInstance().getColumnName(currentStockSavedQuery.getSort2().getColumnName()));
-        }
-        if(currentStockSavedQuery.getSort2()!=null){
-            sort2Direction.setValue(currentStockSavedQuery.getSort2Direction());
-        }
-        displayAsTileCheckbox.setValue(Boolean.TRUE.equals(currentStockSavedQuery.getDisplayAsTile()));
-        valueLayoutCheckbox.setValue(Boolean.TRUE.equals(currentStockSavedQuery.getValueLayout()));
         skipSidebarUpdates = Boolean.FALSE;
     }
     
@@ -448,9 +364,6 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         saveQueryDialog.addConfirmListener(event -> {
             //save the item
             if(currentStockSavedQuery.getSavedQueryName().equals(saveQueryName.getValue())){
-                currentStockSavedQuery.setDisplayAsTile(displayAsTileCheckbox.getValue());
-                currentStockSavedQuery.setValueLayout(valueLayoutCheckbox.getValue());
-
                 //set the visiblecolumns for the saved query if not a Tile view
                 if(!list.getDisplayAsTile()){
                     currentStockSavedQuery.setVisibleColumns(String.join(",", list.getVisibleColumnKeys()));
@@ -461,16 +374,10 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
                 UIUtilities.showNotification("Saving current query overwritting:id:" + currentStockSavedQuery.getId() + " :" + currentStockSavedQuery.getSavedQueryName());
                 //save the currentStockSavedQuery to the database
                 currentSavedQueryId = queryService.saveQuery(currentStockSavedQuery).toString();
-                //setting the dialog id the Empty String will ensure the fireEvent will NOT navigate as we are already there
-                saveQueryDialog.setId("");
-                loadFilters();
-                applyFilters();
-                sidebarChanged(Boolean.FALSE);
+                // Keep the current in-memory/grid state to avoid post-save sort flicker/reset.
+                clearPendingOptionChanges();
+                return;
             }else{  //save as
-                //get the viewStyle from the StockGrid and set it to the currentStockSavedQuery
-                currentStockSavedQuery.setDisplayAsTile(displayAsTileCheckbox.getValue());
-                currentStockSavedQuery.setValueLayout(valueLayoutCheckbox.getValue());
-
                 //set the visiblecolumns for the saved query
                 if(!list.getDisplayAsTile()){
                     currentStockSavedQuery.setVisibleColumns(String.join(",", list.getVisibleColumnKeys()));
@@ -631,7 +538,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         }
         //clear selectedStock
         selectedStock = null;
-        sidebarChanged(Boolean.FALSE);
+        clearPendingOptionChanges();
         updateStockTypeCount();
         // System.out.println("loadFilters: genotypes:" + currentStockSavedQuery.getStockType().getGenotypes());
         // System.out.println("loadFilters: genotypeSegments:");
@@ -687,12 +594,25 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         list.setCurrentSearchName(currentSearchName);
 
         list.createGrid();
-
-        applyOptionsButton.setEnabled(false);
-        currentStockSavedQuery.setDirty(Boolean.FALSE);
-        saveOptionsButton.setEnabled(currentStockSavedQuery.getNeedsSaving());
         sidebarSetValues();
+        clearPendingOptionChanges();
     }
+
+      private void clearPendingOptionChanges() {
+          if (currentStockSavedQuery == null) {
+              return;
+          }
+          currentStockSavedQuery.setDirty(Boolean.FALSE);
+          currentStockSavedQuery.setNeedsSaving(Boolean.FALSE);
+          applyOptionsButton.setEnabled(false);
+          saveOptionsButton.setEnabled(false);
+          resetOptionsButton.setEnabled(false);
+          if ("0".equals(currentSavedQueryId)) {
+              deleteOptionsButton.setEnabled(false);
+          } else {
+              deleteOptionsButton.setEnabled(true);
+          }
+      }
 
     private Component createContent() {
         mdLayout.setSizeFull();
@@ -848,21 +768,23 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     }
 
     private LazyComponent createTabKits(Stock stock) {
-        StockGrid stockGrid = new StockGrid();
-        stockGrid.setId(stock.getId(), StockGrid.StockGridType.KITS);
-        stockGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.kits"));
+        return new LazyComponent(() -> {
+            StockGrid stockGrid = new StockGrid();
+            stockGrid.setId(stock.getId(), StockGrid.StockGridType.KITS);
+            stockGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.kits"));
 
-        // Use mobile as the default only when no saved preference exists.
-        stockGrid.setDisplayAsTile(mobileDevice);
-        stockGrid.loadDisplayAsTilePreference();
+            // Use mobile as the default only when no saved preference exists.
+            stockGrid.setDisplayAsTile(mobileDevice);
+            stockGrid.loadDisplayAsTilePreference();
 
-        if(mobileDevice){
-            stockGrid.setHeight("500px");
-        }else{      
-            stockGrid.setHeight("270px");
-        }
-        stockGrid.createGrid();
-        return new LazyComponent(() -> stockGrid);
+            if(mobileDevice){
+                stockGrid.setHeight("500px");
+            }else{      
+                stockGrid.setHeight("270px");
+            }
+            stockGrid.createGrid();
+            return stockGrid;
+        });
     }
 
     private Component createTabNotes(Stock stock) {
@@ -1173,17 +1095,19 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     @Override
     public void sidebarChanged(Boolean changed) {
         if(skipSidebarUpdates){
-        }else{
+            return;
+        }
+        if (currentStockSavedQuery != null) {
             currentStockSavedQuery.setDirty(changed);
             currentStockSavedQuery.setNeedsSaving(changed);
-            applyOptionsButton.setEnabled(changed);
-            saveOptionsButton.setEnabled(changed);
-            resetOptionsButton.setEnabled(changed);
-            if(currentSavedQueryId.equals("0")){
-                deleteOptionsButton.setEnabled(false);
-            }else{
-                deleteOptionsButton.setEnabled(true);
-            }
+        }
+        applyOptionsButton.setEnabled(changed);
+        saveOptionsButton.setEnabled(changed);
+        resetOptionsButton.setEnabled(changed);
+        if("0".equals(currentSavedQueryId)){
+            deleteOptionsButton.setEnabled(false);
+        }else{
+            deleteOptionsButton.setEnabled(true);
         }
     }
 

@@ -48,6 +48,7 @@ public class StockSavedQuery {
     private String sort1Direction = Direction.ASC.name();
     private String sort2Column = null;  
     private String sort2Direction = Direction.ASC.name();
+    private String sortOrder = null;
     private Boolean defaultQuery = false;
     private String visibleColumns = null;
     private Boolean displayAsTile = false;
@@ -212,21 +213,140 @@ public class StockSavedQuery {
     }
 
     public ColumnSort getSort1() {
-        return new ColumnSort(sort1Column, Direction.fromString(sort1Direction));
+        List<ColumnSort> sortOrders = getSortOrders();
+        if (sortOrders.isEmpty()) {
+            return new ColumnSort(sort1Column, Direction.fromString(sort1Direction));
+        }
+        return sortOrders.get(0);
     }
 
     public void setSort1(ColumnSort sort1) {
+        if (sort1 == null) {
+            this.sort1Column = null;
+            this.sort1Direction = Direction.ASC.name();
+            if (sort2Column == null) {
+                sortOrder = null;
+            }
+            return;
+        }
         this.sort1Column = sort1.getColumnName();
         this.sort1Direction = sort1.getColumnSortDirection().name();
+        List<ColumnSort> sortOrders = getSortOrders();
+        if (sortOrders.isEmpty()) {
+            sortOrders.add(sort1);
+        } else {
+            sortOrders.set(0, sort1);
+        }
+        setSortOrders(sortOrders);
     }
 
     public ColumnSort getSort2() {
-        return new ColumnSort(sort2Column, Direction.fromString(sort2Direction));
+        List<ColumnSort> sortOrders = getSortOrders();
+        if (sortOrders.size() < 2) {
+            return new ColumnSort(sort2Column, Direction.fromString(sort2Direction));
+        }
+        return sortOrders.get(1);
     }
 
     public void setSort2(ColumnSort sort2) {
+        if (sort2 == null) {
+            this.sort2Column = null;
+            this.sort2Direction = Direction.ASC.name();
+            List<ColumnSort> sortOrders = getSortOrders();
+            if (sortOrders.size() > 1) {
+                sortOrders = new ArrayList<>(sortOrders.subList(0, 1));
+            }
+            setSortOrders(sortOrders);
+            return;
+        }
         this.sort2Column = sort2.getColumnName();
         this.sort2Direction = sort2.getColumnSortDirection().name();
+        List<ColumnSort> sortOrders = getSortOrders();
+        if (sortOrders.isEmpty()) {
+            sortOrders.add(new ColumnSort(sort1Column, Direction.fromString(sort1Direction)));
+        }
+        if (sortOrders.size() == 1) {
+            sortOrders.add(sort2);
+        } else {
+            sortOrders.set(1, sort2);
+        }
+        setSortOrders(sortOrders);
+    }
+
+    public List<ColumnSort> getSortOrders() {
+        if (sortOrder != null && !sortOrder.isBlank()) {
+            List<ColumnSort> parsed = new ArrayList<>();
+            String[] entries = sortOrder.split(",");
+            for (String entry : entries) {
+                String[] kv = entry.split(":");
+                if (kv.length != 2 || kv[0] == null || kv[0].isBlank()) {
+                    continue;
+                }
+                parsed.add(new ColumnSort(kv[0], Direction.fromString(kv[1])));
+            }
+            if (!parsed.isEmpty()) {
+                return parsed;
+            }
+        }
+
+        List<ColumnSort> legacy = new ArrayList<>();
+        if (sort1Column != null && !sort1Column.isBlank()) {
+            legacy.add(new ColumnSort(sort1Column, Direction.fromString(sort1Direction)));
+        }
+        if (sort2Column != null && !sort2Column.isBlank()) {
+            legacy.add(new ColumnSort(sort2Column, Direction.fromString(sort2Direction)));
+        }
+        return legacy;
+    }
+
+    public void setSortOrders(List<ColumnSort> sortOrders) {
+        if (sortOrders == null || sortOrders.isEmpty()) {
+            sortOrder = null;
+            sort1Column = null;
+            sort1Direction = Direction.ASC.name();
+            sort2Column = null;
+            sort2Direction = Direction.ASC.name();
+            return;
+        }
+
+        List<String> serialized = new ArrayList<>();
+        for (ColumnSort sort : sortOrders) {
+            if (sort == null || sort.getColumnName() == null || sort.getColumnName().isBlank()) {
+                continue;
+            }
+            serialized.add(sort.getColumnName() + ":" + sort.getColumnSortDirection().name());
+        }
+
+        if (serialized.isEmpty()) {
+            sortOrder = null;
+            sort1Column = null;
+            sort1Direction = Direction.ASC.name();
+            sort2Column = null;
+            sort2Direction = Direction.ASC.name();
+            return;
+        }
+
+        sortOrder = String.join(",", serialized);
+
+        ColumnSort first = sortOrders.stream()
+                .filter(s -> s != null && s.getColumnName() != null && !s.getColumnName().isBlank())
+                .findFirst()
+                .orElse(null);
+        if (first != null) {
+            sort1Column = first.getColumnName();
+            sort1Direction = first.getColumnSortDirection().name();
+        }
+
+        List<ColumnSort> cleaned = sortOrders.stream()
+                .filter(s -> s != null && s.getColumnName() != null && !s.getColumnName().isBlank())
+                .toList();
+        if (cleaned.size() > 1) {
+            sort2Column = cleaned.get(1).getColumnName();
+            sort2Direction = cleaned.get(1).getColumnSortDirection().name();
+        } else {
+            sort2Column = null;
+            sort2Direction = Direction.ASC.name();
+        }
     }
 
     public String getStockStatusName() {

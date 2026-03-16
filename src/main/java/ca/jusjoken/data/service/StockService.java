@@ -23,6 +23,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import ca.jusjoken.data.ColumnSort;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
@@ -151,20 +152,26 @@ public class StockService {
     }
 
     private Sort getSort(StockSavedQuery savedQuery){
-        Sort thisSort;
-        if(savedQuery.getSort2() == null || savedQuery.getSort2().getSortOrder() == null){
-            thisSort = Sort.by(savedQuery.getSort1().getSortOrder());
-        }else{
-            thisSort = Sort.by(savedQuery.getSort1().getSortOrder(), savedQuery.getSort2().getSortOrder());
+        if (savedQuery == null) {
+            return Sort.by(Sort.Order.asc("name"));
         }
-        return thisSort;
+
+        List<Sort.Order> orders = savedQuery.getSortOrders().stream()
+                .map(ColumnSort::getSortOrder)
+                .filter(Objects::nonNull)
+                .toList();
+
+        if (orders.isEmpty()) {
+            return Sort.by(Sort.Order.asc("name"));
+        }
+
+        return Sort.by(orders);
     }
 
     private boolean isPrimarySortByName(StockSavedQuery savedQuery) {
         return savedQuery != null
-                && savedQuery.getSort1() != null
-                && savedQuery.getSort1().getSortOrder() != null
-                && "name".equals(savedQuery.getSort1().getSortOrder().getProperty());
+            && !savedQuery.getSortOrders().isEmpty()
+            && "name".equals(savedQuery.getSortOrders().get(0).getColumnName());
     }
 
     private List<Stock> moveBlankNamesToEnd(List<Stock> input, StockSavedQuery savedQuery) {
