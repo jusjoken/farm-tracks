@@ -11,4 +11,6 @@ public interface TaskRepository extends JpaRepository<Task, Integer>  {
     void deleteAllByTaskPlanId(Integer id);
     
     List<Task> findByTaskPlanId(Integer id);
+
+    long countByTaskPlanIdAndCompletedFalse(Integer id);
 }

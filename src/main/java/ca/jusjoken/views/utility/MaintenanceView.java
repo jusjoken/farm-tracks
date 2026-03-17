@@ -28,7 +28,7 @@ import com.vaadin.flow.component.upload.receivers.FileData;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.VaadinService;
-import jakarta.annotation.security.PermitAll;
+import jakarta.annotation.security.RolesAllowed;
 import java.text.NumberFormat;
 
 /**
@@ -37,7 +37,7 @@ import java.text.NumberFormat;
  */
 @PageTitle("Maintenance")
 @Route("maintenance")
-@PermitAll
+@RolesAllowed("ADMIN")
 @Uses(Icon.class)
 public class MaintenanceView extends Div implements ProgressBarUpdateListener{
     private final Import importUtility = new Import();

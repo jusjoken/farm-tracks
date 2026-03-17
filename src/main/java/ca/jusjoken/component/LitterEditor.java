@@ -1,13 +1,18 @@
 package ca.jusjoken.component;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.ShortcutRegistration;
 import com.vaadin.flow.component.Shortcuts;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -16,30 +21,24 @@ import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.component.combobox.ComboBox;
 
-import java.time.LocalDate;
-import java.util.Objects;
-
-import com.vaadin.flow.component.select.Select;
-import org.springframework.transaction.support.TransactionTemplate;
-
+import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
+import ca.jusjoken.data.entity.Task;
+import ca.jusjoken.data.entity.TaskPlan;
 import ca.jusjoken.data.service.AppSettingsService;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.TaskPlanService;
-import ca.jusjoken.data.Utility;
-import ca.jusjoken.data.entity.Task;
-import ca.jusjoken.data.entity.TaskPlan;
 import ca.jusjoken.data.service.TaskService;
 import ca.jusjoken.utility.TaskType;
 
@@ -287,8 +286,7 @@ public class LitterEditor {
                         .findFirst()
                         .orElse(null);
                 if (birthTask != null) {
-                    birthTask.setCompleted(true);
-                    taskService.save(birthTask);
+                    taskService.setTaskCompleted(birthTask, true);
                 }
                 createKitStocks(saved.getId(), zeroIfNull(saved.getKitsCount()), zeroIfNull(saved.getDiedKitsCount()));
                 notifyRefreshNeeded();

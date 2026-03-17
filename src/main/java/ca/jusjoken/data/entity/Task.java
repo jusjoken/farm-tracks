@@ -19,6 +19,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Transient;
 
 @Entity
 public class Task {
@@ -37,6 +38,7 @@ public class Task {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "task_plan_id", nullable = true)
     private TaskPlan taskPlan;
+    @Transient
     private Icon icon;
     
 
@@ -66,7 +68,7 @@ public class Task {
 
     public void setType(TaskType type) {
         this.type = type;
-        this.icon = type != null ? type.getIcon() : null;
+        this.icon = null;
     }
 
     public String getName() {
@@ -143,7 +145,7 @@ public class Task {
     public HorizontalLayout getHeader() {
         HorizontalLayout headerLayout = new HorizontalLayout();
         headerLayout.setSpacing(true);
-        System.out.println("Creating header for Task: " + this.name + " with type: " + this.type + " and icon: " + getIcon());
+        // System.out.println("Creating header for Task: " + this.name + " with type: " + this.type + " and icon: " + getIcon());
         if(getIcon() != null){
             headerLayout.add(getIcon());
         }
@@ -182,7 +184,7 @@ public class Task {
     }
 
     public Icon getIcon() {
-        System.out.println("Getting icon for Task: " + this.name + " with type: " + this.type);
+        // System.out.println("Getting icon for Task: " + this.name + " with type: " + this.type);
         return type != null ? type.getIcon() : null;
     }
 

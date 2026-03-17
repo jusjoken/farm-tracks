@@ -268,6 +268,10 @@ public class TaskEditor {
     }
 
     private void dialogSave() {
+        Boolean previousCompleted = task.getId() != null
+            ? taskService.findById(task.getId()).map(Task::getCompleted).orElse(task.getCompleted())
+            : null;
+
         task.setType(type.getValue());
         task.setName(name.getValue() == null ? null : name.getValue().trim());
         task.setDate(date.getValue());
@@ -291,7 +295,12 @@ public class TaskEditor {
         }
         task.setCompleted(Boolean.TRUE.equals(completed.getValue()));
 
-        taskService.save(task);
+        boolean completionChanged = task.getId() == null || !Objects.equals(previousCompleted, task.getCompleted());
+        if (completionChanged) {
+            taskService.setTaskCompleted(task, Boolean.TRUE.equals(task.getCompleted()));
+        } else {
+            taskService.save(task);
+        }
         notifyRefreshNeeded();
         dialogClose();
     }

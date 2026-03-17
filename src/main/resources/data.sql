@@ -6,6 +6,30 @@
  * Author:  birch
  * Created: Feb 1, 2026
  */
-INSERT IGNORE INTO `stock_type` (`id`, `name`, `female_name`, `male_name`, `non_breeder_name`, `default_type`, `breeder_name`, `name_singular`, `image_file_name`) VALUES
-(-2, 'Goats',	'Doe',	'Buck',	'Other',	CONVERT(b'0', UNSIGNED),	'Breeders',	'Goat', 'goat_blank.jpg'),
-(-1, 'Rabbits',	'Doe',	'Buck',	'Kits',	CONVERT(b'1', UNSIGNED),	'Breeders',	'Rabbit', 'rabbit_blank.jpg');
+
+CREATE TABLE IF NOT EXISTS `app_user` (
+	`id` INT NOT NULL AUTO_INCREMENT,
+	`username` VARCHAR(100) NOT NULL,
+	`password_hash` VARCHAR(255) NOT NULL,
+	`enabled` BIT(1) NOT NULL,
+	PRIMARY KEY (`id`),
+	UNIQUE KEY `uk_app_user_username` (`username`)
+);
+
+CREATE TABLE IF NOT EXISTS `app_user_role` (
+	`user_id` INT NOT NULL,
+	`role_name` VARCHAR(30) NOT NULL,
+	PRIMARY KEY (`user_id`, `role_name`),
+	CONSTRAINT `fk_app_user_role_user` FOREIGN KEY (`user_id`) REFERENCES `app_user` (`id`) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS `persistent_logins` (
+	`username` VARCHAR(100) NOT NULL,
+	`series` VARCHAR(64) NOT NULL,
+	`token` VARCHAR(64) NOT NULL,
+	`last_used` TIMESTAMP NOT NULL,
+	PRIMARY KEY (`series`)
+);
+
+ALTER TABLE `app_user` ADD COLUMN IF NOT EXISTS `display_name` VARCHAR(150) NULL;
+

@@ -6,6 +6,7 @@ package ca.jusjoken.views.login;
 
 import com.vaadin.flow.component.html.Main;
 import com.vaadin.flow.component.login.LoginForm;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.BeforeEnterEvent;
@@ -28,8 +29,11 @@ public class LoginView extends Main implements BeforeEnterObserver {
     public LoginView() {
         //addClassNames(LumoUtility.Display.FLEX, LumoUtility.JustifyContent.CENTER,LumoUtility.AlignItems.CENTER);
         login = new LoginForm();
-        login.setAction("login"); 
-        
+        login.setAction("login");
+        login.addForgotPasswordListener(e ->
+            Notification.show("Please contact your administrator to reset your password.",
+                    6000, Notification.Position.MIDDLE));
+
         VerticalLayout layout = new VerticalLayout();
         layout.setAlignItems(FlexComponent.Alignment.CENTER);
         layout.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);

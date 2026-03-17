@@ -59,8 +59,10 @@ import ca.jusjoken.views.stock.StockTypeView;
 import ca.jusjoken.views.stock.StockView;
 import ca.jusjoken.views.utility.LitterListView;
 import ca.jusjoken.views.utility.MaintenanceView;
+import ca.jusjoken.views.utility.PlanListView;
 import ca.jusjoken.views.utility.PlanTemplateView;
 import ca.jusjoken.views.utility.TaskListView;
+import ca.jusjoken.views.utility.UserManagementView;
 
 /**
  * The main view is a top-level placeholder for other views.
@@ -79,6 +81,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     private ContextMenu menu;
     private Button ftSignin;
     private String userName;
+    private String displayName;
     private final SideNav nav = new SideNav();
     private final AccessAnnotationChecker accessChecker;
     private final DialogCommon dialogCommon;
@@ -131,6 +134,14 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         if(authContext.isAuthenticated()){
             userName = authContext.getAuthenticatedUser(UserDetails.class).get().getUsername();
         }
+            displayName = userName;
+            if (authContext.isAuthenticated()) {
+                displayName = ca.jusjoken.data.service.Registry.getBean(ca.jusjoken.data.service.AppUserService.class)
+                    .findByUsername(userName)
+                    .map(u -> (u.getDisplayName() != null && !u.getDisplayName().isBlank())
+                            ? u.getDisplayName() : u.getUsername())
+                    .orElse(userName);
+            }
 
         Image ftIcon = new Image(
             DownloadHandler.fromInputStream(event -> {
@@ -188,7 +199,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         menu.setOpenOnClick(true);
 
         Div heading = new Div();
-        heading.setText(userName);
+        heading.setText(displayName);
         heading.getStyle().set("text-align", "center");
         heading.getStyle().set("font-weight", "bold");
         heading.getStyle().set("padding", "8px");
@@ -266,6 +277,12 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
             sn.setPrefixComponent(FontAwesome.Solid.TASKS.create());
         }
 
+        if(accessChecker.hasAccess(PlanListView.class)){
+            SideNavItem sn = new SideNavItem("Plans", PlanListView.class);
+            nav.addItem(sn);
+            sn.setPrefixComponent(FontAwesome.Solid.LIST_SQUARES.create());
+        }
+
 
         //build nav items for each stock query from database
         if(accessChecker.hasAccess(StockView.class)){
@@ -303,7 +320,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
             sn.setPrefixComponent(FontAwesome.Solid.SITEMAP.create());
         }
 
-        if(accessChecker.hasAccess(MaintenanceView.class) || accessChecker.hasAccess(StockTypeView.class) || accessChecker.hasAccess(PlanTemplateView.class)){
+        if(accessChecker.hasAccess(MaintenanceView.class) || accessChecker.hasAccess(StockTypeView.class) || accessChecker.hasAccess(PlanTemplateView.class) || accessChecker.hasAccess(UserManagementView.class)){
             SideNavItem utilityItem = new SideNavItem("Utility");
             utilityItem.setExpanded(true);
             nav.addItem(utilityItem);
@@ -315,6 +332,9 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
             }
             if(accessChecker.hasAccess(PlanTemplateView.class)){
                 utilityItem.addItem(new SideNavItem("Plan Templates", PlanTemplateView.class, FontAwesome.Solid.COGS.create()));
+            }
+            if(accessChecker.hasAccess(UserManagementView.class)){
+                utilityItem.addItem(new SideNavItem("Users", UserManagementView.class, FontAwesome.Solid.COGS.create()));
             }
         }
         

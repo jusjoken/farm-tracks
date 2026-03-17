@@ -7,11 +7,13 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 import ca.jusjoken.component.Badge;
+import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.entity.TaskPlan;
 import ca.jusjoken.utility.BadgeVariant;
 import ca.jusjoken.utility.TaskType;
+import jakarta.transaction.Transactional;
 
 @Service
 public class TaskPlanService {
@@ -41,12 +43,68 @@ public class TaskPlanService {
         return taskPlanRepository.findAll();
     }
 
+    public List<TaskPlan> findByStatus(ca.jusjoken.data.Utility.TaskPlanStatus status) {
+        return taskPlanRepository.findAll().stream()
+                .filter(plan -> plan.getStatus() == status)
+                .toList();
+    }
+
     public Optional<TaskPlan> findById(Integer id) {
         return taskPlanRepository.findById(id);
     }
 
     public TaskPlan save(TaskPlan taskPlan) {
         return taskPlanRepository.save(taskPlan);
+    }
+
+    @Transactional
+    public Optional<TaskPlan> markIncomplete(Integer id) {
+        return taskPlanRepository.findById(id)
+                .map(plan -> {
+                    plan.setStatus(Utility.TaskPlanStatus.INCOMPLETE);
+                    return taskPlanRepository.save(plan);
+                });
+    }
+
+    @Transactional
+    public Optional<TaskPlan> markActive(Integer id) {
+        return taskPlanRepository.findById(id)
+                .map(plan -> {
+                    boolean hasIncompleteTasks = taskService.findByPlanId(plan.getId()).stream()
+                            .anyMatch(task -> !Boolean.TRUE.equals(task.getCompleted()));
+                    plan.setStatus(hasIncompleteTasks ? Utility.TaskPlanStatus.ACTIVE : Utility.TaskPlanStatus.INACTIVE);
+                    return taskPlanRepository.save(plan);
+                });
+    }
+
+    @Transactional
+    public int reconcileStatusesForAllPlans() {
+        int updated = 0;
+        List<TaskPlan> plans = taskPlanRepository.findAll();
+        for (TaskPlan plan : plans) {
+            if (plan.getStatus() == Utility.TaskPlanStatus.INCOMPLETE) {
+                // Keep manually abandoned plans as INCOMPLETE.
+                continue;
+            }
+
+            List<Task> tasks = taskService.findByPlanId(plan.getId());
+            if (tasks.isEmpty()) {
+                continue;
+            }
+
+            boolean hasIncompleteTasks = tasks.stream()
+                    .anyMatch(task -> !Boolean.TRUE.equals(task.getCompleted()));
+            Utility.TaskPlanStatus targetStatus = hasIncompleteTasks
+                    ? Utility.TaskPlanStatus.ACTIVE
+                    : Utility.TaskPlanStatus.INACTIVE;
+
+            if (plan.getStatus() != targetStatus) {
+                plan.setStatus(targetStatus);
+                taskPlanRepository.save(plan);
+                updated++;
+            }
+        }
+        return updated;
     }
 
     public void deleteById(Integer id) {

@@ -252,13 +252,23 @@ public class TaskGrid extends Grid<Task> {
                         Stock stockEntity = null;
                         getPlanEditor().dialogOpen(taskPlanId, menuEntity.getLinkType(), stockEntity, PlanEditor.DialogMode.DISPLAY);
                     });
+
+                    GridMenuItem<Task> markPlanIncompleteMenu = menu.addItem(new Item("Mark Plan Incomplete", Utility.ICONS.ACTION_CHECK.getIconSource()));
+                    markPlanIncompleteMenu.addMenuItemClickListener(click -> {
+                        taskPlanService.markIncomplete(taskPlanId);
+                        refreshGrid();
+                    });
                 }
                 //if the current task type has an action associated with it, show the action in the context menu. For example, if the task type is BIRTH then show a "View Offspring" action that opens the stock list view filtered to show the offspring from this birth task.
                 if (menuEntity.getType() != null && menuEntity.getType().hasAction()) {
                     if (menuEntity.getType() == TaskType.BIRTH) {
-                        GridMenuItem<Task> actionMenu = menu.addItem(new Item(menuEntity.getType().getAction(), Utility.ICONS.ACTION_BIRTH.getIconSource()));
+                        GridMenuItem<Task> actionMenu = menu.addItem(new Item(menuEntity.getType().getAction(), menuEntity.getIcon().getIcon()));
                         actionMenu.addMenuItemClickListener(click -> {
-                            litterEditor.runTaskAction(menuEntity, null);
+                            //get the stocktype from the task linkbreederid
+                            Stock stock = stockService.findById(menuEntity.getLinkBreederId());
+                            //set the stocktype filter on the littergrid to the stocktype of the breeder and set the parent filter to the name of the breeder and then open the litter editor
+                            litterEditor.runTaskAction(menuEntity, stock.getStockType());
+
                         });
 
                     }
@@ -267,8 +277,7 @@ public class TaskGrid extends Grid<Task> {
                     String actionText = menuEntity.getCompleted() ? "Mark Incomplete" : "Mark Complete";
                     GridMenuItem<Task> actionMenu = menu.addItem(new Item(actionText, Utility.ICONS.ACTION_CHECK.getIconSource()));
                     actionMenu.addMenuItemClickListener(click -> {
-                        menuEntity.setCompleted(!menuEntity.getCompleted());
-                        taskService.save(menuEntity);
+                        taskService.setTaskCompleted(menuEntity, !Boolean.TRUE.equals(menuEntity.getCompleted()));
                         refreshGrid();
                     });
                 }
