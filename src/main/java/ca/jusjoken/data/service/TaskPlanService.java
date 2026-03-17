@@ -6,6 +6,9 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
+
 import ca.jusjoken.component.Badge;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Stock;
@@ -41,6 +44,21 @@ public class TaskPlanService {
 
     public List<TaskPlan> findAll() {
         return taskPlanRepository.findAll();
+    }
+
+    public List<TaskPlan> findByStockId(Integer stockId) {
+        if (stockId == null) {
+            return List.of();
+        }
+
+        return taskPlanRepository.findAll().stream()
+                .filter(plan -> plan != null
+                        && (stockId.equals(plan.getLinkMotherId()) || stockId.equals(plan.getLinkFatherId())))
+                .toList();
+    }
+
+    public long countByStockId(Integer stockId) {
+        return findByStockId(stockId).size();
     }
 
     public List<TaskPlan> findByStatus(ca.jusjoken.data.Utility.TaskPlanStatus status) {
@@ -111,6 +129,16 @@ public class TaskPlanService {
         taskPlanRepository.deleteById(id);
     }
 
+    @Transactional
+    public void deletePlanAndTasks(Integer id) {
+        if (id == null) {
+            return;
+        }
+
+        taskService.deleteAllByTaskPlanId(id);
+        taskPlanRepository.deleteById(id);
+    }
+
     //add a method to create a displayname for a taskplan that includes the father, mother and the date for the task associated with a sequence of 1
     public String getDisplayName(TaskPlan taskPlan) {
         String fatherName = "Unknown Father";
@@ -137,6 +165,47 @@ public class TaskPlanService {
 
         return dateInfo + ": " + fatherName + " / " + motherName;
     }
+
+    public HorizontalLayout getHeader(TaskPlan plan) {
+        HorizontalLayout headerLayout = new HorizontalLayout();
+        headerLayout.setSpacing(true);
+
+        // Icon for plan type
+        Icon typeIcon = null;
+        if (plan.getType() != null) {
+            switch (plan.getType()) {
+                case BREEDER -> typeIcon = new Icon(ca.jusjoken.data.Utility.ICONS.TYPE_BREEDER.getIconSource());
+                case LITTER -> typeIcon = new Icon(ca.jusjoken.data.Utility.ICONS.TYPE_NESTBOX.getIconSource());
+                case GENERAL -> typeIcon = new Icon(ca.jusjoken.data.Utility.ICONS.TYPE_CUSTOM.getIconSource());
+                default -> typeIcon = null;
+            }
+        }
+        if (typeIcon != null) {
+            typeIcon.setSize("1.2em");
+            headerLayout.add(typeIcon);
+        }
+
+        String dateInfo = "";
+        String linkTypeInfo = "";
+
+        linkTypeInfo = switch (plan.getType()) {
+            case BREEDER -> "Breeder";
+            case LITTER -> "Litter";
+            default -> "General";
+        };
+        List<Task> tasks = taskService.findByPlanId(plan.getId());
+        if (!tasks.isEmpty()) {
+            var firstTask = tasks.get(0);
+            if (firstTask.getDate() != null) {
+                dateInfo = firstTask.getDate().format(DateTimeFormatter.ofPattern("MM-dd-yyyy"));
+            }
+        }
+
+        headerLayout.add(linkTypeInfo + " Plan: " + dateInfo);
+        return headerLayout;
+    }
+
+
 
     public Badge getDisplayNameBadge(TaskPlan taskPlan) {
         String dateInfo = "";

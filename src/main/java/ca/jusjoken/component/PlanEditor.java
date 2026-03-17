@@ -21,6 +21,7 @@ import com.vaadin.flow.component.select.Select;
 
 import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.Utility.TaskLinkType;
+import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.PlanTemplate;
 import ca.jusjoken.data.entity.PlanTemplateTask;
 import ca.jusjoken.data.entity.Stock;
@@ -65,6 +66,7 @@ public class PlanEditor {
     private PlanTemplate selectedPlanTemplate;
     private TaskLinkType selectedTaskLinkType;
     private TaskPlan editingTaskPlan;
+    private Integer contextLitterId;
     private final TaskService taskService;
     private final TaskPlanService taskPlanService;
     private final Grid<GeneratedTaskRow> taskTemplatesGrid = new Grid<>(GeneratedTaskRow.class, false);
@@ -211,6 +213,39 @@ public class PlanEditor {
         dialogOpen(null, taskLinkType, stockEntity, mode);
     }
 
+    public void dialogOpenForLitter(Litter litter) {
+        dialogOpen(TaskLinkType.LITTER, null, DialogMode.CREATE);
+
+        if (litter == null) {
+            return;
+        }
+
+        contextLitterId = litter.getId();
+
+        selectDefaultLitterTemplateForStockType(litter.getStockType());
+
+        if (litter.getMother() != null) {
+            Stock mother = stockService.findById(litter.getMother().getId());
+            if (mother != null) {
+                femaleStockSelect.setValue(mother);
+            }
+        }
+
+        if (litter.getFather() != null) {
+            Stock father = stockService.findById(litter.getFather().getId());
+            if (father != null) {
+                maleStockSelect.setValue(father);
+            }
+        }
+
+        if (litter.getDoB() != null) {
+            startDatePicker.setValue(litter.getDoB());
+        }
+
+        refreshGeneratedTemplateTasks();
+        valuesChanged();
+    }
+
     public void dialogOpen(Integer taskPlanId, TaskLinkType taskLinkType, Stock stockEntity, DialogMode mode) {
         System.out.println("Opening PlanEditor dialog with taskPlanId: " + taskPlanId + ", taskLinkType: " + taskLinkType + ", stockEntity: " + stockEntity + ", mode: " + mode);
 
@@ -353,11 +388,31 @@ public class PlanEditor {
         //use this to ensure on open the dialog is set up properly and old values are gone
         selectedPlanTemplate = null;
         selectedTaskLinkType = null;
+        contextLitterId = null;
         femaleStockSelect.clear();
         maleStockSelect.clear();
         startDatePicker.clear();
         generatedTemplateTaskRows.clear();
         taskTemplatesGrid.setItems(generatedTemplateTaskRows);
+    }
+
+    private void selectDefaultLitterTemplateForStockType(StockType stockType) {
+        if (filteredPlanTemplates == null || filteredPlanTemplates.isEmpty()) {
+            selectedPlanTemplate = null;
+            planTemplateSelect.clear();
+            return;
+        }
+
+        PlanTemplate template = filteredPlanTemplates.stream()
+                .filter(t -> stockType != null
+                        && t.getStockType() != null
+                        && t.getStockType().getId() != null
+                        && t.getStockType().getId().equals(stockType.getId()))
+                .findFirst()
+                .orElse(filteredPlanTemplates.get(0));
+
+        selectedPlanTemplate = template;
+        planTemplateSelect.setValue(template);
     }
 
     private void buildDialogLayout() {
@@ -417,6 +472,9 @@ public class PlanEditor {
             task.setTaskPlan(savedTaskPlan);
             task.setLinkType(selectedTaskLinkType);
             task.setLinkBreederId(femaleStockSelect.getValue() != null ? femaleStockSelect.getValue().getId() : null);
+            if (selectedTaskLinkType == TaskLinkType.LITTER) {
+                task.setLinkLitterId(contextLitterId);
+            }
             task.setType(row.getType());
             System.out.println("Saving task: " + task);
             taskService.save(task);

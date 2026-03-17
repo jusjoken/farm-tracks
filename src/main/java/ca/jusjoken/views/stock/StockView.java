@@ -84,6 +84,7 @@ import ca.jusjoken.component.StockDetailsFormLayout;
 import ca.jusjoken.component.StockGrid;
 import ca.jusjoken.component.TaskEditor;
 import ca.jusjoken.component.TaskGrid;
+import ca.jusjoken.component.TaskPlanGrid;
 import ca.jusjoken.component.WeightEditor;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.BreederFilter;
@@ -153,10 +154,13 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     private Boolean skipSidebarUpdates = Boolean.FALSE;
     private Integer selectedTabIndex = 0;
     private TaskGrid taskGrid = new TaskGrid();
+    private TaskPlanGrid planGrid = new TaskPlanGrid();
     private LitterGrid litterGrid = new LitterGrid();
     private boolean mobileDevice = false;
     private static final int MOBILE_BREAKPOINT_PX = 768;   
     private Registration resizeRegistration;
+    private Registration taskGridCountRegistration;
+    private Registration planGridCountRegistration;
 
     public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockTypeService stockTypeService, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService, StockWeightHistoryService weightService, TaskService taskService) {
         this.stockRepository = stockRepository;
@@ -205,6 +209,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
 
     private void applyDeviceScopedGridPreferenceKeys() {
         taskGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.tasks"));
+        planGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.plans"));
         litterGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.litters"));
     }
 
@@ -698,7 +703,14 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
 
         List<Tab> tabList = new ArrayList<>();
         tabList.add(tabs.add("Overview", createTabOverview(stock)));
-        tabList.add(tabs.add(createTab("Tasks'", TabType.COUNT, taskService.getTaskCountForStock(stock).toString()), createTabTasks(stock)));
+        Component tasksContent = createTabTasks(stock);
+        Tab tasksTab = createTab("Tasks'", TabType.COUNT, String.valueOf(taskGrid.getDisplayedCount()));
+        bindTasksTabCount(tasksTab, stock.getId());
+        tabList.add(tabs.add(tasksTab, tasksContent));
+        Component plansContent = createTabPlans(stock);
+        Tab plansTab = createTab("Plans", TabType.COUNT, String.valueOf(planGrid.getDisplayedCount()));
+        bindPlansTabCount(plansTab, stock.getId());
+        tabList.add(tabs.add(plansTab, plansContent));
         tabList.add(tabs.add(createTab("Litters", TabType.COUNT, litterService.getLitterCountForParent(stock).toString()), createTabLitters(stock)));
         tabList.add(tabs.add(createTab(stock.getStockType().getNonBreederName(), TabType.COUNT, stockService.getKitCountForParent(stock).toString()),createTabKits(stock)));
         tabList.add(tabs.add(createTab("Notes", TabType.HASDATA, stock.getNotes()),createTabNotes(stock)));
@@ -731,6 +743,50 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
             return new Tab(label, paperClip);        
         }else{
             return new Tab(label);        
+        }
+    }
+
+    private void bindPlansTabCount(Tab plansTab, Integer stockId) {
+        if (planGridCountRegistration != null) {
+            planGridCountRegistration.remove();
+            planGridCountRegistration = null;
+        }
+
+        updateCountTab(plansTab, "Plans", planGrid.getDisplayedCount());
+        planGridCountRegistration = planGrid.addRefreshListener(() -> {
+            if (selectedStock == null || !selectedStock.getId().equals(stockId)) {
+                return;
+            }
+            updateCountTab(plansTab, "Plans", planGrid.getDisplayedCount());
+        });
+    }
+
+    private void bindTasksTabCount(Tab tasksTab, Integer stockId) {
+        if (taskGridCountRegistration != null) {
+            taskGridCountRegistration.remove();
+            taskGridCountRegistration = null;
+        }
+
+        updateCountTab(tasksTab, "Tasks'", taskGrid.getDisplayedCount());
+        taskGridCountRegistration = taskGrid.addRefreshListener(() -> {
+            if (selectedStock == null || !selectedStock.getId().equals(stockId)) {
+                return;
+            }
+            updateCountTab(tasksTab, "Tasks'", taskGrid.getDisplayedCount());
+        });
+    }
+
+    private void updateCountTab(Tab tab, String labelText, int count) {
+        tab.removeAll();
+        Span label = new Span(labelText);
+        tab.add(label);
+
+        if (count > 0) {
+            String countText = String.valueOf(count);
+            Span counter = UIUtilities.getSuperScriptSpan(countText);
+            counter.getElement().setAttribute("aria-label", countText);
+            counter.getElement().setAttribute("title", countText);
+            tab.add(counter);
         }
     }
 
@@ -1035,6 +1091,14 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
             resizeRegistration.remove();
             resizeRegistration = null;
         }
+        if (taskGridCountRegistration != null) {
+            taskGridCountRegistration.remove();
+            taskGridCountRegistration = null;
+        }
+        if (planGridCountRegistration != null) {
+            planGridCountRegistration.remove();
+            planGridCountRegistration = null;
+        }
         super.onDetach(detachEvent);
     }
 
@@ -1090,6 +1154,16 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
             taskGrid.setHeight("270px");
         }
         return new LazyComponent(() -> taskGrid);
+    }
+
+    private Component createTabPlans(Stock stock) {
+        planGrid.setAssociatedStockId(stock.getId());
+        if(mobileDevice){
+            planGrid.setHeight("500px");
+        }else{
+            planGrid.setHeight("270px");
+        }
+        return new LazyComponent(() -> planGrid);
     }
    
     @Override

@@ -18,6 +18,8 @@ import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Hr;
 import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -35,6 +37,7 @@ import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.entity.TaskPlan;
 import ca.jusjoken.data.service.AppSettingsService;
 import ca.jusjoken.data.service.LitterService;
+import ca.jusjoken.data.service.PlanTemplateService;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockStatusHistoryService;
@@ -69,6 +72,7 @@ public class LitterEditor {
     private final TextArea notes = new TextArea("Notes");
     private final Select<TaskPlan> taskPlanSelect = new Select<>("Incomplete Breed Plans");
     private final TaskPlanService taskPlanService;
+    private final PlanTemplateService planTemplateService;
     private final TaskService taskService;
     private final StockStatusHistoryService stockStatusHistoryService;
     private final TransactionTemplate transactionTemplate;
@@ -79,6 +83,7 @@ public class LitterEditor {
     private AppSettingsService appSettingsService;
     private VerticalLayout dialogLayout;
     private List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
+    private PlanEditor planEditor;
 
     public LitterEditor() {
         litterService = Registry.getBean(LitterService.class);
@@ -86,6 +91,7 @@ public class LitterEditor {
         appSettingsService = Registry.getBean(AppSettingsService.class);
 
         taskPlanService = Registry.getBean(TaskPlanService.class);
+        planTemplateService = Registry.getBean(PlanTemplateService.class);
         taskService = Registry.getBean(TaskService.class);
         stockStatusHistoryService = Registry.getBean(StockStatusHistoryService.class);
         transactionTemplate = Registry.getBean(TransactionTemplate.class);
@@ -175,6 +181,9 @@ public class LitterEditor {
         dialogTitle = (dialogMode == DialogMode.CREATE) ? "Create new litter" : "Edit litter";
         dialogLayout.removeAll();
 
+        //if the mode is edit then the taskplanselect should be hidden
+        taskPlanSelect.setVisible(dialogMode == DialogMode.CREATE);
+
         dialog.setHeaderTitle(dialogTitle);
         dialog.getElement().setAttribute("aria-label", dialogTitle);
         dialog.getHeader().add(dialogCloseButton);
@@ -219,6 +228,7 @@ public class LitterEditor {
         }
 
         kitsCount.setReadOnly(dialogMode == DialogMode.EDIT);
+        diedKitsCount.setReadOnly(dialogMode == DialogMode.EDIT);
 
         dialogLayout.add(new Hr(), taskPlanSelect, prefix, name, breed, bred, doB, father, mother, kitsCount, diedKitsCount, notes);
         updateSaveEnabled();
@@ -289,8 +299,11 @@ public class LitterEditor {
                     taskService.setTaskCompleted(birthTask, true);
                 }
                 createKitStocks(saved.getId(), zeroIfNull(saved.getKitsCount()), zeroIfNull(saved.getDiedKitsCount()));
+
                 notifyRefreshNeeded();
                 dialogClose();
+                openLitterPlanEditorOrWarn(saved);
+
             });
             confirm.addCancelListener(event -> {
                 Litter saved = litterService.save(litter);
@@ -356,6 +369,30 @@ public class LitterEditor {
 
     private void dialogClose() {
         dialog.close();
+    }
+
+    private PlanEditor getPlanEditor() {
+        if (planEditor == null) {
+            planEditor = new PlanEditor();
+            planEditor.addListener(this::notifyRefreshNeeded);
+        }
+        return planEditor;
+    }
+
+    private void openLitterPlanEditorOrWarn(Litter savedLitter) {
+        List<ca.jusjoken.data.entity.PlanTemplate> litterTemplates =
+                planTemplateService.findAllByTaskLinkType(Utility.TaskLinkType.LITTER);
+
+        if (litterTemplates == null || litterTemplates.isEmpty()) {
+            Notification warning = Notification.show(
+                    "No litter plan template exists, so no litter tasks were created.",
+                    5000,
+                    Notification.Position.BOTTOM_START);
+            warning.addThemeVariants(NotificationVariant.LUMO_WARNING);
+            return;
+        }
+
+        getPlanEditor().dialogOpenForLitter(savedLitter);
     }
 
     public void addListener(ListRefreshNeededListener listener) {

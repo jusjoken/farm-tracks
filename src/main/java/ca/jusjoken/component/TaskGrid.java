@@ -8,6 +8,7 @@ import java.util.Optional;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.card.Card;
 import com.vaadin.flow.component.card.CardVariant;
+import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.grid.GridVariant;
@@ -16,6 +17,7 @@ import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
 import com.vaadin.flow.component.grid.contextmenu.GridSubMenu;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.data.provider.ListDataProvider;
+import com.vaadin.flow.data.provider.Query;
 import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.shared.Registration;
@@ -47,6 +49,7 @@ public class TaskGrid extends Grid<Task> {
     private String currentCompletionFilter = Utility.TaskCompletionFilter.ACTIVE.filterName;
     Grid.Column<Task> dateColumn;
     private Registration sortListenerRegistration;
+    private final List<Runnable> refreshListeners = new ArrayList<>();
     private Boolean menuCreated = false;
     private Boolean minimalColumns = false;
     private Boolean displayAsTile = false;
@@ -70,6 +73,7 @@ public class TaskGrid extends Grid<Task> {
         this.minimalColumns = minimalColumns;
 
         taskEditor.addListener(this::refreshGrid);
+        litterEditor.addListener(this::refreshGrid);
         if (enablePlanActions) {
             getPlanEditor().addListener(this::refreshGrid);
         }
@@ -99,10 +103,22 @@ public class TaskGrid extends Grid<Task> {
             return "";
         }
         return switch (task.getLinkType()) {
-            case BREEDER -> stockService.findById(task.getLinkBreederId()).getName();
-            case LITTER -> stockService.findById(task.getLinkLitterId()).getName();
+            case BREEDER -> getStockName(task.getLinkBreederId());
+            case LITTER -> {
+                String litterName = getStockName(task.getLinkLitterId());
+                // Legacy litter tasks may have only linkBreederId populated.
+                yield litterName.isEmpty() ? getStockName(task.getLinkBreederId()) : litterName;
+            }
             default -> "";
         };
+    }
+
+    private String getStockName(Integer stockId) {
+        if (stockId == null) {
+            return "";
+        }
+        Stock stock = stockService.findById(stockId);
+        return stock != null && stock.getName() != null ? stock.getName() : "";
     }
 
 
@@ -193,96 +209,139 @@ public class TaskGrid extends Grid<Task> {
     private GridContextMenu<Task> createContextMenu(Grid<Task> grid) {
         GridContextMenu<Task> menu = new GridContextMenu<>(grid);
         menu.setDynamicContentHandler(menuEntity -> {
-            if (menuEntity == null) {
-                return false;
-            } else {
-                menu.removeAll();
-                GridMenuItem<Task> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
-                displayAsTileMenu.setCheckable(true);
-                displayAsTileMenu.setChecked(displayAsTile);
-                displayAsTileMenu.addMenuItemClickListener(click -> {
-                    displayAsTile = displayAsTileMenu.isChecked();
-                    saveDisplayAsTilePreference();
-                    configureGrid();
-                    refreshGrid();
+            menu.removeAll();
+
+            GridMenuItem<Task> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
+            displayAsTileMenu.setCheckable(true);
+            displayAsTileMenu.setChecked(displayAsTile);
+            displayAsTileMenu.addMenuItemClickListener(click -> {
+                displayAsTile = displayAsTileMenu.isChecked();
+                saveDisplayAsTilePreference();
+                configureGrid();
+                refreshGrid();
+            });
+            menu.addSeparator();
+
+            // Always provide filter access, even when no rows are visible.
+            GridMenuItem<Task> filterByCompletionMenu = menu.addItem(new Item("Filter by Completion", Utility.ICONS.ACTION_FILTER.getIconSource()));
+            GridSubMenu<Task> filterSubMenu = filterByCompletionMenu.getSubMenu();
+            for (Utility.TaskCompletionFilter filter : Utility.TaskCompletionFilter.values()) {
+                GridMenuItem<Task> menuItem = filterSubMenu.addItem(filter.filterName);
+                menuItem.setCheckable(true);
+                menuItem.setChecked(currentCompletionFilter.equals(filter.filterName));
+                menuItem.addMenuItemClickListener(click -> {
+                    currentCompletionFilter = filter.filterName;
+                    updateCompletionFilter(currentCompletionFilter);
+                    updateSortOrder();
+                    notifyRefreshListeners();
                 });
-                menu.addSeparator();
+            }
 
-                //add a submenu to filter by completion status
-                GridMenuItem<Task> filterByCompletionMenu = menu.addItem(new Item("Filter by Completion", Utility.ICONS.ACTION_FILTER.getIconSource()));
-                GridSubMenu<Task> filterSubMenu = filterByCompletionMenu.getSubMenu();
-                //for each taskcompletionfilter option, add a menu item to the submenu and set it to checked if it is the current filter
-                for (Utility.TaskCompletionFilter filter : Utility.TaskCompletionFilter.values()) {
-                    GridMenuItem<Task> menuItem = filterSubMenu.addItem(filter.filterName);
-                    menuItem.setCheckable(true);
-                    menuItem.setChecked(currentCompletionFilter.equals(filter.filterName));
-                    menuItem.addMenuItemClickListener(click -> {
-                        currentCompletionFilter = filter.filterName;
-                        updateCompletionFilter(currentCompletionFilter);
-                        updateSortOrder();
-                    });
-                }
-
-                menu.addComponentAsFirst(UIUtilities.getContextMenuHeader("Task: " + menuEntity.getName()));
-
-                GridMenuItem<Task> addNewMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
-                addNewMenu.addMenuItemClickListener(click -> {
-                    if(stockId != null){
-                        Stock stock = stockService.findById(stockId);
-                        Task newTask = new Task();
-                        newTask.setLinkType(Utility.TaskLinkType.BREEDER);
-                        newTask.setLinkBreederId(stockId);
-                        taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, stock.getStockType());
-                    } else {
-                        taskEditor.dialogOpen();
-                    }
-                });
-                menu.addSeparator();
-
-                // Context menu opened on a task, show option to edit
-                GridMenuItem<Task> editMenu = menu.addItem(new Item("Edit Task", Utility.ICONS.ACTION_EDIT.getIconSource()));
-                editMenu.addMenuItemClickListener(click -> {
-                    taskEditor.dialogOpen(menuEntity, TaskEditor.DialogMode.EDIT, null);
-                });
-                //add a menu item to view the plan if the task has a plan
-                Integer taskPlanId = safeGetTaskPlanId(menuEntity);
-                if (enablePlanActions && taskPlanId != null) {
-                    GridMenuItem<Task> editPlanMenu = menu.addItem(new Item("View Plan", Utility.ICONS.ACTION_EDIT.getIconSource()));
-                    editPlanMenu.addMenuItemClickListener(click -> {
-                        Stock stockEntity = null;
-                        getPlanEditor().dialogOpen(taskPlanId, menuEntity.getLinkType(), stockEntity, PlanEditor.DialogMode.DISPLAY);
-                    });
-
-                    GridMenuItem<Task> markPlanIncompleteMenu = menu.addItem(new Item("Mark Plan Incomplete", Utility.ICONS.ACTION_CHECK.getIconSource()));
-                    markPlanIncompleteMenu.addMenuItemClickListener(click -> {
-                        taskPlanService.markIncomplete(taskPlanId);
-                        refreshGrid();
-                    });
-                }
-                //if the current task type has an action associated with it, show the action in the context menu. For example, if the task type is BIRTH then show a "View Offspring" action that opens the stock list view filtered to show the offspring from this birth task.
-                if (menuEntity.getType() != null && menuEntity.getType().hasAction()) {
-                    if (menuEntity.getType() == TaskType.BIRTH) {
-                        GridMenuItem<Task> actionMenu = menu.addItem(new Item(menuEntity.getType().getAction(), menuEntity.getIcon().getIcon()));
-                        actionMenu.addMenuItemClickListener(click -> {
-                            //get the stocktype from the task linkbreederid
-                            Stock stock = stockService.findById(menuEntity.getLinkBreederId());
-                            //set the stocktype filter on the littergrid to the stocktype of the breeder and set the parent filter to the name of the breeder and then open the litter editor
-                            litterEditor.runTaskAction(menuEntity, stock.getStockType());
-
-                        });
-
-                    }
+            GridMenuItem<Task> addNewMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+            addNewMenu.addMenuItemClickListener(click -> {
+                if(stockId != null){
+                    Stock stock = stockService.findById(stockId);
+                    Task newTask = new Task();
+                    newTask.setLinkType(Utility.TaskLinkType.BREEDER);
+                    newTask.setLinkBreederId(stockId);
+                    taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, stock.getStockType());
                 } else {
-                    //if no specific action then add a make complete action for active tasks and a mark incomplete action for completed tasks
-                    String actionText = menuEntity.getCompleted() ? "Mark Incomplete" : "Mark Complete";
-                    GridMenuItem<Task> actionMenu = menu.addItem(new Item(actionText, Utility.ICONS.ACTION_CHECK.getIconSource()));
-                    actionMenu.addMenuItemClickListener(click -> {
-                        taskService.setTaskCompleted(menuEntity, !Boolean.TRUE.equals(menuEntity.getCompleted()));
-                        refreshGrid();
-                    });
+                    taskEditor.dialogOpen();
                 }
+            });
+
+            if (menuEntity == null) {
+                menu.addComponentAsFirst(UIUtilities.getContextMenuHeader("Task Grid"));
                 return true;
             }
+
+            menu.addSeparator();
+            menu.addComponentAsFirst(UIUtilities.getContextMenuHeader("Task: " + menuEntity.getName()));
+
+            // Context menu opened on a task, show option to edit
+            GridMenuItem<Task> editMenu = menu.addItem(new Item("Edit Task", Utility.ICONS.ACTION_EDIT.getIconSource()));
+            editMenu.addMenuItemClickListener(click -> {
+                taskEditor.dialogOpen(menuEntity, TaskEditor.DialogMode.EDIT, null);
+            });
+            //add a menu item to view the plan if the task has a plan
+            Integer taskPlanId = safeGetTaskPlanId(menuEntity);
+            if (enablePlanActions && taskPlanId != null) {
+                GridMenuItem<Task> editPlanMenu = menu.addItem(new Item("View Plan", Utility.ICONS.ACTION_EDIT.getIconSource()));
+                editPlanMenu.addMenuItemClickListener(click -> {
+                    Stock stockEntity = null;
+                    getPlanEditor().dialogOpen(taskPlanId, menuEntity.getLinkType(), stockEntity, PlanEditor.DialogMode.DISPLAY);
+                });
+
+                String markPlanIncompleteLabel = getMarkPlanIncompleteLabel(taskPlanId);
+                Item markPlanIncompleteItem = new Item(markPlanIncompleteLabel, Utility.ICONS.STATUS_INACTIVE.getIconSource());
+                String markPlanIncompleteTooltip = getMarkPlanIncompleteTooltip(markPlanIncompleteLabel);
+                if (markPlanIncompleteTooltip != null) {
+                    markPlanIncompleteItem.getElement().setAttribute("title", markPlanIncompleteTooltip);
+                }
+                GridMenuItem<Task> markPlanIncompleteMenu = menu.addItem(markPlanIncompleteItem);
+                markPlanIncompleteMenu.addMenuItemClickListener(click -> {
+                    menu.close();
+                    taskPlanService.markIncomplete(taskPlanId);
+                    refreshGrid();
+                });
+            }
+            //if the current task type has an action associated with it, show the action in the context menu. For example, if the task type is BIRTH then show a "View Offspring" action that opens the stock list view filtered to show the offspring from this birth task.
+            if (menuEntity.getType() != null && menuEntity.getType().hasAction()) {
+                if (menuEntity.getType() == TaskType.BIRTH) {
+                    GridMenuItem<Task> actionMenu = menu.addItem(new Item(menuEntity.getType().getAction(), menuEntity.getIcon().getIcon()));
+                    actionMenu.addMenuItemClickListener(click -> {
+                        //get the stocktype from the task linkbreederid
+                        Stock stock = stockService.findById(menuEntity.getLinkBreederId());
+                        //set the stocktype filter on the littergrid to the stocktype of the breeder and set the parent filter to the name of the breeder and then open the litter editor
+                        litterEditor.runTaskAction(menuEntity, stock.getStockType());
+
+                    });
+                    
+                    //for BIRTH tasks, also add the option to mark the plan as incomplete (missed birth)
+                    if (taskPlanId != null) {
+                        String missedBirthLabel = "Missed Birth";
+                        Item missedBirthItem = new Item(missedBirthLabel, Utility.ICONS.STATUS_INACTIVE.getIconSource());
+                        missedBirthItem.getElement().setAttribute("title", "Mark this breeder plan incomplete due to a missed birth.");
+                        GridMenuItem<Task> missedBirthMenu = menu.addItem(missedBirthItem);
+                        missedBirthMenu.addMenuItemClickListener(click -> {
+                            menu.close();
+                            taskPlanService.markIncomplete(taskPlanId);
+                            refreshGrid();
+                        });
+                    }
+
+                }
+            } else {
+                //if no specific action then add a make complete action for active tasks and a mark incomplete action for completed tasks
+                String actionText = menuEntity.getCompleted() ? "Mark Incomplete" : "Mark Complete";
+                GridMenuItem<Task> actionMenu = menu.addItem(new Item(actionText, Utility.ICONS.ACTION_CHECK.getIconSource()));
+                actionMenu.addMenuItemClickListener(click -> {
+                    menu.close();
+                    taskService.setTaskCompleted(menuEntity, !Boolean.TRUE.equals(menuEntity.getCompleted()));
+                    refreshGrid();
+                });
+            }
+
+            menu.addSeparator();
+            GridMenuItem<Task> deleteMenu = menu.addItem(new Item("Delete Task", Utility.ICONS.ACTION_DELETE.getIconSource()));
+            deleteMenu.addMenuItemClickListener(click -> {
+                menu.close();
+                ConfirmDialog confirm = new ConfirmDialog();
+                confirm.setHeader("Delete task: " + menuEntity.getName());
+                confirm.setText("Are you sure you want to delete this task? This action cannot be undone.");
+                confirm.setCancelable(true);
+                confirm.setCancelText("No");
+                confirm.setConfirmText("Yes");
+                confirm.addConfirmListener(event -> {
+                    taskService.deleteTaskAndSyncPlanStatus(menuEntity.getId());
+                    refreshGrid();
+                    confirm.close();
+                });
+                confirm.addCancelListener(event -> confirm.close());
+                confirm.open();
+            });
+
+            return true;
         });
 
         return menu;
@@ -326,6 +385,28 @@ public class TaskGrid extends Grid<Task> {
             // no fallback left
         }
 
+        return null;
+    }
+
+    private String getMarkPlanIncompleteLabel(Integer taskPlanId) {
+        if (taskPlanId == null) {
+            return "Mark Plan Incomplete";
+        }
+
+        TaskPlan plan = taskPlanService.findById(taskPlanId).orElse(null);
+        if (plan == null || plan.getType() != Utility.TaskLinkType.BREEDER) {
+            return "Mark Plan Incomplete";
+        }
+
+        boolean hasBirthTask = taskService.findByPlanId(taskPlanId).stream()
+                .anyMatch(task -> task.getType() == TaskType.BIRTH);
+        return hasBirthTask ? "Missed Birth" : "Mark Plan Incomplete";
+    }
+
+    private String getMarkPlanIncompleteTooltip(String label) {
+        if ("Missed Birth".equals(label)) {
+            return "Mark this breeder plan incomplete due to a missed birth.";
+        }
         return null;
     }
 
@@ -381,6 +462,26 @@ public class TaskGrid extends Grid<Task> {
         // re-apply filter after data provider is recreated
         updateCompletionFilter(currentCompletionFilter);
         updateSortOrder();
+        notifyRefreshListeners();
+    }
+
+    public int getDisplayedCount() {
+        return dataProvider != null ? dataProvider.size(new Query<>()) : 0;
+    }
+
+    public Registration addRefreshListener(Runnable listener) {
+        if (listener == null) {
+            return () -> {};
+        }
+
+        refreshListeners.add(listener);
+        return () -> refreshListeners.remove(listener);
+    }
+
+    private void notifyRefreshListeners() {
+        for (Runnable listener : refreshListeners) {
+            listener.run();
+        }
     }
 
     public Boolean getMinimalColumns() {

@@ -769,7 +769,6 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                         //open breed plan dialog
                         planEditor.dialogOpen(Utility.TaskLinkType.BREEDER, stockEntity);
                     });
-                menu.addItem(new Item("Birth", Utility.ICONS.ACTION_BIRTH.getIconSource()));
                 createStatusMenuItem(menu, stockEntity, "sold");
                 createStatusMenuItem(menu, stockEntity, "forsale");
                 createStatusMenuItem(menu, stockEntity, "deposit");

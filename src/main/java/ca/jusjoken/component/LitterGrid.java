@@ -507,7 +507,8 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
                 GridMenuItem<Litter> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
                 editMenu.addMenuItemClickListener(click -> {
-                    //open litter edit dialog
+                    //open litter edit dialog with the selected litter
+                    litterEditor.dialogOpen(litterEntity, LitterEditor.DialogMode.EDIT, litterEntity.getStockType());
                 });
                 menu.addSeparator();
                 GridMenuItem<Litter> deleteMenu = menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));

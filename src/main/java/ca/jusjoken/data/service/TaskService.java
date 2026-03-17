@@ -74,6 +74,54 @@ public class TaskService {
         taskRepository.deleteById(id);
     }
 
+    @Transactional
+    public void deleteTaskAndSyncPlanStatus(Integer taskId) {
+        if (taskId == null) {
+            return;
+        }
+
+        Optional<Task> taskOpt = taskRepository.findById(taskId);
+        if (taskOpt.isEmpty()) {
+            return;
+        }
+
+        Task task = taskOpt.get();
+        Integer taskPlanId = null;
+        try {
+            if (task.getTaskPlan() != null) {
+                taskPlanId = task.getTaskPlan().getId();
+            }
+        } catch (Exception ignored) {
+            // Keep null if task-plan proxy cannot be resolved.
+        }
+
+        taskRepository.deleteById(taskId);
+
+        if (taskPlanId == null) {
+            return;
+        }
+
+        Optional<TaskPlan> planOpt = taskPlanRepository.findById(taskPlanId);
+        if (planOpt.isEmpty()) {
+            return;
+        }
+
+        TaskPlan plan = planOpt.get();
+        if (plan.getStatus() == Utility.TaskPlanStatus.INCOMPLETE) {
+            return;
+        }
+
+        long incompleteCount = taskRepository.countByTaskPlanIdAndCompletedFalse(taskPlanId);
+        Utility.TaskPlanStatus targetStatus = incompleteCount > 0
+                ? Utility.TaskPlanStatus.ACTIVE
+                : Utility.TaskPlanStatus.INACTIVE;
+
+        if (plan.getStatus() != targetStatus) {
+            plan.setStatus(targetStatus);
+            taskPlanRepository.save(plan);
+        }
+    }
+
     public List<Task> findByPlanId(Integer taskPlanId) {
         return taskRepository.findByTaskPlanId(taskPlanId);
     }
