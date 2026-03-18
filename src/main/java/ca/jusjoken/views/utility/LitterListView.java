@@ -7,6 +7,8 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.shared.Registration;
@@ -21,12 +23,13 @@ import jakarta.annotation.security.PermitAll;
 @Route(value = "litters", layout = MainLayout.class)
 @PermitAll
 @PageTitle("Litter List")
-public class LitterListView extends Main implements ListRefreshNeededListener{
+public class LitterListView extends Main implements ListRefreshNeededListener, BeforeEnterObserver{
     private final LitterGrid litterGrid = new LitterGrid();
     private final StockTypeService stockTypeService;
     private boolean mobileDevice = false;
     private static final int MOBILE_BREAKPOINT_PX = 768;   
     private Registration resizeRegistration;
+    private Integer queryLitterIdFilter;
 
     public LitterListView(StockTypeService stockTypeService) {
         this.stockTypeService = stockTypeService;
@@ -155,8 +158,34 @@ public class LitterListView extends Main implements ListRefreshNeededListener{
         // Use mobile as the default only when no saved preference exists.
         litterGrid.setDisplayAsTile(mobileDevice);
         litterGrid.loadDisplayAsTilePreference();
+        litterGrid.setLitterIdFilter(queryLitterIdFilter);
 
         litterGrid.createGrid();
+        litterGrid.expandFilteredLitterDetails();
+    }
+
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        String litterIdValue = event.getLocation().getQueryParameters().getParameters()
+                .getOrDefault("litterId", java.util.List.of())
+                .stream()
+                .findFirst()
+                .orElse(null);
+
+        queryLitterIdFilter = parseIntegerOrNull(litterIdValue);
+        // Rebuild after query-param filtering so deep-link navigation reliably auto-expands/highlights.
+        listRefreshNeeded();
+    }
+
+    private Integer parseIntegerOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
 }

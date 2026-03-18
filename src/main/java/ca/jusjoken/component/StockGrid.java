@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -21,6 +23,7 @@ import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.checkbox.CheckboxGroup;
 import com.vaadin.flow.component.checkbox.CheckboxGroupVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.ColumnTextAlign;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridSortOrder;
@@ -33,12 +36,14 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.data.renderer.LocalDateRenderer;
 import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
 import com.vaadin.flow.data.renderer.NumberRenderer;
+import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.shared.Registration;
 
 import ca.jusjoken.UIUtilities;
@@ -59,6 +64,7 @@ import ca.jusjoken.data.service.StockWeightHistoryService;
 import ca.jusjoken.data.service.UserUiSettingsService;
 import ca.jusjoken.utility.BadgeVariant;
 import ca.jusjoken.views.stock.StockPedigreeEditor;
+import ca.jusjoken.views.utility.LitterListView;
 
 public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
@@ -94,6 +100,12 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
     public static enum StockGridType {
         LITTER, STOCK, KITS
+    }
+
+    private enum FosterPlacement {
+        NONE,
+        FOSTER_IN,
+        FOSTER_OUT
     }
 
     private StockGridType stockGridType = StockGridType.KITS;
@@ -244,9 +256,19 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         //setHeight("270px");
         setColumnReorderingAllowed(true);
         addComponentColumn(stockEntity -> {
-            return stockEntity.getnameAndPrefix(false,true, true);
+            return createNameCell(stockEntity);
                 }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(false).setKey("name")
                     .setComparator(Stock::getDisplayName).setSortable(true);
+
+        if (stockGridType == StockGridType.LITTER) {
+            addComponentColumn(this::createFosterIndicatorBadge)
+                    .setHeader("Foster")
+                    .setResizable(true)
+                    .setAutoWidth(true)
+                    .setKey("foster")
+                    .setComparator(this::getFosterSortValue)
+                    .setSortable(true);
+        }
 
         if(stockGridType == StockGridType.STOCK){
             addComponentColumn(stockEntity -> {
@@ -332,6 +354,11 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         card.setHeaderPrefix(avatar);
         card.setHeader(stock.getHeader());
 
+        FosterPlacement fosterPlacement = getFosterPlacementForCurrentLitter(stock);
+        if (fosterPlacement == FosterPlacement.FOSTER_OUT) {
+            card.getElement().getStyle().set("opacity", "0.65");
+        }
+
         String stockTattoo = stock.getTattoo();
         if(!stockTattoo.isEmpty() && !stockTattoo.equals(stock.getDisplayName())){
             card.addToFooter(UIUtilities.createBadge(null,stockTattoo, BadgeVariant.SUCCESS));
@@ -354,6 +381,12 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
         card.addToFooter(UIUtilities.createBadge(null,stock.getAge().getAgeFormattedString()));
         card.addToFooter(UIUtilities.createBadge(null,stock.getWeightInLbsOzAsString()));
+
+        if (fosterPlacement == FosterPlacement.FOSTER_IN) {
+            card.addToFooter(createFosterIndicatorBadge(stock));
+        } else if (fosterPlacement == FosterPlacement.FOSTER_OUT) {
+            card.addToFooter(createFosterIndicatorBadge(stock));
+        }
 
         UIUtilities.setCardBorders(card, stock);
 
@@ -380,6 +413,11 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         card.setHeaderPrefix(avatar);
         card.setHeader(stock.getHeader());
 
+        FosterPlacement fosterPlacement = getFosterPlacementForCurrentLitter(stock);
+        if (fosterPlacement == FosterPlacement.FOSTER_OUT) {
+            card.getElement().getStyle().set("opacity", "0.65");
+        }
+
         card.addToFooter(stock.getStatusBadge());
 
         card.addToFooter(stock.getSaleStatusBadge(true));
@@ -387,6 +425,12 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         card.addToFooter(UIUtilities.createBadge("Invoice", stock.getInvoiceNumber(),BadgeVariant.CONTRAST));
 
         card.addToFooter(UIUtilities.createBadge("Value", stock.getStockValueFormatted(), BadgeVariant.SUCCESS));
+
+        if (fosterPlacement == FosterPlacement.FOSTER_IN) {
+            card.addToFooter(createFosterIndicatorBadge(stock));
+        } else if (fosterPlacement == FosterPlacement.FOSTER_OUT) {
+            card.addToFooter(createFosterIndicatorBadge(stock));
+        }
 
         UIUtilities.setCardBorders(card, stock);
 
@@ -420,7 +464,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             dataProvider = new ListDataProvider<>(getSortedStocks(stockService.getKitsForParent(stock)));
             super.setDataProvider(dataProvider);
         } else if (litterId != null) {
-            dataProvider = new ListDataProvider<>(getSortedStocks(stockService.getKitsForLitter(litterId)));
+            dataProvider = new ListDataProvider<>(getSortedStocks(stockService.getKitsForLitterDisplay(litterId)));
             super.setDataProvider(dataProvider);
         }else{
             //dataProvider = new ListDataProvider<>(getListDataView().getItems().collect(Collectors.toList()));
@@ -479,8 +523,127 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             case "doB" -> compareComparable(left == null ? null : left.getDoB(), right == null ? null : right.getDoB());
             case "stockValue" -> compareComparable(left == null ? null : left.getStockValue(), right == null ? null : right.getStockValue());
             case "notes" -> compareStrings(left == null ? null : left.getNotes(), right == null ? null : right.getNotes());
+            case "foster" -> Integer.compare(getFosterSortValue(left), getFosterSortValue(right));
             default -> 0;
         };
+    }
+
+    private Component createNameCell(Stock stockEntity) {
+        Component nameComponent = stockEntity.getnameAndPrefix(false, true, true);
+        if (getFosterPlacementForCurrentLitter(stockEntity) == FosterPlacement.FOSTER_OUT) {
+            nameComponent.getElement().getStyle().set("opacity", "0.65");
+            nameComponent.getElement().getStyle().set("text-decoration", "line-through");
+        }
+        return nameComponent;
+    }
+
+    private Component createFosterIndicatorBadge(Stock stockEntity) {
+        FosterPlacement placement = getFosterPlacementForCurrentLitter(stockEntity);
+        if (placement == FosterPlacement.FOSTER_IN) {
+            Badge badge = UIUtilities.createBadge(null, "Foster In", BadgeVariant.PRIMARY);
+            String birthLitterName = getBirthLitterDisplayName(stockEntity);
+            if (!birthLitterName.isBlank()) {
+                badge.getElement().setProperty("title", "Born in: " + birthLitterName);
+            }
+            return badge;
+        }
+        if (placement == FosterPlacement.FOSTER_OUT) {
+            Badge badge = UIUtilities.createBadge(null, "Fostered Out", BadgeVariant.WARNING);
+            String fosterLitterName = getFosterLitterDisplayName(stockEntity);
+            String tooltip = fosterLitterName.isBlank()
+                    ? "Moved to foster litter"
+                    : "Now in: " + fosterLitterName;
+            badge.getElement().setProperty("title", tooltip + " (click for details)");
+            badge.getStyle().set("cursor", "pointer");
+            badge.addClickListener(event -> openFosterLitterDialog(stockEntity));
+            return badge;
+        }
+        return new Div();
+    }
+
+    private String getBirthLitterDisplayName(Stock stockEntity) {
+        if (stockEntity == null || stockEntity.getLitter() == null) {
+            return "";
+        }
+        String displayName = stockEntity.getLitter().getDisplayName();
+        return displayName == null ? "" : displayName;
+    }
+
+    private String getFosterLitterDisplayName(Stock stockEntity) {
+        if (stockEntity == null || stockEntity.getFosterLitter() == null) {
+            return "";
+        }
+        String displayName = stockEntity.getFosterLitter().getDisplayName();
+        return displayName == null ? "" : displayName;
+    }
+
+    private void openFosterLitterDialog(Stock stockEntity) {
+        String fosterLitterName = getFosterLitterDisplayName(stockEntity);
+        String destination = fosterLitterName.isBlank() ? "Unknown" : fosterLitterName;
+        Integer fosterLitterId = stockEntity == null || stockEntity.getFosterLitter() == null
+            ? null
+            : stockEntity.getFosterLitter().getId();
+
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Foster Destination");
+
+        TextField destinationField = new TextField("Current foster litter");
+        destinationField.setWidthFull();
+        destinationField.setReadOnly(true);
+        destinationField.setValue(destination);
+
+        Button openLitters = new Button("Open Litters", click -> {
+            UI currentUi = UI.getCurrent();
+            if (currentUi != null) {
+                if (fosterLitterId != null) {
+                    currentUi.navigate("litters", new QueryParameters(Map.of("litterId", List.of(String.valueOf(fosterLitterId)))));
+                } else {
+                    currentUi.navigate(LitterListView.class);
+                }
+            }
+            dialog.close();
+        });
+        openLitters.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        openLitters.setEnabled(fosterLitterId != null);
+
+        Button close = new Button("Close", click -> dialog.close());
+
+        HorizontalLayout footer = new HorizontalLayout(openLitters, close);
+        footer.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+        footer.setWidthFull();
+
+        VerticalLayout content = new VerticalLayout(destinationField, footer);
+        content.setPadding(false);
+        content.setSpacing(true);
+
+        dialog.add(content);
+        dialog.open();
+    }
+
+    private int getFosterSortValue(Stock stockEntity) {
+        FosterPlacement placement = getFosterPlacementForCurrentLitter(stockEntity);
+        return switch (placement) {
+            case FOSTER_IN -> 1;
+            case FOSTER_OUT -> 2;
+            case NONE -> 0;
+        };
+    }
+
+    private FosterPlacement getFosterPlacementForCurrentLitter(Stock stockEntity) {
+        if (stockGridType != StockGridType.LITTER || litterId == null || stockEntity == null) {
+            return FosterPlacement.NONE;
+        }
+
+        Integer birthLitterId = stockEntity.getLitter() == null ? null : stockEntity.getLitter().getId();
+        Integer fosterLitterId = stockEntity.getFosterLitter() == null ? null : stockEntity.getFosterLitter().getId();
+
+        if (fosterLitterId != null && Objects.equals(fosterLitterId, litterId) && !Objects.equals(birthLitterId, litterId)) {
+            return FosterPlacement.FOSTER_IN;
+        }
+        if (Objects.equals(birthLitterId, litterId) && fosterLitterId != null && !Objects.equals(fosterLitterId, litterId)) {
+            return FosterPlacement.FOSTER_OUT;
+        }
+        return FosterPlacement.NONE;
     }
 
     private int compareStrings(String left, String right) {

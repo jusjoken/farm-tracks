@@ -68,7 +68,8 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
     private Registration selectionListenerRegistration;
     private String preferenceScopeKey;
     private Integer expandedPlanId;
-        private Boolean displayAsTile = false;
+    private Boolean displayAsTile = false;
+    private boolean menuCreated = false;
 
         private final ComponentRenderer<Component, TaskPlan> planCardRenderer = new ComponentRenderer<>(
             this::createPlanCard);
@@ -111,7 +112,10 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
         if (!displayAsTile) {
             restoreExpandedDetails();
         }
-        createContextMenu(this);
+        if (!menuCreated) {
+            createContextMenu(this);
+            menuCreated = true;
+        }
     }
 
     private void configureListView() {
@@ -312,11 +316,17 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
         menu.setDynamicContentHandler(planEntity -> {
             menu.removeAll();
 
+            GridMenuItem<TaskPlan> addPlanMenu = menu.addItem(new Item("Add Plan", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+            addPlanMenu.addMenuItemClickListener(click -> {
+                menu.close();
+                planEditor.dialogOpen(currentTypeFilter, null, PlanEditor.DialogMode.CREATE);
+            });
+            menu.addSeparator();
+
             GridMenuItem<TaskPlan> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
             displayAsTileMenu.setCheckable(true);
             displayAsTileMenu.setChecked(displayAsTile);
             displayAsTileMenu.addMenuItemClickListener(click -> {
-                menu.close();
                 displayAsTile = displayAsTileMenu.isChecked();
                 saveDisplayAsTilePreference();
                 configureGrid();
@@ -331,7 +341,6 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
                 filterItem.setCheckable(true);
                 filterItem.setChecked(currentStatusFilter == filter);
                 filterItem.addMenuItemClickListener(click -> {
-                    menu.close();
                     currentStatusFilter = filter;
                     refreshGrid();
                 });
@@ -343,7 +352,7 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
             }
 
             menu.addSeparator();
-            menu.addComponentAsFirst(UIUtilities.getContextMenuHeader("Plan: " + taskPlanService.getDisplayName(planEntity)));
+            menu.addComponentAsFirst(UIUtilities.getContextMenuHeader(getContextMenuHeaderText(planEntity)));
 
             GridMenuItem<TaskPlan> viewPlanMenu = menu.addItem(new Item("View Plan", Utility.ICONS.ACTION_VIEW.getIconSource()));
             viewPlanMenu.addMenuItemClickListener(click ->
@@ -484,7 +493,33 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
         if (settingsKey == null) {
             return;
         }
-        displayAsTile = userUiSettingsService.getBooleanForCurrentUser(settingsKey, Boolean.TRUE.equals(displayAsTile));
+
+        displayAsTile = userUiSettingsService.getValueForCurrentUser(settingsKey)
+                .map(this::toBoolean)
+                .orElseGet(this::getDefaultDisplayAsTileForScope);
+    }
+
+    private boolean getDefaultDisplayAsTileForScope() {
+        if (preferenceScopeKey != null && preferenceScopeKey.endsWith(".mobile")) {
+            return true;
+        }
+        if (preferenceScopeKey != null && preferenceScopeKey.endsWith(".desktop")) {
+            return false;
+        }
+        return Boolean.TRUE.equals(displayAsTile);
+    }
+
+    private boolean toBoolean(Object value) {
+        if (value instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+        if (value instanceof String stringValue) {
+            return Boolean.parseBoolean(stringValue);
+        }
+        if (value instanceof Number numberValue) {
+            return numberValue.intValue() != 0;
+        }
+        return false;
     }
 
     private void saveDisplayAsTilePreference() {
@@ -650,5 +685,15 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
             setDetailsVisible(expandedPlan, false);
             expandedPlanId = null;
         }
+    }
+
+    private String getContextMenuHeaderText(TaskPlan plan) {
+        if (plan == null) {
+            return "Plan";
+        }
+        if (plan.getType() == Utility.TaskLinkType.GENERAL) {
+            return "Plan: General Plan";
+        }
+        return "Plan: " + taskPlanService.getDisplayName(plan);
     }
 }

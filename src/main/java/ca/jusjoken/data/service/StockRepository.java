@@ -51,6 +51,14 @@ public interface StockRepository extends JpaRepository<Stock, Long>  {
 
     public List<Stock> findAllKitsByLitterId(Integer id);
 
+    public List<Stock> findAllByFosterLitterId(Integer id);
+
+    @Query("select s from Stock s where (s.fosterLitter.id = :litterId) or (s.fosterLitter is null and s.litter.id = :litterId)")
+    List<Stock> findAllKitsAssignedToLitterId(@Param("litterId") Integer litterId);
+
+    @Query("select count(s) from Stock s where (s.fosterLitter.id = :litterId) or (s.fosterLitter is null and s.litter.id = :litterId)")
+    Long countAllKitsAssignedToLitterId(@Param("litterId") Integer litterId);
+
     public List<Stock> findAllByMotherId(Integer id);
 
     public List<Stock> findAllByFatherId(Integer id);

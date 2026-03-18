@@ -503,7 +503,33 @@ public class TaskGrid extends Grid<Task> {
         if (settingsKey == null) {
             return;
         }
-        displayAsTile = userUiSettingsService.getBooleanForCurrentUser(settingsKey, Boolean.TRUE.equals(displayAsTile));
+
+        displayAsTile = userUiSettingsService.getValueForCurrentUser(settingsKey)
+                .map(this::toBoolean)
+                .orElseGet(this::getDefaultDisplayAsTileForScope);
+    }
+
+    private boolean getDefaultDisplayAsTileForScope() {
+        if (preferenceScopeKey != null && preferenceScopeKey.endsWith(".mobile")) {
+            return true;
+        }
+        if (preferenceScopeKey != null && preferenceScopeKey.endsWith(".desktop")) {
+            return false;
+        }
+        return Boolean.TRUE.equals(displayAsTile);
+    }
+
+    private boolean toBoolean(Object value) {
+        if (value instanceof Boolean booleanValue) {
+            return booleanValue;
+        }
+        if (value instanceof String stringValue) {
+            return Boolean.parseBoolean(stringValue);
+        }
+        if (value instanceof Number numberValue) {
+            return numberValue.intValue() != 0;
+        }
+        return false;
     }
 
     public void applyDisplayAsTilePreference() {

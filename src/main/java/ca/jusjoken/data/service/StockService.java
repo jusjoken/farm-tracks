@@ -9,7 +9,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -55,6 +57,51 @@ public class StockService {
         List<Stock> kitsForLitter = stockRepository.findAllKitsByLitterId(litterId);
         //TODO: update to include kits that are fostered
         return kitsForLitter;
+    }
+
+    public List<Stock> getKitsAssignedToLitter(Litter litter){
+        if (litter == null || litter.getId() == null) {
+            return Collections.emptyList();
+        }
+        return getKitsAssignedToLitter(litter.getId());
+    }
+
+    public List<Stock> getKitsAssignedToLitter(Integer litterId){
+        if (litterId == null) {
+            return Collections.emptyList();
+        }
+        return stockRepository.findAllKitsAssignedToLitterId(litterId);
+    }
+
+    public List<Stock> getKitsForLitterDisplay(Integer litterId) {
+        if (litterId == null) {
+            return Collections.emptyList();
+        }
+
+        List<Stock> bornInLitter = stockRepository.findAllKitsByLitterId(litterId);
+        List<Stock> fosteredIntoLitter = stockRepository.findAllByFosterLitterId(litterId);
+
+        // Use insertion order so biological kits remain first, then foster-ins.
+        Map<Integer, Stock> deduped = new LinkedHashMap<>();
+        for (Stock stock : bornInLitter) {
+            if (stock != null && stock.getId() != null) {
+                deduped.put(stock.getId(), stock);
+            }
+        }
+        for (Stock stock : fosteredIntoLitter) {
+            if (stock != null && stock.getId() != null) {
+                deduped.put(stock.getId(), stock);
+            }
+        }
+        return new ArrayList<>(deduped.values());
+    }
+
+    public Long getKitsAssignedCountForLitter(Integer litterId){
+        if (litterId == null) {
+            return 0L;
+        }
+        Long count = stockRepository.countAllKitsAssignedToLitterId(litterId);
+        return count == null ? 0L : count;
     }
 
     public List<Stock> getKitsForParent(Stock stock){

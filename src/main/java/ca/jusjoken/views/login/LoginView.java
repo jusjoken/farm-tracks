@@ -4,6 +4,7 @@
  */
 package ca.jusjoken.views.login;
 
+import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.html.Main;
 import com.vaadin.flow.component.login.LoginForm;
 import com.vaadin.flow.component.notification.Notification;
@@ -42,6 +43,35 @@ public class LoginView extends Main implements BeforeEnterObserver {
         add(layout);
         setSizeFull();
        
+    }
+
+    @Override
+    protected void onAttach(AttachEvent attachEvent) {
+        super.onAttach(attachEvent);
+        // Unauthenticated users do not have saved UI settings yet; follow system preference,
+        // and keep following it if the OS theme changes while login is open.
+        attachEvent.getUI().getPage().executeJs(
+            "const root = document.documentElement;"
+            + "const attr = 'theme';"
+            + "const apply = (isDark) => {"
+            + "  const tokens = (root.getAttribute(attr) || '')"
+            + "    .split(/\\s+/)"
+            + "    .filter(Boolean)"
+            + "    .filter(token => token !== 'dark');"
+            + "  if (isDark) { tokens.push('dark'); }"
+            + "  if (tokens.length) { root.setAttribute(attr, tokens.join(' ')); }"
+            + "  else { root.removeAttribute(attr); }"
+            + "};"
+            + "if (window.__farmTracksLoginMql && window.__farmTracksLoginThemeHandler) {"
+            + "  window.__farmTracksLoginMql.removeEventListener('change', window.__farmTracksLoginThemeHandler);"
+            + "}"
+            + "const mql = window.matchMedia('(prefers-color-scheme: dark)');"
+            + "const handler = (event) => apply(event.matches);"
+            + "apply(mql.matches);"
+            + "mql.addEventListener('change', handler);"
+            + "window.__farmTracksLoginMql = mql;"
+            + "window.__farmTracksLoginThemeHandler = handler;"
+        );
     }
 
     @Override

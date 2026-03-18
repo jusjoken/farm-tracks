@@ -434,11 +434,21 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     }
 
     private void applySavedColorScheme(UI ui) {
-        if (ui == null || !authContext.isAuthenticated()) {
+        if (ui == null) {
             return;
         }
-        boolean useDarkMode = userUiSettingsService.getBooleanForCurrentUser(DARK_MODE_PREFERENCE_KEY, false);
-        ui.getPage().setColorScheme(useDarkMode ? Value.DARK : Value.LIGHT);
+
+        if (authContext.isAuthenticated()) {
+            boolean useDarkMode = userUiSettingsService.getBooleanForCurrentUser(DARK_MODE_PREFERENCE_KEY, false);
+            ui.getPage().setColorScheme(useDarkMode ? Value.DARK : Value.LIGHT);
+            return;
+        }
+
+        // No user preference is available while anonymous; follow system theme.
+        ui.getPage()
+            .executeJs("return window.matchMedia('(prefers-color-scheme: dark)').matches;")
+            .then(Boolean.class, prefersDark ->
+                ui.getPage().setColorScheme(Boolean.TRUE.equals(prefersDark) ? Value.DARK : Value.LIGHT));
     }
 
     private void saveLastUsedStockSavedQueryId(String queryId) {

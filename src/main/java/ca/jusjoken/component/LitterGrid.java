@@ -2,7 +2,9 @@ package ca.jusjoken.component;
 
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import com.vaadin.flow.component.AttachEvent;
@@ -42,14 +44,15 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     private Integer stockId;
     private StockType stockType;
     private Stock stock;
-    private final StockService stockService;
-    private final LitterService litterService;
-    private final StockTypeService stockTypeService;
-    private final UserUiSettingsService userUiSettingsService;
+    private StockService stockService;
+    private LitterService litterService;
+    private StockTypeService stockTypeService;
+    private UserUiSettingsService userUiSettingsService;
     private boolean mobileDevice = false;
     private static final int MOBILE_BREAKPOINT_PX = 768;   
     private Registration resizeRegistration;
     private String parentNameFilter;
+    private Integer litterIdFilter;
     private LitterDisplayMode litterDisplayMode = LitterDisplayMode.ALL;
     private Grid.Column<Litter> kitsCountColumn;
     private Grid.Column<Litter> survivalRateColumn;
@@ -58,9 +61,10 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     private Grid.Column<Litter> bredColumn;
     private Grid.Column<Litter> bornColumn;
     private Registration sortListenerRegistration;
-    private final TaskEditor taskEditor;
-    private final LitterEditor litterEditor;
+    private TaskEditor taskEditor;
+    private LitterEditor litterEditor;
     private final List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
+    private final Map<Integer, Integer> assignedKitCountsByLitterId = new HashMap<>();
     private Boolean displayAsTile = false;
     private String preferenceScopeKey;
 
@@ -76,17 +80,56 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
     public LitterGrid(Integer stockId) {
         super(Litter.class, false);
-        this.stockService = Registry.getBean(StockService.class);
-        this.litterService = Registry.getBean(LitterService.class);
-        this.stockTypeService = Registry.getBean(StockTypeService.class);
-        this.userUiSettingsService = Registry.getBean(UserUiSettingsService.class);
         this.stockId = stockId;
-        this.taskEditor = new TaskEditor();
-        this.litterEditor = new LitterEditor();
-        this.litterEditor.addListener(this);
+        initializeServicesIfNeeded();
         setStockValues();
         createContextMenu(this);
         createGrid();
+    }
+
+    private boolean initializeServicesIfNeeded() {
+        try {
+            if (stockService == null) {
+                stockService = Registry.getBean(StockService.class);
+            }
+            if (litterService == null) {
+                litterService = Registry.getBean(LitterService.class);
+            }
+            if (stockTypeService == null) {
+                stockTypeService = Registry.getBean(StockTypeService.class);
+            }
+            if (userUiSettingsService == null) {
+                userUiSettingsService = Registry.getBean(UserUiSettingsService.class);
+            }
+            return true;
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    private LitterEditor getOrCreateLitterEditor() {
+        if (litterEditor != null) {
+            return litterEditor;
+        }
+        try {
+            litterEditor = new LitterEditor();
+            litterEditor.addListener(this);
+            return litterEditor;
+        } catch (RuntimeException ex) {
+            return null;
+        }
+    }
+
+    private TaskEditor getOrCreateTaskEditor() {
+        if (taskEditor != null) {
+            return taskEditor;
+        }
+        try {
+            taskEditor = new TaskEditor();
+            return taskEditor;
+        } catch (RuntimeException ex) {
+            return null;
+        }
     }
 
     public void createGrid(){
@@ -112,11 +155,13 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     }
 
     private void configureTileView() {
+        setPartNameGenerator(item -> null);
         addColumn(litterCardRenderer).setKey("name");
     }
 
     private void configureListView() {
         addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
+        setPartNameGenerator(item -> null);
 
         //setHeight("200px");
 
@@ -129,10 +174,13 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
             .setHeader("Born").setSortable(true).setComparator(Litter::getDoB).setResizable(true).setKey("born");
         bredColumn = addColumn(new LocalDateRenderer<>(Litter::getBred,"MM-dd-YYYY"))
             .setHeader("Bred").setSortable(true).setComparator(Litter::getBred).setResizable(true).setKey("bred");
-        kitsCountColumn = addColumn(item -> item.getKitsCount()).setHeader(stockType.getNonBreederName()).setSortable(true).setResizable(true).setKey("kits");
+        String kitsHeader = (stockType != null && stockType.getNonBreederName() != null)
+            ? stockType.getNonBreederName()
+            : "Kits";
+        kitsCountColumn = addColumn(this::getDisplayKitsCount).setHeader(kitsHeader).setSortable(true).setResizable(true).setKey("kits");
         diedKitsCountColumn = addColumn(item -> item.getDiedKitsCount()).setHeader("Died").setSortable(true).setResizable(true).setKey("died");
-        kitsSurvivedCountColumn = addColumn(item -> item.getKitsSurvivedCount()).setHeader("Survived").setSortable(true).setResizable(true).setKey("survived");
-        survivalRateColumn = addColumn(item -> item.getSurvivalRate()).setHeader("Survival Rate").setSortable(true).setResizable(true).setKey("survival");
+        kitsSurvivedCountColumn = addColumn(this::getDisplayKitsSurvivedCount).setHeader("Survived").setSortable(true).setResizable(true).setKey("survived");
+        survivalRateColumn = addColumn(this::getDisplaySurvivalRate).setHeader("Survival Rate").setSortable(true).setResizable(true).setKey("survival");
         Grid.Column<Litter> statusColumn = addComponentColumn(litter -> {
             return litter.getActiveBadge();
         }).setHeader("Status")
@@ -193,10 +241,10 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
         card.addToFooter(litter.getActiveBadge());
 
-        card.addToFooter(UIUtilities.createBadge("Kits: ",litter.getKitsCount().toString(), BadgeVariant.CONTRAST));
+        card.addToFooter(UIUtilities.createBadge("Kits: ", String.valueOf(getDisplayKitsCount(litter)), BadgeVariant.CONTRAST));
         card.addToFooter(UIUtilities.createBadge("Died: ",litter.getDiedKitsCount().toString(), BadgeVariant.CONTRAST));
-        card.addToFooter(UIUtilities.createBadge("Survived: ",litter.getKitsSurvivedCount().toString(), BadgeVariant.CONTRAST));
-        card.addToFooter(UIUtilities.createBadge("Rate: ",litter.getSurvivalRate().toString(), BadgeVariant.CONTRAST));
+        card.addToFooter(UIUtilities.createBadge("Survived: ", String.valueOf(getDisplayKitsSurvivedCount(litter)), BadgeVariant.CONTRAST));
+        card.addToFooter(UIUtilities.createBadge("Rate: ", getDisplaySurvivalRate(litter), BadgeVariant.CONTRAST));
 
         setItemDetailsRenderer(new ComponentRenderer<>(item -> {
             return createKitsInLitterLayout(item);
@@ -206,14 +254,18 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     }
 
     private void setStockValues() {
+        if (!initializeServicesIfNeeded()) {
+            stock = null;
+            return;
+        }
         if(stockId != null){
             stock = stockService.findById(stockId);
-            stockType = stock.getStockType();
+            stockType = stock == null ? null : stock.getStockType();
         } else if (stockType != null) {
             stock = null;
         } else {
             stock = null;
-            stockType = stockTypeService.findRabbits();
+            stockType = stockTypeService == null ? null : stockTypeService.findRabbits();
         }
     }
 
@@ -224,6 +276,13 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     }    
 
     private void setLitterDataProvider() {
+        if (!initializeServicesIfNeeded()) {
+            dataProvider = new ListDataProvider<>(new ArrayList<>());
+            setDataProvider(dataProvider);
+            refreshAssignedKitCounts();
+            applyFilters();
+            return;
+        }
         if(stockId != null){
             dataProvider = new ListDataProvider<>(litterService.getLitters(stock));
         } else if (stockType != null) {
@@ -232,6 +291,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
             dataProvider = new ListDataProvider<>(litterService.getAllLitters());
         }
         setDataProvider(dataProvider);
+        refreshAssignedKitCounts();
         applyFilters();
     }
 
@@ -310,12 +370,41 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         applyFilters();
     }
 
+    public void setLitterIdFilter(Integer litterIdFilter) {
+        this.litterIdFilter = litterIdFilter;
+        applyFilters();
+    }
+
+    public void expandFilteredLitterDetails() {
+        if (litterIdFilter == null || dataProvider == null) {
+            return;
+        }
+
+        for (Litter litter : dataProvider.getItems()) {
+            if (litter == null || litter.getId() == null || !litter.getId().equals(litterIdFilter)) {
+                continue;
+            }
+
+            Litter targetLitter = litter;
+            getElement().getNode().runWhenAttached(ui -> ui.beforeClientResponse(this, context -> {
+                dataProvider.refreshAll();
+                setDetailsVisible(targetLitter, true);
+                scrollToItem(targetLitter);
+            }));
+            break;
+        }
+    }
+
     private void applyFilters() {
         if (dataProvider == null) {
             return;
         }
 
         dataProvider.clearFilters();
+
+        if (litterIdFilter != null) {
+            dataProvider.addFilter(litter -> litter != null && litter.getId() != null && litter.getId().equals(litterIdFilter));
+        }
 
         if (parentNameFilter != null && !parentNameFilter.isEmpty()) {
             dataProvider.addFilter(litter -> {
@@ -355,11 +444,11 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
             }
 
             litterCount++;
-            kitsTotal += safeInt(litter.getKitsCount());
+            kitsTotal += getDisplayKitsCount(litter);
             diedTotal += safeInt(litter.getDiedKitsCount());
-            survivedTotal += safeInt(litter.getKitsSurvivedCount());
+            survivedTotal += getDisplayKitsSurvivedCount(litter);
 
-            Double survivalValue = toSurvivalNumber(litter.getSurvivalRate());
+            Double survivalValue = toSurvivalNumber(getDisplaySurvivalRate(litter));
             if (survivalValue != null) {
                 survivalSum += survivalValue;
                 survivalCount++;
@@ -399,7 +488,8 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         }
 
         boolean statusMatch = litterDisplayMode == LitterDisplayMode.ALL || matchesDisplayMode(litter);
-        return parentMatch && statusMatch;
+        boolean litterIdMatch = litterIdFilter == null || (litter != null && litter.getId() != null && litter.getId().equals(litterIdFilter));
+        return parentMatch && statusMatch && litterIdMatch;
     }
 
     private boolean matchesDisplayMode(Litter litter) {
@@ -440,6 +530,48 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
     private int safeInt(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private int getDisplayKitsCount(Litter litter) {
+        if (litter == null) {
+            return 0;
+        }
+        Integer litterId = litter.getId();
+        if (litterId == null) {
+            return safeInt(litter.getKitsCount());
+        }
+        return assignedKitCountsByLitterId.getOrDefault(litterId, safeInt(litter.getKitsCount()));
+    }
+
+    private int getDisplayKitsSurvivedCount(Litter litter) {
+        int kitsCount = getDisplayKitsCount(litter);
+        int diedCount = safeInt(litter == null ? null : litter.getDiedKitsCount());
+        return Math.max(0, kitsCount - diedCount);
+    }
+
+    private String getDisplaySurvivalRate(Litter litter) {
+        int survived = getDisplayKitsSurvivedCount(litter);
+        int died = safeInt(litter == null ? null : litter.getDiedKitsCount());
+        int total = survived + died;
+        if (total <= 0) {
+            return "0%";
+        }
+        double ratio = (double) survived / (double) total;
+        return String.format("%.0f%%", ratio * 100.0);
+    }
+
+    private void refreshAssignedKitCounts() {
+        assignedKitCountsByLitterId.clear();
+        if (dataProvider == null || !initializeServicesIfNeeded() || stockService == null) {
+            return;
+        }
+        for (Litter litter : dataProvider.getItems()) {
+            if (litter == null || litter.getId() == null) {
+                continue;
+            }
+            Long count = stockService.getKitsAssignedCountForLitter(litter.getId());
+            assignedKitCountsByLitterId.put(litter.getId(), count == null ? 0 : count.intValue());
+        }
     }
 
     private Double toSurvivalNumber(Object value) {
@@ -488,7 +620,10 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
                 GridMenuItem<Litter> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));
                 addNewMenu.addMenuItemClickListener(click -> {
                     //open litter edit dialog - to be create yet
-                    litterEditor.dialogOpen(new Litter(), LitterEditor.DialogMode.CREATE, litterEntity.getStockType());
+                    LitterEditor editor = getOrCreateLitterEditor();
+                    if (editor != null) {
+                        editor.dialogOpen(new Litter(), LitterEditor.DialogMode.CREATE, litterEntity.getStockType());
+                    }
                     
                 });
 
@@ -500,7 +635,10 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
                     newTask.setLinkType(Utility.TaskLinkType.LITTER);
                     newTask.setLinkLitterId(litterEntity.getId());
 
-                    taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, litterEntity.getStockType());
+                    TaskEditor editor = getOrCreateTaskEditor();
+                    if (editor != null) {
+                        editor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, litterEntity.getStockType());
+                    }
                     
                 });
                 menu.addSeparator();
@@ -508,7 +646,10 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
                 GridMenuItem<Litter> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
                 editMenu.addMenuItemClickListener(click -> {
                     //open litter edit dialog with the selected litter
-                    litterEditor.dialogOpen(litterEntity, LitterEditor.DialogMode.EDIT, litterEntity.getStockType());
+                    LitterEditor editor = getOrCreateLitterEditor();
+                    if (editor != null) {
+                        editor.dialogOpen(litterEntity, LitterEditor.DialogMode.EDIT, litterEntity.getStockType());
+                    }
                 });
                 menu.addSeparator();
                 GridMenuItem<Litter> deleteMenu = menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
@@ -522,7 +663,9 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
                     confirm.setConfirmText("Yes");
                     confirm.addConfirmListener(event -> {
                         System.out.println("Deleting litter with ID: " + litterEntity.getId());
-                        litterService.deleteById(litterEntity.getId());
+                        if (initializeServicesIfNeeded() && litterService != null) {
+                            litterService.deleteById(litterEntity.getId());
+                        }
                         listRefreshNeeded();
                         confirm.close();
                     });
@@ -559,6 +702,9 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     }
 
     public void loadDisplayAsTilePreference() {
+        if (!initializeServicesIfNeeded() || userUiSettingsService == null) {
+            return;
+        }
         String settingsKey = getDisplayAsTilePreferenceKey();
         if (settingsKey == null) {
             return;
@@ -583,6 +729,9 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     }
 
     private void saveDisplayAsTilePreference() {
+        if (!initializeServicesIfNeeded() || userUiSettingsService == null) {
+            return;
+        }
         String settingsKey = getDisplayAsTilePreferenceKey();
         if (settingsKey == null) {
             return;
@@ -598,6 +747,9 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     }
 
     private void saveSortPreference(List<GridSortOrder<Litter>> sortOrders) {
+        if (!initializeServicesIfNeeded() || userUiSettingsService == null) {
+            return;
+        }
         String settingsKey = getSortPreferenceKey();
         if (settingsKey == null) return;
         if (sortOrders == null || sortOrders.isEmpty()) return;
@@ -613,6 +765,9 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     }
 
     private List<GridSortOrder<Litter>> loadSortPreference() {
+        if (!initializeServicesIfNeeded() || userUiSettingsService == null) {
+            return null;
+        }
         String settingsKey = getSortPreferenceKey();
         if (settingsKey == null) return null;
         Optional<Object> value = userUiSettingsService.getValueForCurrentUser(settingsKey);
