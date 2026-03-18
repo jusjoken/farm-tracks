@@ -135,7 +135,7 @@ public class TaskGrid extends Grid<Task> {
             configureListView();
         }
 
-        setEmptyStateText("No litters available to display");
+        setEmptyStateText("No tasks available to display");
 
 
 

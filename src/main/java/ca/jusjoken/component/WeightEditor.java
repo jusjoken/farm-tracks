@@ -78,7 +78,6 @@ public class WeightEditor {
         dialogCloseButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         dialog.setCloseOnEsc(true);
         dialogCancelButton.addClickListener((e) -> dialogClose());
-        dialogCancelButton.setAutofocus(true);
         dialogCancelButton.setEnabled(true);
 
         dialogOkButton.addClickListener(
@@ -91,7 +90,7 @@ public class WeightEditor {
         dialogOkButton.setDisableOnClick(true);
         dialogOkButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        HorizontalLayout footerLayout = new HorizontalLayout(dialogCancelButton,dialogOkButton);
+        HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton, dialogCancelButton);
 
         // Prevent click shortcut of the OK button from also triggering when another button is focused
         ShortcutRegistration shortcutRegistration = Shortcuts
@@ -105,6 +104,7 @@ public class WeightEditor {
         //one time configuration for any fields
         notes.setLabel("Optional notes:");
         notes.setWidthFull();
+        notes.setAutoselect(true);
         weightInput.setLabel("Weight");
         weightInput.setWidthFull();
         weightInput.addValueChangeListener(event -> {
@@ -175,6 +175,12 @@ public class WeightEditor {
         dialogLayout.add(fieldsLayout);
 
         dialog.open();
+        focusFirstEditableField();
+    }
+
+    private void focusFirstEditableField() {
+        weightInput.focus();
+        weightInput.selectAll();
     }
     
     private void updateAge(){

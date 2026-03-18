@@ -97,7 +97,6 @@ public class PlanEditor {
         dialog.setCloseOnEsc(true);
 
         dialogCancelButton.addClickListener(e -> dialogClose());
-        dialogCancelButton.setAutofocus(true);
         dialogCancelButton.setEnabled(true);
 
         dialogOkButton.addClickListener(e -> dialogSave());
@@ -105,7 +104,7 @@ public class PlanEditor {
         dialogOkButton.setDisableOnClick(true);
         dialogOkButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        HorizontalLayout footerLayout = new HorizontalLayout(dialogCancelButton, dialogOkButton);
+        HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton, dialogCancelButton);
 
         ShortcutRegistration shortcutRegistration = Shortcuts
                 .addShortcutListener(footerLayout, () -> {}, Key.ENTER)
@@ -382,6 +381,21 @@ public class PlanEditor {
         refreshGeneratedTemplateTasks();
         buildDialogLayout();
         dialog.open();
+        focusFirstEditableField();
+    }
+
+    private void focusFirstEditableField() {
+        if (taskLinkTypeSelect.isVisible() && taskLinkTypeSelect.isEnabled() && !taskLinkTypeSelect.isReadOnly()) {
+            taskLinkTypeSelect.focus();
+            return;
+        }
+        if (planTemplateSelect.isVisible() && planTemplateSelect.isEnabled() && !planTemplateSelect.isReadOnly()) {
+            planTemplateSelect.focus();
+            return;
+        }
+        if (startDatePicker.isVisible() && startDatePicker.isEnabled() && !startDatePicker.isReadOnly()) {
+            startDatePicker.focus();
+        }
     }
 
     private void clearAllFields() {

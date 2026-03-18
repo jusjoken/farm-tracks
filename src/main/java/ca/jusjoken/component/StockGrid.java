@@ -79,7 +79,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private final UserUiSettingsService userUiSettingsService;
     private StockSavedQuery currentStockSavedQuery;
     private String currentSearchName;
-    private final DialogCommon dialogCommon;
+    private final StockEditor dialogCommon;
     private final List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
     private final List<SidebarChangedListener> sidebarChangedListeners = new ArrayList<>();
     private final StockStatusHistoryService statusService;
@@ -121,7 +121,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         this.displayAsTile = false;
         this.valueLayout = false;
 
-        this.dialogCommon = new DialogCommon();
+        this.dialogCommon = new StockEditor();
         this.statusEditor = new StatusEditor();
         this.weightEditor = new WeightEditor();
         this.genotypeEditor = new GenotypeEditor();
@@ -346,7 +346,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         avatar.getElement().addEventListener("click", click -> {
             //open image dialog
             dialogCommon.setDialogTitle("Edit Profile Image");
-            dialogCommon.dialogOpen(stock,DialogCommon.DisplayMode.PROFILE_IMAGE);
+            dialogCommon.dialogOpen(stock,StockEditor.DisplayMode.PROFILE_IMAGE);
         }).addEventData("event.stopPropagation()");  
         
         card.addThemeVariants(CardVariant.LUMO_ELEVATED);
@@ -405,7 +405,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         avatar.getElement().addEventListener("click", click -> {
             //open image dialog
             dialogCommon.setDialogTitle("Edit Profile Image");
-            dialogCommon.dialogOpen(stock,DialogCommon.DisplayMode.PROFILE_IMAGE);
+            dialogCommon.dialogOpen(stock,StockEditor.DisplayMode.PROFILE_IMAGE);
         }).addEventData("event.stopPropagation()");  
         
         card.addThemeVariants(CardVariant.LUMO_ELEVATED);
@@ -585,6 +585,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             : stockEntity.getFosterLitter().getId();
 
         Dialog dialog = new Dialog();
+        dialog.setCloseOnEsc(true);
         dialog.setHeaderTitle("Foster Destination");
 
         TextField destinationField = new TextField("Current foster litter");
@@ -889,7 +890,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                     //newStock.setStatusDate(LocalDateTime.now());
                     
                     dialogCommon.setDialogTitle("Create new");
-                    dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
+                    dialogCommon.dialogOpen(newStock,StockEditor.DisplayMode.STOCK_DETAILS);
                     
                 });
 
@@ -910,13 +911,13 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                 editMenu.addMenuItemClickListener(click -> {
                     //open stock edit dialog
                     dialogCommon.setDialogTitle("Edit Stock");
-                    dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.STOCK_DETAILS);
+                    dialogCommon.dialogOpen(stockEntity,StockEditor.DisplayMode.STOCK_DETAILS);
                 });
                 GridMenuItem<Stock> editImageMenu = menu.addItem(new Item("Edit Image", Utility.ICONS.ACTION_EDIT_IMAGE.getIconSource()));
                 editImageMenu.addMenuItemClickListener(click -> {
                     //open image dialog
                     dialogCommon.setDialogTitle("Edit Profile Image");
-                    dialogCommon.dialogOpen(stockEntity,DialogCommon.DisplayMode.PROFILE_IMAGE);
+                    dialogCommon.dialogOpen(stockEntity,StockEditor.DisplayMode.PROFILE_IMAGE);
                 });
                 if(!stockEntity.getStockType().getGenotypes().isEmpty()){
                     GridMenuItem<Stock> editGenotype = menu.addItem(new Item("Edit Genotype", Utility.ICONS.ACTION_PEDIGREE.getIconSource()));

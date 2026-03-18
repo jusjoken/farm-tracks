@@ -35,12 +35,15 @@ public class GenotypeEditor {
     private Stock stockEntity;
     private String dialogTitle = "";
     private VerticalLayout fieldsLayout;
+    private GenotypeSegmentSelect firstSegmentSelect;
 
     private Button dialogOkButton = new Button("OK");
     private Button dialogCancelButton = new Button("Cancel");
     private Button dialogCloseButton = new Button(new Icon("lumo", "cross"));
     
     private VerticalLayout dialogLayout = new VerticalLayout();
+    private boolean persistOnSave = true;
+    private Runnable afterSaveAction;
 
     private List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
 
@@ -61,7 +64,6 @@ public class GenotypeEditor {
         dialogCloseButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         dialog.setCloseOnEsc(true);
         dialogCancelButton.addClickListener((e) -> dialogClose());
-        dialogCancelButton.setAutofocus(true);
         dialogCancelButton.setEnabled(true);
 
         dialogOkButton.addClickListener(
@@ -74,7 +76,7 @@ public class GenotypeEditor {
         dialogOkButton.setDisableOnClick(true);
         dialogOkButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        HorizontalLayout footerLayout = new HorizontalLayout(dialogCancelButton,dialogOkButton);
+        HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton, dialogCancelButton);
 
         // Prevent click shortcut of the OK button from also triggering when another button is focused
         ShortcutRegistration shortcutRegistration = Shortcuts
@@ -91,7 +93,13 @@ public class GenotypeEditor {
     }    
     
     public void dialogOpen(Stock stockEntity){
+        dialogOpen(stockEntity, true, null);
+    }
+
+    public void dialogOpen(Stock stockEntity, boolean persistOnSave, Runnable afterSaveAction){
         this.stockEntity = stockEntity;
+        this.persistOnSave = persistOnSave;
+        this.afterSaveAction = afterSaveAction;
         this.genotypeSegments = stockEntity.getGenoSegments();
         
         dialogOkButton.setEnabled(false);
@@ -112,6 +120,7 @@ public class GenotypeEditor {
 
         fieldsLayout = UIUtilities.getVerticalLayout(false, true, false);
         fieldsLayout.removeAll();
+        firstSegmentSelect = null;
 
         //add the needed fields
 
@@ -127,6 +136,9 @@ public class GenotypeEditor {
                 //System.out.println("GenotypeEditor: valueChanged seg2:" + event.getValue());
                 valuesChanged();
             });
+            if (firstSegmentSelect == null) {
+                firstSegmentSelect = genotypeSelect;
+            }
             fieldsLayout.add(genotypeSelect);
         }
 
@@ -136,6 +148,13 @@ public class GenotypeEditor {
         dialogLayout.add(fieldsLayout);
 
         dialog.open();
+        focusFirstEditableField();
+    }
+
+    private void focusFirstEditableField() {
+        if (firstSegmentSelect != null) {
+            firstSegmentSelect.getSegment1().focus();
+        }
     }
 
     private void valuesChanged(){
@@ -159,8 +178,13 @@ public class GenotypeEditor {
         String newGenotype = String.join(",", allGenoList);
         //System.out.println("dialogSave: saving newGenotype:" + newGenotype);
         stockEntity.setGenotype(newGenotype);
-        stockService.save(stockEntity);
-        notifyRefreshNeeded();
+        if (persistOnSave) {
+            stockService.save(stockEntity);
+            notifyRefreshNeeded();
+        }
+        if (afterSaveAction != null) {
+            afterSaveAction.run();
+        }
         dialogClose();
     }
     

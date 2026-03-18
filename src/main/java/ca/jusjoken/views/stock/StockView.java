@@ -10,13 +10,11 @@ import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.ComponentUtil;
 import com.vaadin.flow.component.DetachEvent;
-import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
-import com.vaadin.flow.component.contextmenu.MenuItem;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.dataview.GridLazyDataView;
@@ -30,7 +28,6 @@ import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout;
 import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout.Orientation;
-import com.vaadin.flow.component.menubar.MenuBar;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -56,7 +53,6 @@ import com.vaadin.flow.theme.lumo.LumoUtility.AlignItems;
 import com.vaadin.flow.theme.lumo.LumoUtility.Border;
 import com.vaadin.flow.theme.lumo.LumoUtility.BorderRadius;
 import com.vaadin.flow.theme.lumo.LumoUtility.Display;
-import com.vaadin.flow.theme.lumo.LumoUtility.Flex;
 import com.vaadin.flow.theme.lumo.LumoUtility.FlexDirection;
 import com.vaadin.flow.theme.lumo.LumoUtility.FontSize;
 import com.vaadin.flow.theme.lumo.LumoUtility.FontWeight;
@@ -69,8 +65,6 @@ import com.vaadin.flow.theme.lumo.LumoUtility.Position;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.ComponentConfirmEvent;
-import ca.jusjoken.component.DialogCommon;
-import ca.jusjoken.component.DialogCommonEvent;
 import ca.jusjoken.component.GenotypeEditor;
 import ca.jusjoken.component.Item;
 import ca.jusjoken.component.Layout;
@@ -81,6 +75,8 @@ import ca.jusjoken.component.PlanEditor;
 import ca.jusjoken.component.SidebarChangedListener;
 import ca.jusjoken.component.StatusEditor;
 import ca.jusjoken.component.StockDetailsFormLayout;
+import ca.jusjoken.component.StockEditor;
+import ca.jusjoken.component.StockEditorEvent;
 import ca.jusjoken.component.StockGrid;
 import ca.jusjoken.component.TaskEditor;
 import ca.jusjoken.component.TaskGrid;
@@ -138,7 +134,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     private Button applyOptionsButton = new Button(FontAwesome.Regular.CHECK_SQUARE.create());
     private Button deleteOptionsButton = new Button(FontAwesome.Regular.TRASH_CAN.create());
     private Button resetOptionsButton = new Button(FontAwesome.Solid.UNDO.create());
-    private final DialogCommon dialogCommon;
+    private final StockEditor dialogCommon;
     private final StatusEditor statusEditor;
     private final WeightEditor weightEditor;
     private final GenotypeEditor genotypeEditor;
@@ -173,7 +169,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         this.weightService = weightService;
         this.taskService = taskService;
         applyDeviceScopedGridPreferenceKeys();
-        this.dialogCommon = new DialogCommon();
+        this.dialogCommon = new StockEditor();
         this.statusEditor = new StatusEditor();
         this.weightEditor = new WeightEditor();
         this.genotypeEditor = new GenotypeEditor();
@@ -317,8 +313,9 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         contextMenuOptionsNote.addClassNames(Padding.Horizontal.LARGE, Padding.Top.SMALL, Padding.Bottom.SMALL);
 
         this.sidebar = new Section(header, createSectionHeader("Filter options", false), filterForm, contextMenuOptionsNote);
+        this.sidebar.addClassName("stock-options-sidebar");
         this.sidebar.addClassNames("backdrop-blur-3xl", "var(--lumo-tint-90pct)", Border.RIGHT,
-                Display.FLEX, FlexDirection.COLUMN, Position.ABSOLUTE, "lg:static", "bottom-1", "top-0",
+            Display.FLEX, FlexDirection.COLUMN, Position.ABSOLUTE, "lg:static", "bottom-0", "top-0",
                 "transition-all", "z-10");
         this.sidebar.setWidth(20, Unit.REM);
         return this.sidebar;
@@ -462,10 +459,12 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
 
     private Component createToolbar() {
         TextField search = new TextField();
-        search.addClassNames(Flex.GROW, MinWidth.NONE, Padding.Vertical.NONE);
+        search.addClassNames(MinWidth.NONE, Padding.Vertical.NONE);
+        search.addClassName("stock-toolbar-search");
         search.setAriaLabel("Search");
         search.setClearButtonVisible(true);
-        search.setMaxWidth(25, Unit.REM);
+        search.setWidthFull();
+        search.getStyle().set("min-width", "0");
         search.setPlaceholder("Search");
         search.setPrefixComponent(LumoIcon.SEARCH.create());
         search.setValueChangeMode(ValueChangeMode.EAGER);
@@ -473,48 +472,37 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
             currentSearchName = event.getValue();
             applyFilters();
         });
-        
-        //try a menubar
-        MenuBar menuBar = new MenuBar();
-        menuBar.setWidthFull();
 
-        //adding a textfield to a menubar is not recommended but seems to work well and on mobile does a good job of bringing up the overflow menu
-        menuBar.addItem(search);
-        
-        //Options button
-        Icon optionsItemIcon = new Icon(FontAwesome.Solid.COG.create().getIcon());
-        optionsItemIcon.getStyle().setWidth("var(--lumo-icon-size-s)");
-        optionsItemIcon.getStyle().setHeight("var(--lumo-icon-size-s)");
-        optionsItemIcon.getStyle().setMarginRight("var(--lumo-space-s)");
-        optionsItemIcon.getStyle().setMarginLeft("var(--lumo-space-s)");
-        MenuItem optionsItem = menuBar.addItem(optionsItemIcon);
-        optionsItem.add(new Text("Options"));
-        optionsItem.addClickListener(e -> toggleSidebar());
+        Button optionsButton = new Button(FontAwesome.Solid.COG.create(), e -> toggleSidebar());
+        optionsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        optionsButton.setAriaLabel("Options");
+        optionsButton.setTooltipText("Options");
 
-        Icon gotoStartIcon = new Icon(FontAwesome.Solid.ANGLE_DOUBLE_UP.create().getIcon());
-        gotoStartIcon.getStyle().setWidth("var(--lumo-icon-size-s)");
-        gotoStartIcon.getStyle().setHeight("var(--lumo-icon-size-s)");
-        gotoStartIcon.getStyle().setMarginRight("var(--lumo-space-s)");
-        gotoStartIcon.getStyle().setMarginLeft("var(--lumo-space-s)");
-        
-        MenuItem gotoStartItem = menuBar.addItem(gotoStartIcon);
-        gotoStartItem.addClickListener(e -> list.scrollToStart());
+        Button gotoStartButton = new Button(FontAwesome.Solid.ANGLE_DOUBLE_UP.create(), e -> list.scrollToStart());
+        gotoStartButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        gotoStartButton.setAriaLabel("Go to top");
+        gotoStartButton.setTooltipText("Go to top");
 
-        Icon gotoEndIcon = new Icon(FontAwesome.Solid.ANGLE_DOUBLE_DOWN.create().getIcon());
-        gotoEndIcon.getStyle().setWidth("var(--lumo-icon-size-s)");
-        gotoEndIcon.getStyle().setHeight("var(--lumo-icon-size-s)");
-        gotoEndIcon.getStyle().setMarginRight("var(--lumo-space-s)");
-        gotoEndIcon.getStyle().setMarginLeft("var(--lumo-space-s)");
-        MenuItem gotoEndItem = menuBar.addItem(gotoEndIcon);
-        gotoEndItem.addClickListener(e -> list.scrollToEnd());
-        
-        MenuItem countLabelItem = menuBar.addItem(countLabel);
-        countLabelItem.setClassName(FontSize.SMALL);
-        
-        Layout toolbar = new Layout(menuBar);
-        toolbar.setAlignItems(Layout.AlignItems.BASELINE);
-        toolbar.addClassNames(Border.BOTTOM, Padding.Horizontal.LARGE, Padding.Vertical.SMALL);
-        toolbar.setGap(Layout.Gap.MEDIUM);
+        Button gotoEndButton = new Button(FontAwesome.Solid.ANGLE_DOUBLE_DOWN.create(), e -> list.scrollToEnd());
+        gotoEndButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        gotoEndButton.setAriaLabel("Go to bottom");
+        gotoEndButton.setTooltipText("Go to bottom");
+
+        countLabel.addClassNames(FontSize.SMALL);
+
+        HorizontalLayout actionRow = new HorizontalLayout(optionsButton, gotoStartButton, gotoEndButton, countLabel);
+        actionRow.setWidthFull();
+        actionRow.setPadding(false);
+        actionRow.setSpacing(true);
+        actionRow.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+        actionRow.addClassName("stock-toolbar-actions");
+
+        Layout toolbar = new Layout(search, actionRow);
+        toolbar.addClassName("stock-toolbar");
+        toolbar.setWidthFull();
+        toolbar.setAlignItems(Layout.AlignItems.STRETCH);
+        toolbar.addClassNames(Border.BOTTOM, Padding.Vertical.SMALL);
+        toolbar.setGap(Layout.Gap.SMALL);
         
         return toolbar;
     }
@@ -704,7 +692,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         List<Tab> tabList = new ArrayList<>();
         tabList.add(tabs.add("Overview", createTabOverview(stock)));
         Component tasksContent = createTabTasks(stock);
-        Tab tasksTab = createTab("Tasks'", TabType.COUNT, String.valueOf(taskGrid.getDisplayedCount()));
+        Tab tasksTab = createTab("Tasks", TabType.COUNT, String.valueOf(taskGrid.getDisplayedCount()));
         bindTasksTabCount(tasksTab, stock.getId());
         tabList.add(tabs.add(tasksTab, tasksContent));
         Component plansContent = createTabPlans(stock);
@@ -714,8 +702,8 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         tabList.add(tabs.add(createTab("Litters", TabType.COUNT, litterService.getLitterCountForParent(stock).toString()), createTabLitters(stock)));
         tabList.add(tabs.add(createTab(stock.getStockType().getNonBreederName(), TabType.COUNT, stockService.getKitCountForParent(stock).toString()),createTabKits(stock)));
         tabList.add(tabs.add(createTab("Notes", TabType.HASDATA, stock.getNotes()),createTabNotes(stock)));
-        tabList.add(tabs.add(createTab("Status'", TabType.NONE, Utility.EMPTY_VALUE),createTabStatuses(stock)));
-        tabList.add(tabs.add(createTab("Weights'", TabType.NONE, Utility.EMPTY_VALUE),createTabWeights(stock)));
+        tabList.add(tabs.add(createTab("Status", TabType.NONE, Utility.EMPTY_VALUE),createTabStatuses(stock)));
+        tabList.add(tabs.add(createTab("Weights", TabType.NONE, Utility.EMPTY_VALUE),createTabWeights(stock)));
 
         tabs.setSelectedIndex(selectedTabIndex);
         
@@ -767,12 +755,12 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
             taskGridCountRegistration = null;
         }
 
-        updateCountTab(tasksTab, "Tasks'", taskGrid.getDisplayedCount());
+        updateCountTab(tasksTab, "Tasks", taskGrid.getDisplayedCount());
         taskGridCountRegistration = taskGrid.addRefreshListener(() -> {
             if (selectedStock == null || !selectedStock.getId().equals(stockId)) {
                 return;
             }
-            updateCountTab(tasksTab, "Tasks'", taskGrid.getDisplayedCount());
+            updateCountTab(tasksTab, "Tasks", taskGrid.getDisplayedCount());
         });
     }
 
@@ -1076,7 +1064,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
                 });
 
 
-        ComponentUtil.addListener(attachEvent.getUI(), DialogCommonEvent.class, event ->{
+        ComponentUtil.addListener(attachEvent.getUI(), StockEditorEvent.class, event ->{
             System.out.println("StockView: onAttach: Dialog Common event called: stock:" + event.getSource().getReturnStock());
             if(event.getSource().getReturnStock()!=null){
                 selectedStock = event.getSource().getReturnStock();

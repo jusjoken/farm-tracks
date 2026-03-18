@@ -24,6 +24,7 @@ import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.theme.lumo.LumoUtility;
@@ -65,12 +66,14 @@ public class StatusEditor {
     
     private final TextArea notes = new TextArea();
     private final DateTimePicker statusDateTime = new DateTimePicker();
+    private final Select<StockStatus> statusSelect = new Select<>();
     private final NativeLabel promptLabel = new NativeLabel();
     private final VerticalLayout dialogLayout = new VerticalLayout();
     private final Span ageAsOf = new Span();
     private final WeightInput preButcherWeight = new WeightInput();
     private final WeightInput butcheredWeight = new WeightInput();
     private final NumberField butcheredValue = UIUtilities.getNumberField("Optional value", Boolean.FALSE, "$");
+    private Runnable afterSaveAction;
 
     private List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
     private StockStatusHistoryService statusService;
@@ -93,7 +96,6 @@ public class StatusEditor {
         dialogCloseButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         dialog.setCloseOnEsc(true);
         dialogCancelButton.addClickListener((e) -> dialogClose());
-        dialogCancelButton.setAutofocus(true);
         dialogCancelButton.setEnabled(true);
 
         dialogOkButton.addClickListener(
@@ -106,7 +108,7 @@ public class StatusEditor {
         dialogOkButton.setDisableOnClick(true);
         dialogOkButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        HorizontalLayout footerLayout = new HorizontalLayout(dialogCancelButton,dialogOkButton);
+        HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton, dialogCancelButton);
 
         // Prevent click shortcut of the OK button from also triggering when another button is focused
         ShortcutRegistration shortcutRegistration = Shortcuts
@@ -121,6 +123,7 @@ public class StatusEditor {
         promptLabel.addClassName(LumoUtility.TextColor.ERROR);
         notes.setLabel("Optional notes:");
         notes.setWidthFull();
+        notes.setAutoselect(true);
         statusDateTime.setLabel("Optional status date/time");
         statusDateTime.setWidthFull();
         statusDateTime.addValueChangeListener(event -> {
@@ -128,6 +131,15 @@ public class StatusEditor {
         });
         //custom js code to force a default time of midnight if only the date is entered
         statusDateTime.getElement().executeJs("this.getElementsByTagName(\"vaadin-date-picker\")[0].addEventListener('change', function(){this.getElementsByTagName(\"vaadin-time-picker\")[0].value='00:00';}.bind(this));");
+
+        statusSelect.setLabel("Status");
+        statusSelect.setWidthFull();
+        statusSelect.setItemLabelGenerator(StockStatus::getLongName);
+        statusSelect.addValueChangeListener(event -> {
+            if (dialogMode == DialogMode.CREATE) {
+                applyStatusSelection(event.getValue(), true);
+            }
+        });
         
         butcheredWeight.setWidthFull();
         butcheredWeight.setLabel("Butchered");
@@ -136,43 +148,51 @@ public class StatusEditor {
         preButcherWeight.setLabel("Pre-butcher");
         preButcherWeight.setHelperText("Optional");
         butcheredValue.setWidthFull();
+        butcheredValue.setAutoselect(true);
 
         
     }    
     
     public void dialogOpen(Stock stockEntity, String stockStatusToEdit){
+        dialogOpen(stockEntity, stockStatusToEdit, null);
+    }
+
+    public void dialogOpen(Stock stockEntity){
+        dialogOpen(stockEntity, (Runnable) null);
+    }
+
+    public void dialogOpen(Stock stockEntity, Runnable afterSaveAction){
+        StockStatusHistory newStatus = new StockStatusHistory();
+        newStatus.setStockId(stockEntity.getId());
+        dialogOpen(stockEntity, null, newStatus, DialogMode.CREATE, afterSaveAction);
+    }
+
+    public void dialogOpen(Stock stockEntity, String stockStatusToEdit, Runnable afterSaveAction){
         StockStatusHistory newStatus = new StockStatusHistory();
         newStatus.setStockId(stockEntity.getId());
         newStatus.setStatusName(stockStatusToEdit);
-        dialogOpen(stockEntity, stockStatusToEdit, newStatus, DialogMode.CREATE);
+        dialogOpen(stockEntity, stockStatusToEdit, newStatus, DialogMode.CREATE, afterSaveAction);
         
     }
     public void dialogOpen(Stock stockEntity, String stockStatusToEdit, StockStatusHistory statusEntity, DialogMode mode){
+        dialogOpen(stockEntity, stockStatusToEdit, statusEntity, mode, null);
+    }
+
+    public void dialogOpen(Stock stockEntity, String stockStatusToEdit, StockStatusHistory statusEntity, DialogMode mode, Runnable afterSaveAction){
         this.stockEntity = stockEntity;
         this.statusEntity = statusEntity;
         dialogMode = mode;
-        //check if the passed status is a valid one for edit
-        isStatusValid = Utility.getInstance().hasStockStatus(stockStatusToEdit);
-        if(isStatusValid) stockStatus = Utility.getInstance().getStockStatus(stockStatusToEdit);
-        if(stockStatus.getPrompt()==null){
-            isCustom = Boolean.TRUE;
-        } 
-        else {
-            isCustom = Boolean.FALSE;
-            promptLabel.setText(String.format(stockStatus.getPrompt(),stockEntity.getDisplayName()));
-        }
-        
-        System.out.println("dialogOpen: name:" + stockEntity.getDisplayName() + " isCustom:" + isCustom + " status:" + stockStatusToEdit + " prompt:" + promptLabel.getText() + " mode:" + mode);
+        this.afterSaveAction = afterSaveAction;
 
-        dialogOkButton.setEnabled(true);
-        if(dialogMode.equals(DialogMode.CREATE)){
-            dialogTitle = stockStatus.getActionName();
-        }else{ //edit
-            dialogTitle = "Edit " + stockStatus.getActionName();
+        StockStatus preselectedStatus = null;
+        if (stockStatusToEdit != null && Utility.getInstance().hasStockStatus(stockStatusToEdit)) {
+            preselectedStatus = Utility.getInstance().getStockStatus(stockStatusToEdit);
         }
+
+        dialogOkButton.setEnabled(false);
         
         dialogLayout.removeAll();
-
+        dialogTitle = dialogMode.equals(DialogMode.EDIT) ? "Edit Status" : "Change Status";
         dialog.setHeaderTitle(dialogTitle);
         dialog.getElement().setAttribute("aria-label", dialogTitle);
         dialog.getHeader().add(dialogCloseButton);
@@ -184,35 +204,30 @@ public class StatusEditor {
         dialogLayout.add(stockEntity.getStockHeader(Boolean.FALSE));
         dialogLayout.add(new Hr());
 
-        //add the needed fields
-        if(isCustom){ //add custom fields based on specific status
-            //butcher is the only custom so handle here
-            VerticalLayout promptLayout = UIUtilities.getVerticalLayout(false, true, false);
-            if(dialogMode.equals(DialogMode.CREATE)){
-                promptLayout.add(preButcherWeight, butcheredWeight, butcheredValue);
-            }else{ //edit
-                promptLayout.add(butcheredValue);
-            }
-            promptLayout.add(notes, statusDateTime, ageAsOf);
-            dialogLayout.add(promptLayout);
-            //likely need to use showItem here for more complex forms
-            //dialogLayout.add(showItem());
-        }else{ //general form using prompt
-            VerticalLayout promptLayout = UIUtilities.getVerticalLayout(false, true, false);
-            promptLayout.add(promptLabel, notes, statusDateTime, ageAsOf);
-            dialogLayout.add(promptLayout);
-        }
-        
-        //set values here
         if(dialogMode.equals(DialogMode.CREATE)){
             notes.setValue("");
             statusDateTime.setValue(null);
-            if(isCustom){
-                preButcherWeight.setValue(stockEntity.getWeight());
-                butcheredWeight.setValue(null);
-                butcheredValue.setValue(stockEntity.getStockValue());
+
+            if (preselectedStatus != null) {
+                applyStatusSelection(preselectedStatus, false);
+            } else {
+                var statuses = Utility.getInstance().getStockStatusList(false);
+                statusSelect.setItems(statuses);
+                dialogLayout.add(statusSelect);
+                stockStatus = null;
+                isStatusValid = Boolean.FALSE;
+                isCustom = Boolean.FALSE;
+                promptLabel.setText("Select a status to continue.");
+                VerticalLayout statusHintLayout = UIUtilities.getVerticalLayout(false, true, false);
+                statusHintLayout.add(promptLabel);
+                dialogLayout.add(statusHintLayout);
             }
         }else{ //edit
+            if (preselectedStatus == null) {
+                dialogClose();
+                return;
+            }
+            applyStatusSelection(preselectedStatus, false);
             if(statusEntity.hasNote()){
                 notes.setValue(statusEntity.getNote());
             }
@@ -227,7 +242,88 @@ public class StatusEditor {
         updateAge();
 
         dialog.open();
+        focusFirstEditableField();
         
+    }
+
+    private void applyStatusSelection(StockStatus selectedStatus, boolean resetCreateValues) {
+        stockStatus = selectedStatus;
+        isStatusValid = stockStatus != null;
+        if (!isStatusValid) {
+            dialogOkButton.setEnabled(false);
+            return;
+        }
+
+        statusEntity.setStatusName(stockStatus.getName());
+        isCustom = stockStatus.getPrompt() == null;
+        if (isCustom) {
+            promptLabel.setText("");
+        } else {
+            promptLabel.setText(String.format(stockStatus.getPrompt(), stockEntity.getDisplayName()));
+        }
+
+        if(dialogMode.equals(DialogMode.CREATE)){
+            dialogTitle = stockStatus.getActionName();
+        }else{
+            dialogTitle = "Edit " + stockStatus.getActionName();
+        }
+        dialog.setHeaderTitle(dialogTitle);
+        dialog.getElement().setAttribute("aria-label", dialogTitle);
+
+        rebuildStatusFields();
+
+        if (dialogMode.equals(DialogMode.CREATE) && resetCreateValues && isCustom) {
+            preButcherWeight.setValue(stockEntity.getWeight());
+            butcheredWeight.setValue(null);
+            butcheredValue.setValue(stockEntity.getStockValue());
+        }
+
+        dialogOkButton.setEnabled(true);
+        updateAge();
+    }
+
+    private void rebuildStatusFields() {
+        VerticalLayout promptLayout = UIUtilities.getVerticalLayout(false, true, false);
+        if (isCustom) {
+            if(dialogMode.equals(DialogMode.CREATE)){
+                promptLayout.add(preButcherWeight, butcheredWeight, butcheredValue);
+            }else{
+                promptLayout.add(butcheredValue);
+            }
+        } else {
+            promptLayout.add(promptLabel);
+        }
+        promptLayout.add(notes, statusDateTime, ageAsOf);
+
+        // Remove existing content below optional status picker and header.
+        while (dialogLayout.getComponentCount() > (dialogMode.equals(DialogMode.CREATE) ? 3 : 2)) {
+            dialogLayout.remove(dialogLayout.getComponentAt(dialogLayout.getComponentCount() - 1));
+        }
+        dialogLayout.add(promptLayout);
+    }
+
+    private void focusFirstEditableField() {
+        if (dialogMode.equals(DialogMode.CREATE) && !isStatusValid) {
+            statusSelect.focus();
+            return;
+        }
+        if (isCustom && dialogMode.equals(DialogMode.CREATE)) {
+            preButcherWeight.focus();
+            preButcherWeight.selectAll();
+            return;
+        }
+        if (isCustom && dialogMode.equals(DialogMode.EDIT)) {
+            butcheredValue.focus();
+            selectNumberFieldValue(butcheredValue);
+            return;
+        }
+        notes.focus();
+    }
+
+    private void selectNumberFieldValue(NumberField field) {
+        field.getElement().executeJs(
+            "const f=this; requestAnimationFrame(() => { const i=f.inputElement; if (i) { i.select(); } });"
+        );
     }
 
     private void updateAge(){
@@ -240,6 +336,9 @@ public class StatusEditor {
     }
 
     private void dialogSave() {
+        if (!isStatusValid || stockStatus == null) {
+            return;
+        }
         if(!notes.isEmpty()) statusEntity.setNote(notes.getValue());
         if(!statusDateTime.isEmpty()) statusEntity.setCustomDate(statusDateTime.getValue());
         if(isCustom){
@@ -260,6 +359,9 @@ public class StatusEditor {
             }
         }
         statusService.save(statusEntity, stockEntity, Boolean.FALSE);
+        if (afterSaveAction != null) {
+            afterSaveAction.run();
+        }
         notifyRefreshNeeded();
         dialogClose();
     }

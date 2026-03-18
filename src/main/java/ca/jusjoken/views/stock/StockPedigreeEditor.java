@@ -88,11 +88,12 @@ import com.vaadin.flow.theme.lumo.LumoUtility.MinWidth;
 import com.vaadin.flow.theme.lumo.LumoUtility.Padding;
 
 import ca.jusjoken.UIUtilities;
-import ca.jusjoken.component.DialogCommon;
 import ca.jusjoken.component.ListRefreshNeededListener;
+import ca.jusjoken.component.StockEditor;
 import ca.jusjoken.component.WeightInput;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.Gender;
+import ca.jusjoken.data.entity.AppSettings;
 import ca.jusjoken.data.entity.Generation;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockType;
@@ -101,7 +102,6 @@ import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.views.MainLayout;
 import jakarta.annotation.security.PermitAll;
-import ca.jusjoken.data.entity.AppSettings;
 
 /**
  *
@@ -138,7 +138,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     private final Logger log = LoggerFactory.getLogger(StockPedigreeEditor.class);
     //all include options
     private final FormLayout settingsForm = new FormLayout();
-    private final DialogCommon dialogCommon;
+    private final StockEditor dialogCommon;
     private final Select<Stock> stockSelect = new Select<>();
     private final Select<StockType> stockTypeChoice = new Select<>();
 
@@ -170,7 +170,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         this.resourcePedigreeTemplate = new ClassPathResource("Pedigree_Template.docx");
         this.resourceGenderMale = new ClassPathResource("/META-INF/resources/images/gender_male.png");
         this.resourceGenderFemale = new ClassPathResource("/META-INF/resources/images/gender_female.png");
-        this.dialogCommon = new DialogCommon();
+        this.dialogCommon = new StockEditor();
 
         setupListeners();
         addClassNames(LumoUtility.Display.FLEX, LumoUtility.Height.FULL, LumoUtility.Overflow.HIDDEN);
@@ -358,7 +358,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
             System.out.println("createParentSelect: edit button clicked:" + click);
             //open stock edit dialog
             dialogCommon.setDialogTitle("Edit Stock");
-            dialogCommon.dialogOpen(item.getStock(),DialogCommon.DisplayMode.STOCK_DETAILS);
+            dialogCommon.dialogOpen(item.getStock(),StockEditor.DisplayMode.STOCK_DETAILS);
         }).addEventData("event.stopPropagation()");
         if(item.getStock().isTemp()){
             editCurrent.setEnabled(false);
@@ -623,7 +623,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
             external.setWeight(0);
             
             dialogCommon.setDialogTitle("Create new");
-            dialogCommon.dialogOpen(external,DialogCommon.DisplayMode.STOCK_DETAILS);
+            dialogCommon.dialogOpen(external,StockEditor.DisplayMode.STOCK_DETAILS);
         });
         parentLayoutV.add(layoutLabel,parentLayout);
         parentLayout.add(parentSelect, removeParent, addParent);
@@ -1146,6 +1146,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     
     private void showPedigreePDF(ByteArrayOutputStream pdfStream){
         Dialog pdfViewerDialog = new Dialog();
+        pdfViewerDialog.setCloseOnEsc(true);
         pdfViewerDialog.setResizable(true);
         pdfViewerDialog.setSizeFull();
         pdfViewerDialog.setHeaderTitle("Pedigree PDF Viewer:" + stock.getDisplayName());

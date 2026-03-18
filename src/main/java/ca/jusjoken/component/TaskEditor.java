@@ -104,7 +104,6 @@ public class TaskEditor {
 
         dialog.setCloseOnEsc(true);
         dialogCancelButton.addClickListener((e) -> dialogClose());
-        dialogCancelButton.setAutofocus(true);
         dialogCancelButton.setEnabled(true);
 
         dialogOkButton.addClickListener(event -> dialogSave());
@@ -119,7 +118,7 @@ public class TaskEditor {
             updateTaskActionVisibility();
         });
 
-        HorizontalLayout footerLayout = new HorizontalLayout(taskActionButton, dialogCancelButton, dialogOkButton);
+        HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton, dialogCancelButton, taskActionButton);
 
         ShortcutRegistration shortcutRegistration = Shortcuts
                 .addShortcutListener(footerLayout, () -> {}, Key.ENTER)
@@ -138,6 +137,7 @@ public class TaskEditor {
         name.setLabel("Name");
         name.setRequired(true);
         name.setWidthFull();
+        name.setAutoselect(true);
 
         date.setLabel("Due Date");
         date.setRequired(true);
@@ -218,6 +218,17 @@ public class TaskEditor {
         updateTaskActionVisibility();
         updateSaveEnabled();
         dialog.open();
+        focusFirstEditableField();
+    }
+
+    private void focusFirstEditableField() {
+        if (type.isVisible() && type.isEnabled() && !type.isReadOnly()) {
+            type.focus();
+            return;
+        }
+        if (name.isVisible() && name.isEnabled() && !name.isReadOnly()) {
+            name.focus();
+        }
     }
 
     private void captureOriginalValues() {

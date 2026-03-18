@@ -101,6 +101,8 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
             configureListView();
         }
 
+        setEmptyStateText("No plans available to display");
+
         setMultiSort(true);
         if (sortListenerRegistration != null) {
             sortListenerRegistration.remove();

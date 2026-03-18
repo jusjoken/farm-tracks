@@ -358,7 +358,8 @@ public class Stock {
 
     public AgeBetween getAge() {
         LocalDate endDate = LocalDate.now();
-        if (getStockStatus().stopsAgeCalculation() && getStatusDate() != null) {
+        StockStatus stockStatus = getStockStatus();
+        if (stockStatus != null && stockStatus.stopsAgeCalculation() && getStatusDate() != null) {
             endDate = getStatusDate().toLocalDate();
         }
         return new AgeBetween(this.doB, endDate);
@@ -448,14 +449,19 @@ public class Stock {
 
     @Access(AccessType.PROPERTY)
     public void setStatus(String status) {
-        if(status==null || status.isEmpty()){
+        if(status==null || status.isBlank()){
             this.status = "active";
+            return;
         }
         this.status = status;
     }
 
     public StockStatus getStockStatus() {
-        return Utility.getInstance().getStockStatus(getStatus());
+        StockStatus stockStatus = Utility.getInstance().getStockStatus(getStatus());
+        if (stockStatus != null) {
+            return stockStatus;
+        }
+        return Utility.getInstance().getStockStatus("active");
     }
 
     public LocalDateTime getStatusDate() {
@@ -962,14 +968,18 @@ public class Stock {
     public List<GenotypeSegment> getGenoSegments(){
         List<GenotypeSegment> genotypeSegments = new ArrayList<>();
         List<GenotypeValuePair> genoPairs = getGenotypeValuePairs();
+        if (stockType == null || stockType.getGenotypeSegments() == null) {
+            return genotypeSegments;
+        }
         Integer counter = 0;
         for(GenotypeSegment typeGenotypeSegment: stockType.getGenotypeSegments()){
             String value1 = "_";
             String value2 = "_";
-            //System.out.println("getGenoSegments: checking: type:" + typeGenotypeSegment.getName() + " counter:" + counter + " for:" + genoPairs.get(counter) + " values:" + typeGenotypeSegment.getValues().toString());
-            if(counter>genoPairs.size()) break;
-            value1 = genoPairs.get(counter).getValue1();
-            value2 = genoPairs.get(counter).getValue2();
+            //System.out.println("getGenoSegments: checking: type:" + typeGenotypeSegment.getName() + " counter:" + counter + " values:" + typeGenotypeSegment.getValues().toString());
+            if(counter < genoPairs.size()) {
+                value1 = genoPairs.get(counter).getValue1();
+                value2 = genoPairs.get(counter).getValue2();
+            }
             genotypeSegments.add(new GenotypeSegment(typeGenotypeSegment.getName(), typeGenotypeSegment.getValues(), new GenotypeValuePair(value1,value2)));
             counter++;
         }
@@ -981,12 +991,16 @@ public class Stock {
     //build a list from the stored genotype string
     public List<GenotypeValuePair> getGenotypeValuePairs(){
         List<GenotypeValuePair> genotypeValuePairs = new ArrayList<>();
+        if (genotype == null || genotype.isBlank()) {
+            return genotypeValuePairs;
+        }
         List<String> genoList = Arrays.asList(genotype.split(","));
         //System.out.println("getGenotypeValuePairs: genoList size:" + genoList.size() + " genotype:" + genotype);
         for(int i = 0; i < genoList.size(); i += 2){
-            //System.out.println("getGenotypeValuePairs: checking i:" + i + " and i+1:" + (i+1));
-            //System.out.println("getGenotypeValuePairs: adding:" + i + " value1:" + genoList.get(i) + " value2:" + genoList.get(i+1));
-            genotypeValuePairs.add(new GenotypeValuePair(genoList.get(i),genoList.get(i+1)));
+            // Guard against malformed odd-length genotype strings.
+            String value1 = genoList.get(i);
+            String value2 = (i + 1 < genoList.size()) ? genoList.get(i + 1) : "_";
+            genotypeValuePairs.add(new GenotypeValuePair(value1, value2));
         }
         return genotypeValuePairs;
     }

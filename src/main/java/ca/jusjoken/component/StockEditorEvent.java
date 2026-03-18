@@ -10,9 +10,9 @@ import com.vaadin.flow.component.ComponentEvent;
  *
  * @author birch
  */
-public class DialogCommonEvent  extends ComponentEvent<DialogCommon>{
+public class StockEditorEvent  extends ComponentEvent<StockEditor>{
     
-    public DialogCommonEvent(DialogCommon source, boolean fromClient) {
+    public StockEditorEvent(StockEditor source, boolean fromClient) {
         super(source, fromClient);
     }
     

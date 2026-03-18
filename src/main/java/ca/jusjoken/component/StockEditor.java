@@ -69,21 +69,24 @@ import com.vaadin.flow.server.streams.InMemoryUploadHandler;
 import com.vaadin.flow.server.streams.UploadHandler;
 
 import ca.jusjoken.UIUtilities;
+import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockWeightHistory;
+import ca.jusjoken.data.service.AppSettingsService;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.ParentIntegerToStockConverter;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StatusHistoryConverter;
 import ca.jusjoken.data.service.StockService;
+import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockWeightHistoryService;
 
 @Tag("dialog-common")
-public class DialogCommon extends Component{
+public class StockEditor extends Component{
 
     public enum DialogMode{
         EDIT, DELETE, VIEW
@@ -97,7 +100,7 @@ public class DialogCommon extends Component{
     }
     //private DisplayMode displayMode = DisplayMode.PROFILE_IMAGE;
 
-    private final Logger log = LoggerFactory.getLogger(DialogCommon.class);
+    private final Logger log = LoggerFactory.getLogger(StockEditor.class);
     private final Dialog dialog = new Dialog();
     private Stock stockEntity;
     private String dialogTitle = "";
@@ -113,6 +116,10 @@ public class DialogCommon extends Component{
     private final Button dialogOkButton = new Button("OK");
     private final Button dialogCancelButton = new Button("Cancel");
     private final Button dialogCloseButton = new Button(new Icon("lumo", "cross"));
+    private final Button fieldGenotypeEditButton = new Button(new Icon(Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
+    private final Button fieldStatusEditButton = new Button(new Icon(Utility.ICONS.ACTION_EDIT.getIconSource()));
+    private final HorizontalLayout fieldGenotypeLayout = new HorizontalLayout();
+    private final HorizontalLayout fieldStatusLayout = new HorizontalLayout();
 
     private Upload dialogUploadComponent;
 
@@ -191,21 +198,25 @@ public class DialogCommon extends Component{
 
     private StockService stockService;
     private LitterService litterService;
+    private AppSettingsService appSettingsService;
     private StockStatusHistoryService statusService;
     private StockWeightHistoryService weightService;
+    private GenotypeEditor genotypeEditor;
+    private StatusEditor statusEditor;
     private DisplayMode openedDisplayMode = DisplayMode.STOCK_DETAILS;
 
     private final List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
 
     //private String profileImagePath;
     
-    public DialogCommon() {
+    public StockEditor() {
         this(DisplayMode.STOCK_DETAILS);
     }
 
-    public DialogCommon(DisplayMode currentDisplayMode) {
+    public StockEditor(DisplayMode currentDisplayMode) {
         this.stockService = Registry.getBean(StockService.class);
         this.litterService = Registry.getBean(LitterService.class);
+        this.appSettingsService = Registry.getBean(AppSettingsService.class);
         this.statusService = Registry.getBean(StockStatusHistoryService.class);
         this.weightService = Registry.getBean(StockWeightHistoryService.class);
         //profileImagePath = System.getenv("PATH_TO_PROFILE_IMAGE");
@@ -284,6 +295,51 @@ public class DialogCommon extends Component{
         fieldRegNo.setWidthFull();
         fieldNotes.setWidthFull();
         fieldValue.setWidthFull();
+
+        fieldPrefix.setAutoselect(true);
+        fieldName.setAutoselect(true);
+        fieldTattoo.setAutoselect(true);
+        fieldColor.setAutoselect(true);
+        fieldBreed.setAutoselect(true);
+        fieldLegs.setAutoselect(true);
+        fieldChampNo.setAutoselect(true);
+        fieldRegNo.setAutoselect(true);
+        fieldGenotype.setAutoselect(true);
+        fieldStatus.setAutoselect(true);
+        fieldNotes.setAutoselect(true);
+        fieldValue.setAutoselect(true);
+
+        fieldGenotypeEditButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON);
+        fieldGenotypeEditButton.getElement().setAttribute("aria-label", "Edit genotype");
+        fieldGenotypeEditButton.setTooltipText("Edit genotype");
+        fieldGenotypeEditButton.addClickListener(event -> openGenotypeEditor());
+
+        fieldGenotypeLayout.setWidthFull();
+        fieldGenotypeLayout.setSpacing(true);
+        fieldGenotypeLayout.setPadding(false);
+        fieldGenotypeLayout.setAlignItems(FlexComponent.Alignment.CENTER);
+        fieldGenotypeLayout.add(fieldGenotype, fieldGenotypeEditButton);
+        fieldGenotypeLayout.expand(fieldGenotype);
+        fieldGenotype.setWidth(null);
+        fieldGenotype.getStyle().set("min-width", "0");
+        fieldGenotype.getStyle().set("flex", "1 1 auto");
+        fieldGenotypeEditButton.getStyle().set("flex-shrink", "0");
+
+        fieldStatusEditButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON);
+        fieldStatusEditButton.getElement().setAttribute("aria-label", "Edit status");
+        fieldStatusEditButton.setTooltipText("Edit status");
+        fieldStatusEditButton.addClickListener(event -> openStatusEditor());
+
+        fieldStatusLayout.setWidthFull();
+        fieldStatusLayout.setSpacing(true);
+        fieldStatusLayout.setPadding(false);
+        fieldStatusLayout.setAlignItems(FlexComponent.Alignment.CENTER);
+        fieldStatusLayout.add(fieldStatus, fieldStatusEditButton);
+        fieldStatusLayout.expand(fieldStatus);
+        fieldStatus.setWidth(null);
+        fieldStatus.getStyle().set("min-width", "0");
+        fieldStatus.getStyle().set("flex", "1 1 auto");
+        fieldStatusEditButton.getStyle().set("flex-shrink", "0");
 
         fieldFather.addCustomValueSetListener(item -> {
             //add the custom value to the list and set as value
@@ -406,6 +462,7 @@ public class DialogCommon extends Component{
         
         if(this.stockEntity.getId()==null){
             isNewStock = Boolean.TRUE;
+            applyDefaultFarmPrefixForNewStock();
         }else isNewStock = Boolean.FALSE;
         
         System.out.println("dialogOpen: external:" + stockEntity.getExternal());
@@ -446,6 +503,33 @@ public class DialogCommon extends Component{
         //dialog.addClassNames("backdrop-blur-none");
 
         dialog.open();
+        focusFirstEditableField(currentDisplayMode);
+    }
+
+    private void applyDefaultFarmPrefixForNewStock() {
+        if (stockEntity == null) {
+            return;
+        }
+        if (stockEntity.getPrefix() != null && !stockEntity.getPrefix().trim().isEmpty()) {
+            return;
+        }
+
+        String farmPrefix = appSettingsService.getAppSettings().getFarmPrefix();
+        if (farmPrefix != null && !farmPrefix.trim().isEmpty()) {
+            stockEntity.setPrefix(farmPrefix.trim());
+        }
+    }
+
+    private void focusFirstEditableField(DisplayMode currentDisplayMode) {
+        if (currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)) {
+            if (fieldPrefix.isVisible() && fieldPrefix.isEnabled() && !fieldPrefix.isReadOnly()) {
+                fieldPrefix.focus();
+                return;
+            }
+            if (fieldName.isVisible() && fieldName.isEnabled() && !fieldName.isReadOnly()) {
+                fieldName.focus();
+            }
+        }
     }
     
     private void validateProfileAvatar(){
@@ -469,7 +553,7 @@ public class DialogCommon extends Component{
                     // Get other information about the file.
                     newData = getResizedImage(data, 600);
                 } catch (Exception ex) {
-                    System.getLogger(DialogCommon.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+                    System.getLogger(StockEditor.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
                 }
                 
                 profileImageData = newData;
@@ -512,7 +596,7 @@ public class DialogCommon extends Component{
                 profileAvatarHasChanges = Boolean.TRUE;
                 validateProfileAvatar();
             } catch (Exception ex) {
-                System.getLogger(DialogCommon.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+                System.getLogger(StockEditor.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
             }
         });
 
@@ -588,6 +672,7 @@ public class DialogCommon extends Component{
     private void openCropDialog(byte[] outputStream, String mimeType) {
       // Set up image crop dialog
       Dialog cropDialog = new Dialog();
+            cropDialog.setCloseOnEsc(true);
       cropDialog.setCloseOnOutsideClick(false);
       cropDialog.setMaxHeight("100%");
       cropDialog.setMaxWidth(cropDialog.getHeight());
@@ -616,7 +701,7 @@ public class DialogCommon extends Component{
           cropDialog.close();
       });
 
-      HorizontalLayout buttonLayout = new HorizontalLayout(cropDialogCancelButton, cropButton);
+    HorizontalLayout buttonLayout = new HorizontalLayout(cropButton, cropDialogCancelButton);
       Div cropDialogLayout = new Div(fieldProfileImageCrop);
       cropDialogLayout.setSizeFull();
       buttonLayout.setWidthFull();
@@ -627,18 +712,18 @@ public class DialogCommon extends Component{
     }  
     
     private byte[] getByteArrayFromImageFile(String filePath){
-        //System.out.println("DialogCommon:getByteArrayFromImageFile:" + filePath);
+        //System.out.println("StockEditor:getByteArrayFromImageFile:" + filePath);
         BufferedImage image = null;
         try {
             image = ImageIO.read(new File(filePath));
         } catch (IOException ex) {
-            System.getLogger(DialogCommon.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+            System.getLogger(StockEditor.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
         }
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try {
             ImageIO.write(image, "png", baos);
         } catch (IOException ex) {
-            System.getLogger(DialogCommon.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+            System.getLogger(StockEditor.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
         }
         byte[] imageBytes = baos.toByteArray();   
         return imageBytes;
@@ -698,13 +783,13 @@ public class DialogCommon extends Component{
             stockFormLayout.addFormItem(fieldWeight,"Weight");
             stockFormLayout.addFormItem(fieldFather,"Father");
             stockFormLayout.addFormItem(fieldMother,"Mother");
-            stockFormLayout.addFormItem(fieldGenotype,"Genotype");
+            stockFormLayout.addFormItem(fieldGenotypeLayout,"Genotype");
             stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
             stockFormLayout.addFormItem(fieldLegs,"Legs");
             stockFormLayout.addFormItem(fieldChampNo,"Championship Number");
             stockFormLayout.addFormItem(fieldRegNo,"Registration Number");
             stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
-            fieldStatusFormItem = stockFormLayout.addFormItem(fieldStatus,"Status");
+            fieldStatusFormItem = stockFormLayout.addFormItem(fieldStatusLayout,"Status");
             stockFormLayout.getElement().appendChild(ElementFactory.createBr()); // row break
             fieldAquiredFormItem = stockFormLayout.addFormItem(fieldAquiredDate,"Aquired");
             stockFormLayout.addFormItem(fieldBornDate,"Born");
@@ -753,6 +838,15 @@ public class DialogCommon extends Component{
             }else{
                 this.stockEntity = stockService.findById(currentStock.getId());
             }
+
+            boolean hasGenotypeConfig = this.stockEntity.getStockType() != null
+                    && !this.stockEntity.getStockType().getGenotypes().isEmpty();
+            fieldGenotypeEditButton.setEnabled(hasGenotypeConfig);
+            fieldGenotypeEditButton.setVisible(hasGenotypeConfig);
+
+                boolean canEditStatus = this.stockEntity.getId() != null;
+                fieldStatusEditButton.setEnabled(canEditStatus);
+                fieldStatusEditButton.setVisible(canEditStatus);
 
             System.out.println("setValues: currentStock: fatherid:" + currentStock.getFatherId());
             System.out.println("setValues: stockEntity: fatherid:" + stockEntity.getFatherId());
@@ -823,6 +917,59 @@ public class DialogCommon extends Component{
 
     public void addListener(ListRefreshNeededListener listener){
         listRefreshNeededListeners.add(listener);
+    }
+
+    private GenotypeEditor getGenotypeEditor() {
+        if (genotypeEditor == null) {
+            genotypeEditor = new GenotypeEditor();
+        }
+        return genotypeEditor;
+    }
+
+    private StatusEditor getStatusEditor() {
+        if (statusEditor == null) {
+            statusEditor = new StatusEditor();
+        }
+        return statusEditor;
+    }
+
+    private void openGenotypeEditor() {
+        if (stockEntity == null || stockEntity.getStockType() == null || stockEntity.getStockType().getGenotypes().isEmpty()) {
+            return;
+        }
+        getGenotypeEditor().dialogOpen(stockEntity, false, this::syncGenotypeFieldFromStock);
+    }
+
+    private void syncGenotypeFieldFromStock() {
+        if (stockEntity == null) {
+            return;
+        }
+        String genotypeValue = stockEntity.getGenotype() == null ? "" : stockEntity.getGenotype();
+        fieldGenotype.setValue(genotypeValue);
+        fieldGenotype.setTooltipText(genotypeValue);
+    }
+
+    private void openStatusEditor() {
+        if (stockEntity == null || stockEntity.getId() == null) {
+            return;
+        }
+        getStatusEditor().dialogOpen(stockEntity, this::syncStatusFieldsFromStock);
+    }
+
+    private void syncStatusFieldsFromStock() {
+        if (stockEntity == null) {
+            return;
+        }
+
+        String statusName = stockEntity.getStatus();
+        String statusDisplay = statusName;
+        if (statusName != null && Utility.getInstance().hasStockStatus(statusName)) {
+            StockStatus status = Utility.getInstance().getStockStatus(statusName);
+            statusDisplay = status != null ? status.getLongName() : statusName;
+        }
+        fieldStatus.setValue(statusDisplay == null ? "" : statusDisplay);
+
+        fieldValue.setValue(stockEntity.getStockValue());
     }
 
     private void notifyRefreshNeeded(){

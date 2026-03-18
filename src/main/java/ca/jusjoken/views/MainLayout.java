@@ -28,7 +28,6 @@ import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
 import com.vaadin.flow.router.AfterNavigationEvent;
 import com.vaadin.flow.router.AfterNavigationObserver;
-import com.vaadin.flow.router.Layout;
 import com.vaadin.flow.server.auth.AccessAnnotationChecker;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 import com.vaadin.flow.server.menu.MenuConfiguration;
@@ -40,10 +39,10 @@ import com.vaadin.flow.theme.lumo.LumoUtility;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.ComponentConfirmEvent;
-import ca.jusjoken.component.DialogCommon;
-import ca.jusjoken.component.DialogCommonEvent;
 import ca.jusjoken.component.ListRefreshNeededListener;
 import ca.jusjoken.component.PlanEditor;
+import ca.jusjoken.component.StockEditor;
+import ca.jusjoken.component.StockEditorEvent;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.PlanTemplate;
 import ca.jusjoken.data.entity.Stock;
@@ -67,7 +66,6 @@ import ca.jusjoken.views.utility.UserManagementView;
 /**
  * The main view is a top-level placeholder for other views.
  */
-@Layout
 @AnonymousAllowed
 public class MainLayout extends AppLayout implements ListRefreshNeededListener, AfterNavigationObserver {
     
@@ -84,7 +82,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     private String displayName;
     private final SideNav nav = new SideNav();
     private final AccessAnnotationChecker accessChecker;
-    private final DialogCommon dialogCommon;
+    private final StockEditor dialogCommon;
     private final PlanEditor planEditor;
 
     private H1 viewTitle;
@@ -99,7 +97,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         this.userUiSettingsService = Registry.getBean(UserUiSettingsService.class);
         this.authContext = authContext;
         this.accessChecker = accessChecker;
-        this.dialogCommon = new DialogCommon();
+        this.dialogCommon = new StockEditor();
         this.planEditor = new PlanEditor();
         setupListeners();
         
@@ -219,7 +217,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
                 newStock.setWeight(0);
 
                 dialogCommon.setDialogTitle("Create new " + type.getNameSingular());
-                dialogCommon.dialogOpen(newStock,DialogCommon.DisplayMode.STOCK_DETAILS);
+                dialogCommon.dialogOpen(newStock,StockEditor.DisplayMode.STOCK_DETAILS);
             });
         }
 
@@ -407,7 +405,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         System.out.println("MainLayout: listRefreshNeeded");
         if(dialogCommon.getReturnStock()!=null){
             UIUtilities.showNotification("New " + dialogCommon.getReturnStock().getStockType().getNameSingular()+ " created.");
-            ComponentUtil.fireEvent(UI.getCurrent(), new DialogCommonEvent(dialogCommon, false));
+            ComponentUtil.fireEvent(UI.getCurrent(), new StockEditorEvent(dialogCommon, false));
         }
     }
 

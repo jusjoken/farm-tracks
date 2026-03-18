@@ -15,7 +15,6 @@ import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.data.binder.PropertyId;
-import com.vaadin.flow.dom.ElementFactory;
 
 /**
  *
@@ -56,6 +55,7 @@ public class StockDetailsFormLayout extends FormLayout{
 
     public StockDetailsFormLayout(Stock stock) {
         setSizeFull();
+        setWidthFull();
         this.stockEntity = stock;
         binder = new Binder<Stock>(Stock.class);
         createForm();
@@ -71,7 +71,7 @@ public class StockDetailsFormLayout extends FormLayout{
 
         setResponsiveSteps(
         // Use one column by default
-        new ResponsiveStep("0", 1, FormLayout.ResponsiveStep.LabelsPosition.ASIDE),
+        new ResponsiveStep("0", 1, FormLayout.ResponsiveStep.LabelsPosition.TOP),
         // Use two columns, if the layout's width exceeds 320px
         new ResponsiveStep("600px", 2,FormLayout.ResponsiveStep.LabelsPosition.TOP),
         // Use three columns, if the layout's width exceeds 500px
@@ -89,18 +89,17 @@ public class StockDetailsFormLayout extends FormLayout{
         fieldAquiredDate.setReadOnly(true);
         fieldBornDate.setReadOnly(true);
         fieldFosterName.setReadOnly(true);
+
+        setFieldWidths();
         
         addFormItem(fieldFatherName,"Father");
         addFormItem(fieldMotherName,"Mother");
         addFormItem(fieldGenotype,"Genotype");
-        getElement().appendChild(ElementFactory.createBr()); // row break
         addFormItem(fieldLegs,"Legs");
         addFormItem(fieldChampNo,"Championship Number");
         addFormItem(fieldRegNo,"Registration Number");
-        getElement().appendChild(ElementFactory.createBr()); // row break
         addFormItem(fieldStatus,"Status");
         addFormItem(fieldValue, "Value");
-        getElement().appendChild(ElementFactory.createBr()); // row break
         addFormItem(fieldAquiredDate,"Aquired");
         addFormItem(fieldBornDate,"Born");
         addFormItem(fieldFosterName,"Foster");
@@ -121,6 +120,20 @@ public class StockDetailsFormLayout extends FormLayout{
         binder.setBean(this.stockEntity);
         binder.bindInstanceFields(this);
         
+    }
+
+    private void setFieldWidths() {
+        fieldFatherName.setWidthFull();
+        fieldMotherName.setWidthFull();
+        fieldGenotype.setWidthFull();
+        fieldLegs.setWidthFull();
+        fieldChampNo.setWidthFull();
+        fieldRegNo.setWidthFull();
+        fieldStatus.setWidthFull();
+        fieldValue.setWidthFull();
+        fieldAquiredDate.setWidthFull();
+        fieldBornDate.setWidthFull();
+        fieldFosterName.setWidthFull();
     }
 
     

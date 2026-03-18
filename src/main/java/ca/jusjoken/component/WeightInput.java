@@ -4,20 +4,21 @@
  */
 package ca.jusjoken.component;
 
-import ca.jusjoken.data.Utility;
 import com.vaadin.flow.component.AbstractCompositeField;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.textfield.NumberField;
 
+import ca.jusjoken.data.Utility;
+
 /**
  *
  * @author birch
  */
 public class WeightInput extends AbstractCompositeField<HorizontalLayout,WeightInput, Integer> {
-    private NumberField pounds = new NumberField();
-    private NumberField ounces = new NumberField();
+    private final NumberField pounds = new NumberField();
+    private final NumberField ounces = new NumberField();
     private Integer totalOunces = 0;
 
     public WeightInput() {
@@ -114,6 +115,17 @@ public class WeightInput extends AbstractCompositeField<HorizontalLayout,WeightI
     
     public void setLabel(String label){
         pounds.setLabel(label);
+    }
+
+    public void focus() {
+        pounds.focus();
+    }
+
+    public void selectAll() {
+        // Programmatic focus does not always trigger autoselect, so select explicitly.
+        pounds.getElement().executeJs(
+            "const f=this; requestAnimationFrame(() => { const i=f.inputElement; if (i) { i.select(); } });"
+        );
     }
     
     public String getHelperText(){

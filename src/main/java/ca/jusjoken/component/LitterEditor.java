@@ -113,7 +113,6 @@ public class LitterEditor {
 
         dialog.setCloseOnEsc(true);
 
-        dialogCancelButton.setAutofocus(true);
         dialogCancelButton.addClickListener(e -> dialogClose());
 
         dialogOkButton.setEnabled(false);
@@ -121,7 +120,7 @@ public class LitterEditor {
         dialogOkButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         dialogOkButton.addClickListener(e -> dialogSave());
 
-        HorizontalLayout footerLayout = new HorizontalLayout(dialogCancelButton, dialogOkButton);
+        HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton, dialogCancelButton);
         ShortcutRegistration shortcutRegistration = Shortcuts
                 .addShortcutListener(footerLayout, () -> {}, Key.ENTER)
                 .listenOn(footerLayout);
@@ -148,6 +147,11 @@ public class LitterEditor {
         diedKitsCount.setWidthFull();
         notes.setWidthFull();
         taskPlanSelect.setWidthFull();
+
+        prefix.setAutoselect(true);
+        name.setAutoselect(true);
+        breed.setAutoselect(true);
+        notes.setAutoselect(true);
 
         taskPlanSelect.addValueChangeListener(e -> applyTaskPlanSelection(e.getValue()));
         prefix.addValueChangeListener(e -> updateSaveEnabled());
@@ -224,7 +228,6 @@ public class LitterEditor {
                     .orElse(null);
             taskPlanSelect.setValue(matchingPlan);
             taskPlanSelect.setReadOnly(true);
-            kitsCount.setAutofocus(true);
         }
 
         kitsCount.setReadOnly(dialogMode == DialogMode.EDIT);
@@ -233,6 +236,21 @@ public class LitterEditor {
         dialogLayout.add(new Hr(), taskPlanSelect, prefix, name, breed, bred, doB, father, mother, kitsCount, diedKitsCount, notes);
         updateSaveEnabled();
         dialog.open();
+        focusFirstEditableField();
+    }
+
+    private void focusFirstEditableField() {
+        if (taskPlanSelect.isVisible() && taskPlanSelect.isEnabled() && !taskPlanSelect.isReadOnly()) {
+            taskPlanSelect.focus();
+            return;
+        }
+        if (prefix.isVisible() && prefix.isEnabled() && !prefix.isReadOnly()) {
+            prefix.focus();
+            return;
+        }
+        if (name.isVisible() && name.isEnabled() && !name.isReadOnly()) {
+            name.focus();
+        }
     }
 
     private String getBreedFromTaskPlan(TaskPlan taskPlan) {
