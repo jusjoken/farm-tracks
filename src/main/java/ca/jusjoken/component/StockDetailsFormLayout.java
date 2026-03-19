@@ -9,12 +9,16 @@ import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.service.ParentIntegerToStringConverter;
 import ca.jusjoken.data.service.StatusHistoryConverter;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.data.binder.PropertyId;
+import com.vaadin.flow.data.renderer.TextRenderer;
+import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
+import ca.jusjoken.data.Utility.Gender;
 
 /**
  *
@@ -23,6 +27,25 @@ import com.vaadin.flow.data.binder.PropertyId;
 public class StockDetailsFormLayout extends FormLayout{
     private Stock stockEntity;
     private Binder<Stock> binder;
+
+    @PropertyId("external")
+    private Checkbox fieldExternal = new Checkbox();
+    @PropertyId("breeder")
+    private Checkbox fieldBreeder = new Checkbox();
+    @PropertyId("sex")
+    private RadioButtonGroup<Gender> fieldGender = new RadioButtonGroup<>();
+    @PropertyId("prefix")
+    private TextField fieldPrefix = new TextField();
+    @PropertyId("name")
+    private TextField fieldName = new TextField();
+    @PropertyId("tattoo")
+    private TextField fieldTattoo = new TextField();
+    @PropertyId("color")
+    private TextField fieldColor = new TextField();
+    @PropertyId("breed")
+    private TextField fieldBreed = new TextField();
+    @PropertyId("weight")
+    private TextField fieldWeight = new TextField();
 
     @PropertyId("fatherId")
     private TextField fieldFatherName = new TextField();
@@ -53,6 +76,11 @@ public class StockDetailsFormLayout extends FormLayout{
     @PropertyId("fosterLitterName")
     private TextField fieldFosterName = new TextField();
 
+    @PropertyId("invoiceNumber")
+    private TextField fieldInvoiceNumber = UIUtilities.getTextField();
+
+    private TextField fieldSaleStatus = new TextField();
+
     public StockDetailsFormLayout(Stock stock) {
         setSizeFull();
         setWidthFull();
@@ -78,6 +106,16 @@ public class StockDetailsFormLayout extends FormLayout{
         new ResponsiveStep("900px", 3,FormLayout.ResponsiveStep.LabelsPosition.TOP));        
         removeAll();
 
+        // Set all fields to readonly
+        fieldExternal.setReadOnly(true);
+        fieldBreeder.setReadOnly(true);
+        fieldGender.setReadOnly(true);
+        fieldPrefix.setReadOnly(true);
+        fieldName.setReadOnly(true);
+        fieldTattoo.setReadOnly(true);
+        fieldColor.setReadOnly(true);
+        fieldBreed.setReadOnly(true);
+        fieldWeight.setReadOnly(true);
         fieldFatherName.setReadOnly(true);
         fieldMotherName.setReadOnly(true);
         fieldGenotype.setReadOnly(true);
@@ -89,9 +127,21 @@ public class StockDetailsFormLayout extends FormLayout{
         fieldAquiredDate.setReadOnly(true);
         fieldBornDate.setReadOnly(true);
         fieldFosterName.setReadOnly(true);
+        fieldInvoiceNumber.setReadOnly(true);
+        fieldSaleStatus.setReadOnly(true);
 
         setFieldWidths();
         
+        // Add fields in same order as StockEditor
+        addFormItem(fieldExternal,"External");
+        addFormItem(fieldPrefix,"Prefix");
+        addFormItem(fieldName,"Name");
+        addFormItem(fieldTattoo,"Tattoo/ID");
+        addFormItem(fieldBreed,"Breed");
+        addFormItem(fieldGender,"Gender");
+        addFormItem(fieldBreeder,"Breeder");
+        addFormItem(fieldColor,"Color");
+        addFormItem(fieldWeight,"Weight");
         addFormItem(fieldFatherName,"Father");
         addFormItem(fieldMotherName,"Mother");
         addFormItem(fieldGenotype,"Genotype");
@@ -99,10 +149,12 @@ public class StockDetailsFormLayout extends FormLayout{
         addFormItem(fieldChampNo,"Championship Number");
         addFormItem(fieldRegNo,"Registration Number");
         addFormItem(fieldStatus,"Status");
-        addFormItem(fieldValue, "Value");
-        addFormItem(fieldAquiredDate,"Aquired");
+        addFormItem(fieldAquiredDate,"Acquired");
         addFormItem(fieldBornDate,"Born");
         addFormItem(fieldFosterName,"Foster");
+        addFormItem(fieldSaleStatus, "Sale Status");
+        addFormItem(fieldValue, "Value");
+        addFormItem(fieldInvoiceNumber, "Invoice #");
         
         //set values
         
@@ -116,6 +168,26 @@ public class StockDetailsFormLayout extends FormLayout{
         binder.forField(fieldStatus)
                 .withConverter(new StatusHistoryConverter(this.stockEntity))
                 .bindReadOnly(Stock::getStatus);
+
+        fieldGender.setItems(Gender.MALE, Gender.FEMALE, Gender.NA);
+        fieldGender.setRenderer(new TextRenderer<>(gender -> {
+            if(gender.equals(Gender.MALE)) return stockEntity.getStockType().getMaleName();
+            else if(gender.equals(Gender.FEMALE)) return stockEntity.getStockType().getFemaleName();
+            return "NA";
+        }));
+
+        // Bind weight as string since fieldWeight is now a TextField
+        binder.forField(fieldWeight)
+                .bindReadOnly(stock -> stock.getWeightInLbsOz());
+
+        // Bind sale status
+        binder.forField(fieldSaleStatus)
+                .bindReadOnly(stock -> {
+                    if (stock.getSaleStatus() == null || stock.getSaleStatus().toString().equals("NONE")) {
+                        return "Not for sale";
+                    }
+                    return stock.getSaleStatus().getShortName();
+                });
         
         binder.setBean(this.stockEntity);
         binder.bindInstanceFields(this);
@@ -123,6 +195,15 @@ public class StockDetailsFormLayout extends FormLayout{
     }
 
     private void setFieldWidths() {
+        fieldExternal.setWidthFull();
+        fieldBreeder.setWidthFull();
+        fieldGender.setWidthFull();
+        fieldPrefix.setWidthFull();
+        fieldName.setWidthFull();
+        fieldTattoo.setWidthFull();
+        fieldColor.setWidthFull();
+        fieldBreed.setWidthFull();
+        fieldWeight.setWidthFull();
         fieldFatherName.setWidthFull();
         fieldMotherName.setWidthFull();
         fieldGenotype.setWidthFull();
@@ -134,8 +215,7 @@ public class StockDetailsFormLayout extends FormLayout{
         fieldAquiredDate.setWidthFull();
         fieldBornDate.setWidthFull();
         fieldFosterName.setWidthFull();
+        fieldInvoiceNumber.setWidthFull();
+        fieldSaleStatus.setWidthFull();
     }
-
-    
-    
 }

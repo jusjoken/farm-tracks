@@ -94,8 +94,10 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
         removeAllColumns();
         removeAllHeaderRows();
         removeAllFooterRows();
+        removeClassName("mobile-tile-scroll-fix");
 
         if (displayAsTile) {
+            addClassName("mobile-tile-scroll-fix");
             configureTileView();
         } else {
             configureListView();
@@ -259,6 +261,7 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
 
         Card card = new Card();
         card.setWidthFull();
+        card.getStyle().set("margin", "var(--lumo-space-xs) 0");
         card.addThemeVariants(CardVariant.LUMO_ELEVATED);
 
         // Build header: icon for plan type + display name

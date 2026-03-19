@@ -126,10 +126,12 @@ public class TaskGrid extends Grid<Task> {
         removeAllColumns();
         removeAllHeaderRows();
         removeAllFooterRows();
+        removeClassName("mobile-tile-scroll-fix");
 
         setDataProvider();
         
         if(displayAsTile){
+            addClassName("mobile-tile-scroll-fix");
             configureTileView();
         }else{
             configureListView();
@@ -194,6 +196,7 @@ public class TaskGrid extends Grid<Task> {
     private Component createListItemCard(Task taskEntity) {
         Card card = new Card();
         card.setWidthFull();
+        card.getStyle().set("margin", "var(--lumo-space-xs) 0");
         card.addThemeVariants(CardVariant.LUMO_ELEVATED);
 
         card.setHeader(taskEntity.getHeader());

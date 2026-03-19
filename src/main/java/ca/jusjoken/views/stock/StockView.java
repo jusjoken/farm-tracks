@@ -619,8 +619,11 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         });
 
         VerticalLayout content = new VerticalLayout(createToolbar(), createList());
-        //content.addClassNames(Flex.GROW);
+        content.setPadding(false);
+        content.setSpacing(false);
         content.setSizeFull();
+        content.setFlexGrow(1, list);
+        content.getStyle().set("min-height", "0");
 
         mdLayout.setMaster(content);
         mdLayout.setDetail(null);
@@ -650,7 +653,8 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         });   
         
         list.setWidthFull();
-        list.setHeightFull();
+        list.getStyle().set("flex", "1 1 auto");
+        list.getStyle().set("min-height", "0");
         list.asSingleSelect().addValueChangeListener(event -> {
             Stock selected = event.getValue();
             if(selected==null){
@@ -670,6 +674,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         VerticalLayout content = UIUtilities.getVerticalLayout(true, false, false);
         content.addClassNames(Padding.Top.NONE, Padding.Right.MEDIUM, Padding.Left.MEDIUM,Padding.Bottom.MEDIUM);
         content.setSizeFull();
+        content.getStyle().set("min-height", "0");
         TabSheet tabs = new TabSheet();
         HorizontalLayout header = UIUtilities.getHorizontalLayout(false, true, false);
 
@@ -687,6 +692,9 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         header.addToStart(stock.getnameAndPrefix(false,true, false));
 
         tabs.setWidthFull();
+        tabs.setHeightFull();
+        tabs.getStyle().set("min-height", "0");
+        content.setFlexGrow(1, tabs);
         //tabs.setHeight("200px");
 
         List<Tab> tabList = new ArrayList<>();
@@ -781,12 +789,11 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     private VerticalLayout createTabOverview(Stock stock) {
         VerticalLayout overviewLayout = UIUtilities.getVerticalLayout(Boolean.TRUE, Boolean.TRUE, Boolean.FALSE);
         Scroller scroll = new Scroller(new StockDetailsFormLayout(stock));
-        scroll.setSizeFull();
-        // scroll.setMaxHeight(270,Unit.PIXELS);
+        scroll.setWidthFull();
         if(mobileDevice){
-            scroll.setMaxHeight(500,Unit.PIXELS);
+            scroll.setHeight(500,Unit.PIXELS);
         }else{      
-            scroll.setMaxHeight(270,Unit.PIXELS);
+            scroll.setHeight(270,Unit.PIXELS);
         }
         overviewLayout.setSizeUndefined();
         overviewLayout.add(scroll);
@@ -1130,28 +1137,39 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     }
 
     private Component createTabTasks(Stock stock) {
-        //taskGrid = new TaskGrid(stock.getId());
         taskGrid.setStockId(stock.getId());
         // Use mobile as the default only when no saved preference exists.
         taskGrid.setDisplayAsTile(mobileDevice);
         taskGrid.applyDisplayAsTilePreference();
-        // taskGrid.setHeight("270px");
-        if(mobileDevice){
-            taskGrid.setHeight("500px");
-        }else{      
-            taskGrid.setHeight("270px");
-        }
-        return new LazyComponent(() -> taskGrid);
+        taskGrid.setSizeFull();
+
+        LazyComponent lazyTasksContent = new LazyComponent(() -> {
+            Div container = new Div(taskGrid);
+            // Preserve a single scroller inside the grid instead of the tab body.
+            container.setSizeFull();
+            container.getStyle().set("min-height", "0");
+            container.getStyle().set("overflow", "hidden");
+            return container;
+        });
+        lazyTasksContent.setSizeFull();
+        lazyTasksContent.getStyle().set("min-height", "0");
+        return lazyTasksContent;
     }
 
     private Component createTabPlans(Stock stock) {
         planGrid.setAssociatedStockId(stock.getId());
-        if(mobileDevice){
-            planGrid.setHeight("500px");
-        }else{
-            planGrid.setHeight("270px");
-        }
-        return new LazyComponent(() -> planGrid);
+        planGrid.setSizeFull();
+
+        LazyComponent lazyPlansContent = new LazyComponent(() -> {
+            Div container = new Div(planGrid);
+            container.setSizeFull();
+            container.getStyle().set("min-height", "0");
+            container.getStyle().set("overflow", "hidden");
+            return container;
+        });
+        lazyPlansContent.setSizeFull();
+        lazyPlansContent.getStyle().set("min-height", "0");
+        return lazyPlansContent;
     }
    
     @Override

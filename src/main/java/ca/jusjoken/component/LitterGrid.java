@@ -10,6 +10,7 @@ import java.util.Optional;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
+import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.card.Card;
 import com.vaadin.flow.component.card.CardVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
@@ -19,6 +20,7 @@ import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
@@ -140,8 +142,10 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         removeAllColumns();
         removeAllHeaderRows();
         removeAllFooterRows();
+        removeClassName("mobile-tile-scroll-fix");
         
         if(displayAsTile){
+            addClassName("mobile-tile-scroll-fix");
             configureTileView();
         }else{
             configureListView();
@@ -224,6 +228,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     private Card createListItemCard(Litter litter){
         Card card = new Card();
         card.setWidthFull();
+        card.getStyle().set("margin", "var(--lumo-space-xs) 0");
         card.addThemeVariants(CardVariant.LUMO_ELEVATED);
 
         card.setHeader(litter.getnameAndPrefix(false,true));
@@ -455,6 +460,8 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
             }
         }
 
+        String avgSurvivalText = (survivalCount == 0 ? "-" : String.format("%.1f%%", survivalSum / survivalCount));
+
         if(!displayAsTile){
             if (kitsCountColumn == null || survivalRateColumn == null || diedKitsCountColumn == null
                     || kitsSurvivedCountColumn == null || dataProvider == null || bredColumn == null) {
@@ -468,8 +475,53 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
             survivalRateColumn.setFooter(survivalCount == 0 ? "Avg: -" : String.format("Survival: %.1f%%", survivalSum / survivalCount));
 
         }else{
-            //for tile view put all the stats in the first column as it is the only column
-            getColumnByKey("name").setFooter("Litters: " + litterCount + " | Kits: " + kitsTotal + " | Died: " + diedTotal + " | Survived: " + survivedTotal + " | Survival: " + (survivalCount == 0 ? "-" : String.format("%.1f%%", survivalSum / survivalCount)));
+            Grid.Column<Litter> tileColumn = getColumnByKey("name");
+            if (tileColumn == null) {
+                return;
+            }
+
+            if (mobileDevice) {
+                // Keep the footer to one compact line on mobile and move full stats into a dialog.
+                final String compactFooterText = "Litters: " + litterCount + " | Kits: " + kitsTotal;
+                final String fullStatsText = "Litters: " + litterCount
+                    + "\nKits: " + kitsTotal
+                    + "\nDied: " + diedTotal
+                    + "\nSurvived: " + survivedTotal
+                    + "\nSurvival: " + avgSurvivalText;
+
+                HorizontalLayout compactFooter = UIUtilities.getHorizontalLayoutNoWidthCentered();
+                compactFooter.setWidthFull();
+                compactFooter.setPadding(false);
+                compactFooter.setSpacing(true);
+
+                Span compactSummary = new Span(compactFooterText);
+                compactSummary.getStyle().set("white-space", "nowrap");
+                compactSummary.getStyle().set("overflow", "hidden");
+                compactSummary.getStyle().set("text-overflow", "ellipsis");
+                compactSummary.getStyle().set("flex", "1 1 auto");
+
+                Button moreButton = new Button("More");
+                moreButton.getStyle().set("flex", "0 0 auto");
+                moreButton.addClickListener(click -> {
+                    ConfirmDialog statsDialog = new ConfirmDialog();
+                    statsDialog.setHeader("Litter Totals");
+                    statsDialog.setText(fullStatsText);
+                    statsDialog.setCancelable(false);
+                    statsDialog.setConfirmText("Close");
+                    statsDialog.open();
+                });
+
+                compactFooter.add(compactSummary, moreButton);
+                tileColumn.setFooter(compactFooter);
+            } else {
+                tileColumn.setFooter(
+                    "Litters: " + litterCount
+                    + " | Kits: " + kitsTotal
+                    + " | Died: " + diedTotal
+                    + " | Survived: " + survivedTotal
+                    + " | Survival: " + avgSurvivalText
+                );
+            }
         }
 
 

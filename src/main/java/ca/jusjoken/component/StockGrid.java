@@ -173,10 +173,13 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         removeAllColumns();
         removeAllHeaderRows();
         removeAllFooterRows();
+        removeClassName("mobile-tile-scroll-fix");
 
         if(displayAsTile && valueLayout){
+            addClassName("mobile-tile-scroll-fix");
             configureValueTileView();
         }else if(displayAsTile && !valueLayout){
+            addClassName("mobile-tile-scroll-fix");
             configureTileView();
         }else if(!displayAsTile && valueLayout){
             configureValueView();
@@ -344,6 +347,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private Card createListItemCard(Stock stock){
         Card card = new Card();
         card.setWidthFull();
+        card.getStyle().set("margin", "var(--lumo-space-xs) 0");
         Avatar avatar = stock.getAvatar(false).getAvatar();
         avatar.getElement().addEventListener("click", click -> {
             //open image dialog
@@ -403,6 +407,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private Card createListItemValueCard(Stock stock){
         Card card = new Card();
         card.setWidthFull();
+        card.getStyle().set("margin", "var(--lumo-space-xs) 0");
         Avatar avatar = stock.getAvatar(false).getAvatar();
         avatar.getElement().addEventListener("click", click -> {
             //open image dialog

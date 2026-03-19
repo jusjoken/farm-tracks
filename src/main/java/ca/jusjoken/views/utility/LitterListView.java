@@ -39,6 +39,7 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
         getStyle().set("display", "flex");
         getStyle().set("flex-direction", "column");
         getStyle().set("overflow", "hidden");
+        getStyle().set("min-height", "0");
 
         //add a select component to choose the stocktype for the litter grid and then set the littergrid stocktype based on the selection
         Select<StockType> stockTypeSelect = new Select<>();
@@ -102,7 +103,7 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
         stockTypeSelect.setValue(stockTypeService.findRabbits());
 
         add(litterGrid);
-        litterGrid.setSizeFull();
+        litterGrid.setWidthFull();
         litterGrid.getStyle().set("flex", "1 1 auto");
         litterGrid.getStyle().set("min-height", "0");
 

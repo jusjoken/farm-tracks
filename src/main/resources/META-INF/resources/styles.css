@@ -87,4 +87,9 @@ div.tag-panel-value-responsive {
         bottom: 0;
         z-index: 1000;
     }
+
+    /* Provide a small mobile bottom inset so the final tile can scroll fully into view. */
+    vaadin-grid.mobile-tile-scroll-fix::part(items) {
+        padding-bottom: calc(var(--lumo-space-m) + env(safe-area-inset-bottom));
+    }
 }

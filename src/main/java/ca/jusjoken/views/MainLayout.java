@@ -103,6 +103,8 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         setupListeners();
         
         //StockView.class.addListener(this);
+        getStyle().set("width", "100%");
+        getStyle().set("height", "100%");
         setPrimarySection(Section.DRAWER);
         applySavedColorScheme(UI.getCurrent());
         addDrawerContent();

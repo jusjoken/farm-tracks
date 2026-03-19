@@ -36,6 +36,10 @@ public class PlanListView extends Main {
 
     public PlanListView() {
         setSizeFull();
+        getStyle().set("display", "flex");
+        getStyle().set("flex-direction", "column");
+        getStyle().set("overflow", "hidden");
+        getStyle().set("min-height", "0");
 
         applyDeviceScopedPreferenceKey();
 
@@ -68,12 +72,20 @@ public class PlanListView extends Main {
         rowCount.getStyle().set("white-space", "nowrap");
         filterLayout.add(rowCount);
 
-        VerticalLayout layout = new VerticalLayout(planGrid);
-        add(filterLayout);
-        planGrid.setHeightFull();
-        layout.setSizeFull();
+        VerticalLayout layout = new VerticalLayout();
+        layout.setPadding(false);
+        layout.setSpacing(false);
+        layout.setWidthFull();
         layout.getStyle().set("flex", "1 1 auto");
         layout.getStyle().set("min-height", "0");
+        layout.getStyle().set("overflow", "hidden");
+
+        add(filterLayout);
+        planGrid.setWidthFull();
+        planGrid.getStyle().set("flex", "1 1 auto");
+        planGrid.getStyle().set("min-height", "0");
+        layout.add(planGrid);
+        layout.setFlexGrow(1, planGrid);
 
         add(layout);
         planGrid.refreshGrid();
