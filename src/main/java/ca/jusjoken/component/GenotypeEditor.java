@@ -57,7 +57,7 @@ public class GenotypeEditor {
         dialogLayout.setPadding(false);
         dialogLayout.setMargin(false);
         dialogLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        dialogLayout.getStyle().set("width", "270px").set("max-width", "100%");
+        UIUtilities.applyDialogWidth(dialog, dialogLayout, UIUtilities.DialogWidthPreset.MEDIUM);
 
         dialog.add(dialogLayout);
         dialogCloseButton.addClickListener((e) -> dialogClose());
@@ -77,6 +77,7 @@ public class GenotypeEditor {
         dialogOkButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton, dialogCancelButton);
+        UIUtilities.applyResponsiveDialogFooter(footerLayout);
 
         // Prevent click shortcut of the OK button from also triggering when another button is focused
         ShortcutRegistration shortcutRegistration = Shortcuts
@@ -111,7 +112,7 @@ public class GenotypeEditor {
         dialog.getElement().setAttribute("aria-label", dialogTitle);
         dialog.getHeader().add(dialogCloseButton);
 
-        dialog.setDraggable(true);
+        UIUtilities.applyDialogDraggableForViewport(dialog);
         dialog.setResizable(true);
         
         //add the header

@@ -5,6 +5,7 @@
 package ca.jusjoken.component;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -89,7 +90,7 @@ public class StatusEditor {
         dialogLayout.setSpacing(false);
         dialogLayout.setPadding(false);
         dialogLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        dialogLayout.getStyle().set("width", "270px").set("max-width", "100%");
+        UIUtilities.applyDialogWidth(dialog, dialogLayout, UIUtilities.DialogWidthPreset.LARGE);
 
         dialog.add(dialogLayout);
         dialogCloseButton.addClickListener((e) -> dialogClose());
@@ -109,6 +110,7 @@ public class StatusEditor {
         dialogOkButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton, dialogCancelButton);
+        UIUtilities.applyResponsiveDialogFooter(footerLayout);
 
         // Prevent click shortcut of the OK button from also triggering when another button is focused
         ShortcutRegistration shortcutRegistration = Shortcuts
@@ -167,6 +169,12 @@ public class StatusEditor {
         dialogOpen(stockEntity, null, newStatus, DialogMode.CREATE, afterSaveAction);
     }
 
+    public void dialogOpen(Stock stockEntity, List<String> allowedStatusNames, Runnable afterSaveAction){
+        StockStatusHistory newStatus = new StockStatusHistory();
+        newStatus.setStockId(stockEntity.getId());
+        dialogOpen(stockEntity, null, newStatus, DialogMode.CREATE, afterSaveAction, allowedStatusNames);
+    }
+
     public void dialogOpen(Stock stockEntity, String stockStatusToEdit, Runnable afterSaveAction){
         StockStatusHistory newStatus = new StockStatusHistory();
         newStatus.setStockId(stockEntity.getId());
@@ -179,6 +187,10 @@ public class StatusEditor {
     }
 
     public void dialogOpen(Stock stockEntity, String stockStatusToEdit, StockStatusHistory statusEntity, DialogMode mode, Runnable afterSaveAction){
+        dialogOpen(stockEntity, stockStatusToEdit, statusEntity, mode, afterSaveAction, null);
+    }
+
+    private void dialogOpen(Stock stockEntity, String stockStatusToEdit, StockStatusHistory statusEntity, DialogMode mode, Runnable afterSaveAction, List<String> allowedStatusNames){
         this.stockEntity = stockEntity;
         this.statusEntity = statusEntity;
         dialogMode = mode;
@@ -197,7 +209,7 @@ public class StatusEditor {
         dialog.getElement().setAttribute("aria-label", dialogTitle);
         dialog.getHeader().add(dialogCloseButton);
 
-        dialog.setDraggable(true);
+        UIUtilities.applyDialogDraggableForViewport(dialog);
         dialog.setResizable(true);
         
         //add the header
@@ -207,11 +219,14 @@ public class StatusEditor {
         if(dialogMode.equals(DialogMode.CREATE)){
             notes.setValue("");
             statusDateTime.setValue(null);
+            butcheredValue.setValue(null);
+            preButcherWeight.setValue(null);
+            butcheredWeight.setValue(null);
 
             if (preselectedStatus != null) {
                 applyStatusSelection(preselectedStatus, false);
             } else {
-                var statuses = Utility.getInstance().getStockStatusList(false);
+                var statuses = resolveStatusesForDialog(allowedStatusNames);
                 statusSelect.setItems(statuses);
                 dialogLayout.add(statusSelect);
                 stockStatus = null;
@@ -232,8 +247,10 @@ public class StatusEditor {
                 notes.setValue(statusEntity.getNote());
             }
             statusDateTime.setValue(statusEntity.getSortDate());
-            if(isCustom){
+            if(isCustom || isDepositStatus()){
                 butcheredValue.setValue(stockEntity.getStockValue());
+            }
+            if(isCustom){
                 //weights are not displayed on edit so make sure they have no value
                 preButcherWeight.setValue(null);
                 butcheredWeight.setValue(null);
@@ -246,6 +263,32 @@ public class StatusEditor {
         
     }
 
+    private List<StockStatus> resolveStatusesForDialog(List<String> allowedStatusNames) {
+        Collection<StockStatus> allStatuses = Utility.getInstance().getStockStatusList(false);
+        if (allowedStatusNames == null || allowedStatusNames.isEmpty()) {
+            return new ArrayList<>(allStatuses);
+        }
+
+        List<StockStatus> filtered = new ArrayList<>();
+        String currentStatusName = stockEntity == null ? null : stockEntity.getStatus();
+        for (String statusName : allowedStatusNames) {
+            if (statusName == null || statusName.isBlank()) {
+                continue;
+            }
+            if (currentStatusName != null && currentStatusName.equalsIgnoreCase(statusName)) {
+                continue;
+            }
+            if (!Utility.getInstance().hasStockStatus(statusName)) {
+                continue;
+            }
+            StockStatus status = Utility.getInstance().getStockStatus(statusName);
+            if (status != null) {
+                filtered.add(status);
+            }
+        }
+        return filtered;
+    }
+
     private void applyStatusSelection(StockStatus selectedStatus, boolean resetCreateValues) {
         stockStatus = selectedStatus;
         isStatusValid = stockStatus != null;
@@ -256,6 +299,7 @@ public class StatusEditor {
 
         statusEntity.setStatusName(stockStatus.getName());
         isCustom = stockStatus.getPrompt() == null;
+        butcheredValue.setLabel(isDepositStatus() ? "Optional deposit amount" : "Optional value");
         if (isCustom) {
             promptLabel.setText("");
         } else {
@@ -272,10 +316,16 @@ public class StatusEditor {
 
         rebuildStatusFields();
 
-        if (dialogMode.equals(DialogMode.CREATE) && resetCreateValues && isCustom) {
-            preButcherWeight.setValue(stockEntity.getWeight());
-            butcheredWeight.setValue(null);
-            butcheredValue.setValue(stockEntity.getStockValue());
+        if (dialogMode.equals(DialogMode.CREATE)) {
+            if (isCustom) {
+                preButcherWeight.setValue(stockEntity.getWeight());
+                butcheredWeight.setValue(null);
+                butcheredValue.setValue(stockEntity.getStockValue());
+            } else if (isDepositStatus()) {
+                butcheredValue.setValue(stockEntity.getStockValue());
+            } else if (resetCreateValues) {
+                butcheredValue.setValue(null);
+            }
         }
 
         dialogOkButton.setEnabled(true);
@@ -292,6 +342,9 @@ public class StatusEditor {
             }
         } else {
             promptLayout.add(promptLabel);
+            if (isDepositStatus()) {
+                promptLayout.add(butcheredValue);
+            }
         }
         promptLayout.add(notes, statusDateTime, ageAsOf);
 
@@ -317,7 +370,16 @@ public class StatusEditor {
             selectNumberFieldValue(butcheredValue);
             return;
         }
+        if (isDepositStatus()) {
+            butcheredValue.focus();
+            selectNumberFieldValue(butcheredValue);
+            return;
+        }
         notes.focus();
+    }
+
+    private boolean isDepositStatus() {
+        return stockStatus != null && "deposit".equalsIgnoreCase(stockStatus.getName());
     }
 
     private void selectNumberFieldValue(NumberField field) {
@@ -341,6 +403,9 @@ public class StatusEditor {
         }
         if(!notes.isEmpty()) statusEntity.setNote(notes.getValue());
         if(!statusDateTime.isEmpty()) statusEntity.setCustomDate(statusDateTime.getValue());
+        if (isDepositStatus() && !butcheredValue.isEmpty()) {
+            stockEntity.setStockValue(butcheredValue.getValue());
+        }
         if(isCustom){
             if(!butcheredValue.isEmpty()) stockEntity.setStockValue(butcheredValue.getValue());
             //create a weight for each filled in optional weight

@@ -49,6 +49,7 @@ import com.vaadin.flow.shared.Registration;
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.ColumnSort;
 import ca.jusjoken.data.Utility;
+import ca.jusjoken.data.Utility.StockSaleStatus;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
 import ca.jusjoken.data.entity.StockSavedQuery.StockViewStyle;
@@ -189,24 +190,19 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
     private void configureValueView() {
         setColumnReorderingAllowed(false);
+        setMultiSort(true);
 
         addComponentColumn(stockEntity -> {
             return stockEntity.getnameAndPrefix(false,true, true);
-        }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(false).setKey("name");
+        }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(false).setKey("name")
+          .setComparator(Stock::getDisplayName).setSortable(true);
 
-        addColumn(Stock::getBreed)
-                .setHeader("Breed").setResizable(true).setAutoWidth(true).setKey("breed");
-
-        addColumn(Stock::getStatus)
-                .setHeader("Status").setResizable(true).setAutoWidth(true).setKey("status");
-
-        addComponentColumn(stockEntity -> { return stockEntity.getSaleStatusBadge(false); }).setHeader("Sale Status").setResizable(true).setAutoWidth(true).setKey("salestatus");
+        addComponentColumn(stockEntity -> { return stockEntity.getSaleStatusBadge(false); })
+            .setHeader("Sale Status").setResizable(true).setAutoWidth(true).setKey("salestatus")
+            .setComparator(this::getSaleStatusSortRank).setSortable(true);
 
         addColumn(Stock::getInvoiceNumber)
-                .setHeader("Invoice").setResizable(true).setAutoWidth(true).setKey("invoice");
-
-        addColumn(new LocalDateTimeRenderer<>(Stock::getStatusDate,"MM-dd-YYYY HHmm"))
-                .setHeader("Status Date").setResizable(true).setAutoWidth(true).setKey("statusdate");
+            .setHeader("Invoice").setResizable(true).setAutoWidth(true).setKey("invoice").setSortable(true);
 
         addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00"))
                 .setHeader("Value")
@@ -215,7 +211,10 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                 .setKey("value")
                 .setFooter(getValueFooter())
                 .setTextAlign(ColumnTextAlign.END)
+            .setSortable(true)
                 .setFrozenToEnd(true);
+
+        configureSortPersistenceListener();
 
     }
 
@@ -315,7 +314,11 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         addColumn(Stock::getNotes).setHeader("Notes").setResizable(true).setAutoWidth(true).setKey("notes").setSortable(true);
 
         setMultiSort(true);
+        configureSortPersistenceListener();
 
+    }
+
+    private void configureSortPersistenceListener() {
         if (sortListenerRegistration != null) {
             sortListenerRegistration.remove();
         }
@@ -330,7 +333,6 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                 getDataProvider().refreshAll();
             }
         });
-
     }
 
     private final ComponentRenderer<Component, Stock> stockCardRenderer = new ComponentRenderer<>(
@@ -417,8 +419,6 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         if (fosterPlacement == FosterPlacement.FOSTER_OUT) {
             card.getElement().getStyle().set("opacity", "0.65");
         }
-
-        card.addToFooter(stock.getStatusBadge());
 
         card.addToFooter(stock.getSaleStatusBadge(true));
 
@@ -521,10 +521,30 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             case "weight" -> compareComparable(left == null ? null : left.getWeight(), right == null ? null : right.getWeight());
             case "acquired" -> compareComparable(left == null ? null : left.getAcquired(), right == null ? null : right.getAcquired());
             case "doB" -> compareComparable(left == null ? null : left.getDoB(), right == null ? null : right.getDoB());
+            case "saleStatus" -> Integer.compare(getSaleStatusSortRank(left), getSaleStatusSortRank(right));
+            case "invoiceNumber" -> compareStrings(left == null ? null : left.getInvoiceNumber(), right == null ? null : right.getInvoiceNumber());
             case "stockValue" -> compareComparable(left == null ? null : left.getStockValue(), right == null ? null : right.getStockValue());
             case "notes" -> compareStrings(left == null ? null : left.getNotes(), right == null ? null : right.getNotes());
             case "foster" -> Integer.compare(getFosterSortValue(left), getFosterSortValue(right));
             default -> 0;
+        };
+    }
+
+    private int getSaleStatusSortRank(Stock stockEntity) {
+        if (stockEntity == null) {
+            return Integer.MAX_VALUE;
+        }
+
+        StockSaleStatus saleStatus = stockEntity.getSaleStatus();
+        if (saleStatus == null) {
+            return Integer.MAX_VALUE;
+        }
+
+        return switch (saleStatus) {
+            case NONE -> 0;
+            case LISTED -> 1;
+            case DEPOSIT -> 2;
+            case SOLD -> 3;
         };
     }
 
@@ -933,14 +953,16 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                         //open breed plan dialog
                         planEditor.dialogOpen(Utility.TaskLinkType.BREEDER, stockEntity);
                     });
-                createStatusMenuItem(menu, stockEntity, "sold");
-                createStatusMenuItem(menu, stockEntity, "forsale");
+                menu.addSeparator();
+                createStatusMenuItem(menu, stockEntity, "listed");
                 createStatusMenuItem(menu, stockEntity, "deposit");
+                createStatusMenuItem(menu, stockEntity, "sold");
+                createStatusMenuItem(menu, stockEntity, "active");
+                menu.addSeparator();
                 createStatusMenuItem(menu, stockEntity, "butchered");
                 createStatusMenuItem(menu, stockEntity, "died");
                 createStatusMenuItem(menu, stockEntity, "archived");
                 createStatusMenuItem(menu, stockEntity, "culled");
-                createStatusMenuItem(menu, stockEntity, "active");
                 GridMenuItem<Stock> weighMenu = menu.addItem(new Item("Weigh", Utility.ICONS.ACTION_WEIGH.getIconSource()));
                 weighMenu.addMenuItemClickListener(click -> {
                     weightEditor.dialogOpen(stockEntity);
@@ -998,14 +1020,21 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     }
     
     private void createStatusMenuItem(GridContextMenu<Stock> menu, Stock stockEntity, String statusToEdit){
-        if(!stockEntity.getStatus().equals(statusToEdit)){
-            StockStatus status = Utility.getInstance().getStockStatus(statusToEdit);
-            GridMenuItem<Stock> item = menu.addItem(new Item(status.getActionName(), status.getIcon().getIconSource()));
-            item.addMenuItemClickListener(click -> {
-                //open status editor
-                statusEditor.dialogOpen(stockEntity, statusToEdit);
-            });
+        String currentStatus = stockEntity.getStatus();
+        if (Objects.equals(currentStatus, statusToEdit)) {
+            return;
         }
+
+        StockStatus status = Utility.getInstance().getStockStatus(statusToEdit);
+        if (status == null || status.getActionName() == null || status.getIcon() == null) {
+            return;
+        }
+
+        GridMenuItem<Stock> item = menu.addItem(new Item(status.getActionName(), status.getIcon().getIconSource()));
+        item.addMenuItemClickListener(click -> {
+            //open status editor
+            statusEditor.dialogOpen(stockEntity, statusToEdit);
+        });
     }
     
     private void deleteStockEntityWithConfirm(Stock stockEntity){
@@ -1348,6 +1377,8 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             case "weight" -> "weight";
             case "aquired" -> "acquired";
             case "dob" -> "doB";
+            case "salestatus" -> "saleStatus";
+            case "invoice" -> "invoiceNumber";
             case "value" -> "stockValue";
             case "notes" -> "notes";
             default -> null;
@@ -1373,6 +1404,8 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             case "weight" -> "weight";
             case "acquired" -> "aquired";
             case "doB" -> "dob";
+            case "saleStatus" -> "salestatus";
+            case "invoiceNumber" -> "invoice";
             case "stockValue" -> "value";
             case "notes" -> "notes";
             default -> null;

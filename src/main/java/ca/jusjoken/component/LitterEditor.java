@@ -28,6 +28,7 @@ import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 
+import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
@@ -105,7 +106,7 @@ public class LitterEditor {
         dialogLayout.setSpacing(false);
         dialogLayout.setMargin(false);
         dialogLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        dialogLayout.getStyle().set("width", "270px").set("max-width", "100%");
+        UIUtilities.applyDialogWidth(dialog, dialogLayout, UIUtilities.DialogWidthPreset.WIDE);
         dialog.add(dialogLayout);
 
         dialogCloseButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
@@ -121,6 +122,7 @@ public class LitterEditor {
         dialogOkButton.addClickListener(e -> dialogSave());
 
         HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton, dialogCancelButton);
+        UIUtilities.applyResponsiveDialogFooter(footerLayout);
         ShortcutRegistration shortcutRegistration = Shortcuts
                 .addShortcutListener(footerLayout, () -> {}, Key.ENTER)
                 .listenOn(footerLayout);
@@ -191,7 +193,7 @@ public class LitterEditor {
         dialog.setHeaderTitle(dialogTitle);
         dialog.getElement().setAttribute("aria-label", dialogTitle);
         dialog.getHeader().add(dialogCloseButton);
-        dialog.setDraggable(true);
+        UIUtilities.applyDialogDraggableForViewport(dialog);
         dialog.setResizable(true);
 
         if (currentStockType != null) {

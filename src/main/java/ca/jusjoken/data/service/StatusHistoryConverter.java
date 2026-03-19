@@ -4,11 +4,13 @@
  */
 package ca.jusjoken.data.service;
 
-import ca.jusjoken.data.entity.Stock;
+import java.time.format.DateTimeFormatter;
+
 import com.vaadin.flow.data.binder.Result;
 import com.vaadin.flow.data.binder.ValueContext;
 import com.vaadin.flow.data.converter.Converter;
-import java.time.format.DateTimeFormatter;
+
+import ca.jusjoken.data.entity.Stock;
 
 /**
  *
@@ -29,8 +31,12 @@ public class StatusHistoryConverter implements Converter<String, String>{
 
     @Override
     public String convertToPresentation(String model, ValueContext vc) {
-        if(stock.getStatusDate()==null) return stock.getStatus();
-        return stock.getStatus() + " - " + stock.getStatusDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HHmm"));
+        String displayStatus = stock.getEffectiveStatusKey();
+        if (stock.isDisplayStatusOverriddenBySaleStatus()) {
+            return displayStatus;
+        }
+        if(stock.getStatusDate()==null) return displayStatus;
+        return displayStatus + " - " + stock.getStatusDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HHmm"));
     }
     
 }

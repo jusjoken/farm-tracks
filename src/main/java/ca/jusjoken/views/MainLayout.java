@@ -56,6 +56,7 @@ import ca.jusjoken.data.service.UserUiSettingsService;
 import ca.jusjoken.views.stock.StockPedigreeEditor;
 import ca.jusjoken.views.stock.StockTypeView;
 import ca.jusjoken.views.stock.StockView;
+import ca.jusjoken.views.utility.AppSettingsView;
 import ca.jusjoken.views.utility.LitterListView;
 import ca.jusjoken.views.utility.MaintenanceView;
 import ca.jusjoken.views.utility.PlanListView;
@@ -318,7 +319,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
             sn.setPrefixComponent(FontAwesome.Solid.SITEMAP.create());
         }
 
-        if(accessChecker.hasAccess(MaintenanceView.class) || accessChecker.hasAccess(StockTypeView.class) || accessChecker.hasAccess(PlanTemplateView.class) || accessChecker.hasAccess(UserManagementView.class)){
+        if(accessChecker.hasAccess(MaintenanceView.class) || accessChecker.hasAccess(StockTypeView.class) || accessChecker.hasAccess(PlanTemplateView.class) || accessChecker.hasAccess(UserManagementView.class) || accessChecker.hasAccess(AppSettingsView.class)){
             SideNavItem utilityItem = new SideNavItem("Utility");
             utilityItem.setExpanded(true);
             nav.addItem(utilityItem);
@@ -333,6 +334,9 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
             }
             if(accessChecker.hasAccess(UserManagementView.class)){
                 utilityItem.addItem(new SideNavItem("Users", UserManagementView.class, FontAwesome.Solid.COGS.create()));
+            }
+            if(accessChecker.hasAccess(AppSettingsView.class)){
+                utilityItem.addItem(new SideNavItem("App Settings", AppSettingsView.class, FontAwesome.Solid.COGS.create()));
             }
         }
         

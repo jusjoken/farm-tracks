@@ -4,12 +4,16 @@
  */
 package ca.jusjoken.data.service;
 
-import ca.jusjoken.data.entity.Stock;
-import ca.jusjoken.data.entity.StockStatusHistory;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import ca.jusjoken.data.Utility.StockSaleStatus;
+import ca.jusjoken.data.entity.Stock;
+import ca.jusjoken.data.entity.StockStatusHistory;
 
 /**
  *
@@ -45,7 +49,9 @@ public class StockStatusHistoryService {
         if(!statusList.isEmpty()){
             StockStatusHistory statusHistory = statusList.get(0);
             //System.out.println("saveLatestToStock: latest:" + statusHistory);
-            stock.setStatus(statusHistory.getStatusName());
+            String latestStatusName = statusHistory.getStatusName();
+            stock.setStatus(latestStatusName);
+            syncSaleStatusFromStatusName(stock, latestStatusName);
             /*
             if(fromImport){
                 //skip an existing date from the import to maintain original dates
@@ -60,6 +66,58 @@ public class StockStatusHistoryService {
             //save the stock item
             stockService.save(stock);
         }
+    }
+
+    private void syncSaleStatusFromStatusName(Stock stock, String statusName) {
+        stock.setSaleStatus(mapSaleStatusFromStatusName(statusName));
+    }
+
+    private StockSaleStatus mapSaleStatusFromStatusName(String statusName) {
+        if (statusName == null || statusName.isBlank()) {
+            return StockSaleStatus.NONE;
+        }
+
+        String normalized = statusName.trim().toLowerCase();
+        return switch (normalized) {
+            case "listed", "forsale" -> StockSaleStatus.LISTED;
+            case "deposit" -> StockSaleStatus.DEPOSIT;
+            case "sold" -> StockSaleStatus.SOLD;
+            default -> StockSaleStatus.NONE;
+        };
+    }
+
+    private String mapStatusNameFromSaleStatus(StockSaleStatus saleStatus) {
+        StockSaleStatus normalizedSaleStatus = saleStatus == null ? StockSaleStatus.NONE : saleStatus;
+        return switch (normalizedSaleStatus) {
+            case LISTED -> "listed";
+            case DEPOSIT -> "deposit";
+            case SOLD -> "sold";
+            case NONE -> "active";
+        };
+    }
+
+    public void saveStatusHistoryForSaleStatusChange(Stock stock, StockSaleStatus previousSaleStatus) {
+        if (stock == null || stock.getId() == null) {
+            return;
+        }
+
+        StockSaleStatus oldSaleStatus = previousSaleStatus == null ? StockSaleStatus.NONE : previousSaleStatus;
+        StockSaleStatus currentSaleStatus = stock.getSaleStatus() == null ? StockSaleStatus.NONE : stock.getSaleStatus();
+        if (oldSaleStatus == currentSaleStatus) {
+            return;
+        }
+
+        String mappedStatusName = mapStatusNameFromSaleStatus(currentSaleStatus);
+        List<StockStatusHistory> existingStatusHistory = findByStockId(stock.getId());
+        if (!existingStatusHistory.isEmpty()) {
+            String latestStatusName = existingStatusHistory.get(0).getStatusName();
+            if (latestStatusName != null && latestStatusName.equalsIgnoreCase(mappedStatusName)) {
+                saveLatestToStock(stock, Boolean.FALSE);
+                return;
+            }
+        }
+
+        save(new StockStatusHistory(stock.getId(), mappedStatusName, LocalDateTime.now()), stock, Boolean.FALSE);
     }
     
     public StockStatusHistory save(StockStatusHistory statusHistory, Stock stock, Boolean fromImport){

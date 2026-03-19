@@ -58,6 +58,7 @@ import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.component.textfield.TextFieldVariant;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.data.binder.PropertyId;
@@ -71,6 +72,7 @@ import com.vaadin.flow.server.streams.UploadHandler;
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.Gender;
+import ca.jusjoken.data.Utility.StockSaleStatus;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockStatusHistory;
@@ -105,6 +107,7 @@ public class StockEditor extends Component{
     private Stock stockEntity;
     private String dialogTitle = "";
     private Boolean isNewStock = Boolean.FALSE;
+    private StockSaleStatus openedSaleStatus = StockSaleStatus.NONE;
     
     private Integer returnId = null;
     private Stock returnStock;
@@ -118,8 +121,10 @@ public class StockEditor extends Component{
     private final Button dialogCloseButton = new Button(new Icon("lumo", "cross"));
     private final Button fieldGenotypeEditButton = new Button(new Icon(Utility.ICONS.ACTION_PEDIGREE.getIconSource()));
     private final Button fieldStatusEditButton = new Button(new Icon(Utility.ICONS.ACTION_EDIT.getIconSource()));
+    private final Button fieldSaleStatusEditButton = new Button(new Icon(Utility.ICONS.ACTION_EDIT.getIconSource()));
     private final HorizontalLayout fieldGenotypeLayout = new HorizontalLayout();
     private final HorizontalLayout fieldStatusLayout = new HorizontalLayout();
+    private final HorizontalLayout fieldSaleStatusLayout = new HorizontalLayout();
 
     private Upload dialogUploadComponent;
 
@@ -188,7 +193,12 @@ public class StockEditor extends Component{
 
     @PropertyId("stockValue")
     private final NumberField fieldValue = UIUtilities.getNumberField("",Boolean.FALSE,"$");
-    
+
+    @PropertyId("invoiceNumber")
+    private final TextField fieldInvoiceNumber = UIUtilities.getTextField();
+
+    private final TextField fieldSaleStatus = new TextField();
+
     //FormItems that may be hidden
     FormItem fieldFosterFormItem;
     FormItem fieldStatusFormItem;
@@ -230,7 +240,7 @@ public class StockEditor extends Component{
         dialogLayout.setSpacing(false);
         dialogLayout.setPadding(false);
         dialogLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        dialogLayout.getStyle().set("width", "270px").set("max-width", "100%");
+        UIUtilities.applyDialogWidth(dialog, dialogLayout, UIUtilities.DialogWidthPreset.XLARGE);
 
         dialog.add(dialogLayout);
         dialogCloseButton.addClickListener((e) -> dialogClose());
@@ -255,6 +265,7 @@ public class StockEditor extends Component{
         );
 
         HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton,dialogCancelButton,dialogResetButton);
+        UIUtilities.applyResponsiveDialogFooter(footerLayout);
 
         // Prevent click shortcut of the OK button from also triggering when another button is focused
         ShortcutRegistration shortcutRegistration = Shortcuts
@@ -295,6 +306,30 @@ public class StockEditor extends Component{
         fieldRegNo.setWidthFull();
         fieldNotes.setWidthFull();
         fieldValue.setWidthFull();
+        fieldInvoiceNumber.setWidthFull();
+        fieldSaleStatus.setWidthFull();
+
+        fieldSaleStatus.setReadOnly(true);
+
+        fieldValue.setLabel("");
+        fieldInvoiceNumber.setLabel("");
+        fieldValue.removeThemeVariants(TextFieldVariant.LUMO_SMALL);
+        fieldInvoiceNumber.removeThemeVariants(TextFieldVariant.LUMO_SMALL);
+
+        fieldSaleStatusEditButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON);
+        fieldSaleStatusEditButton.getElement().setAttribute("aria-label", "Edit sale status");
+        fieldSaleStatusEditButton.setTooltipText("Edit sale status");
+        fieldSaleStatusEditButton.addClickListener(event -> openSaleStatusEditor());
+
+        fieldSaleStatusLayout.setWidthFull();
+        fieldSaleStatusLayout.setSpacing(true);
+        fieldSaleStatusLayout.setPadding(false);
+        fieldSaleStatusLayout.setAlignItems(FlexComponent.Alignment.CENTER);
+        fieldSaleStatusLayout.add(fieldSaleStatus, fieldSaleStatusEditButton);
+        fieldSaleStatusLayout.expand(fieldSaleStatus);
+        fieldSaleStatus.getStyle().set("min-width", "0");
+        fieldSaleStatus.getStyle().set("flex", "1 1 auto");
+        fieldSaleStatusEditButton.getStyle().set("flex-shrink", "0");
 
         fieldPrefix.setAutoselect(true);
         fieldName.setAutoselect(true);
@@ -308,6 +343,7 @@ public class StockEditor extends Component{
         fieldStatus.setAutoselect(true);
         fieldNotes.setAutoselect(true);
         fieldValue.setAutoselect(true);
+        fieldInvoiceNumber.setAutoselect(true);
 
         fieldGenotypeEditButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON);
         fieldGenotypeEditButton.getElement().setAttribute("aria-label", "Edit genotype");
@@ -427,6 +463,8 @@ public class StockEditor extends Component{
                 }
             }
 
+            saveStatusHistoryForSaleStatusChange();
+
             returnId = this.stockEntity.getId();
             returnStock = this.stockEntity;
             System.out.println("dialogSave: stockEntity after save:" + stockEntity);
@@ -459,6 +497,7 @@ public class StockEditor extends Component{
     public void dialogOpen(Stock stockEntity, DisplayMode currentDisplayMode){
         binder = new Binder<>(Stock.class);
         this.stockEntity = stockEntity;
+        openedSaleStatus = stockEntity.getSaleStatus() == null ? StockSaleStatus.NONE : stockEntity.getSaleStatus();
         
         if(this.stockEntity.getId()==null){
             isNewStock = Boolean.TRUE;
@@ -468,6 +507,11 @@ public class StockEditor extends Component{
         System.out.println("dialogOpen: external:" + stockEntity.getExternal());
         
         openedDisplayMode = currentDisplayMode;
+        if (currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)) {
+            UIUtilities.applyDialogWidth(dialog, dialogLayout, UIUtilities.DialogWidthPreset.COMPACT);
+        } else {
+            UIUtilities.applyDialogWidth(dialog, dialogLayout, UIUtilities.DialogWidthPreset.XLARGE);
+        }
         //set values and visibility for fields
         clearLists();
         dialogLayout.removeAll();
@@ -498,12 +542,16 @@ public class StockEditor extends Component{
         dialog.getElement().setAttribute("aria-label", dialogTitle);
         dialog.getHeader().add(dialogCloseButton);
 
-        dialog.setDraggable(true);
+        UIUtilities.applyDialogDraggableForViewport(dialog);
         dialog.setResizable(true);
         //dialog.addClassNames("backdrop-blur-none");
 
         dialog.open();
         focusFirstEditableField(currentDisplayMode);
+    }
+
+    private void saveStatusHistoryForSaleStatusChange() {
+        statusService.saveStatusHistoryForSaleStatusChange(stockEntity, openedSaleStatus);
     }
 
     private void applyDefaultFarmPrefixForNewStock() {
@@ -760,7 +808,7 @@ public class StockEditor extends Component{
         
         stockFormLayout.setResponsiveSteps(
         // Use one column by default
-        new ResponsiveStep("0", 1, FormLayout.ResponsiveStep.LabelsPosition.ASIDE),
+        new ResponsiveStep("0", 1, FormLayout.ResponsiveStep.LabelsPosition.TOP),
         // Use two columns, if the layout's width exceeds 320px
         new ResponsiveStep("600px", 2,FormLayout.ResponsiveStep.LabelsPosition.TOP),
         // Use three columns, if the layout's width exceeds 500px
@@ -794,7 +842,9 @@ public class StockEditor extends Component{
             fieldAquiredFormItem = stockFormLayout.addFormItem(fieldAquiredDate,"Aquired");
             stockFormLayout.addFormItem(fieldBornDate,"Born");
             fieldFosterFormItem = stockFormLayout.addFormItem(fieldFoster,"Foster");
+            stockFormLayout.addFormItem(fieldSaleStatusLayout, "Sale Status");
             stockFormLayout.addFormItem(fieldValue, "Value");
+            stockFormLayout.addFormItem(fieldInvoiceNumber, "Invoice #");
             stockFormLayout.addFormItem(fieldNotes,"Notes");
             
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
@@ -847,6 +897,8 @@ public class StockEditor extends Component{
                 boolean canEditStatus = this.stockEntity.getId() != null;
                 fieldStatusEditButton.setEnabled(canEditStatus);
                 fieldStatusEditButton.setVisible(canEditStatus);
+                fieldSaleStatusEditButton.setEnabled(canEditStatus);
+                fieldSaleStatusEditButton.setVisible(canEditStatus);
 
             System.out.println("setValues: currentStock: fatherid:" + currentStock.getFatherId());
             System.out.println("setValues: stockEntity: fatherid:" + stockEntity.getFatherId());
@@ -884,6 +936,7 @@ public class StockEditor extends Component{
 
             binder.bindInstanceFields(this);
             binder.readBean(this.stockEntity);
+            syncStatusFieldsFromStock();
             binder.validate(); //force validation so warnings are displayed on form load
 
             binder.addStatusChangeListener(listener -> {
@@ -956,12 +1009,23 @@ public class StockEditor extends Component{
         getStatusEditor().dialogOpen(stockEntity, this::syncStatusFieldsFromStock);
     }
 
+    private void openSaleStatusEditor() {
+        if (stockEntity == null || stockEntity.getId() == null) {
+            return;
+        }
+        List<String> saleStatuses = new ArrayList<>(List.of("listed", "deposit", "sold"));
+        if (stockEntity.getSaleStatus() != StockSaleStatus.NONE) {
+            saleStatuses.add("active");
+        }
+        getStatusEditor().dialogOpen(stockEntity, saleStatuses, this::syncStatusFieldsFromStock);
+    }
+
     private void syncStatusFieldsFromStock() {
         if (stockEntity == null) {
             return;
         }
 
-        String statusName = stockEntity.getStatus();
+        String statusName = stockEntity.getEffectiveStatusKey();
         String statusDisplay = statusName;
         if (statusName != null && Utility.getInstance().hasStockStatus(statusName)) {
             StockStatus status = Utility.getInstance().getStockStatus(statusName);
@@ -970,6 +1034,11 @@ public class StockEditor extends Component{
         fieldStatus.setValue(statusDisplay == null ? "" : statusDisplay);
 
         fieldValue.setValue(stockEntity.getStockValue());
+        fieldInvoiceNumber.setValue(stockEntity.getInvoiceNumber());
+        String saleStatusDisplay = stockEntity.getSaleStatus() == StockSaleStatus.NONE
+            ? "Not for sale"
+            : stockEntity.getSaleStatus().getShortName();
+        fieldSaleStatus.setValue(saleStatusDisplay);
     }
 
     private void notifyRefreshNeeded(){

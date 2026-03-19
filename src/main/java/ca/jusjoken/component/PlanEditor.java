@@ -19,6 +19,7 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
 
+import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.Utility.TaskLinkType;
 import ca.jusjoken.data.entity.Litter;
@@ -88,7 +89,7 @@ public class PlanEditor {
         dialogLayout.setSpacing(false);
         dialogLayout.setPadding(false);
         dialogLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        dialogLayout.getStyle().set("width", "270px").set("max-width", "100%");
+        UIUtilities.applyDialogWidth(dialog, dialogLayout, UIUtilities.DialogWidthPreset.WIDE);
         dialog.add(dialogLayout);
 
         dialogCloseButton.addClickListener(e -> dialogClose());
@@ -105,6 +106,7 @@ public class PlanEditor {
         dialogOkButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton, dialogCancelButton);
+        UIUtilities.applyResponsiveDialogFooter(footerLayout);
 
         ShortcutRegistration shortcutRegistration = Shortcuts
                 .addShortcutListener(footerLayout, () -> {}, Key.ENTER)
@@ -292,7 +294,7 @@ public class PlanEditor {
         dialog.getElement().setAttribute("aria-label", dialogTitle);
         dialog.getHeader().add(dialogCloseButton);
 
-        dialog.setDraggable(true);
+        UIUtilities.applyDialogDraggableForViewport(dialog);
         dialog.setResizable(true);
 
         //add a select field of tasklinktype to select the link type for this editor, and filter the plan templates based on the selected tasklinktype

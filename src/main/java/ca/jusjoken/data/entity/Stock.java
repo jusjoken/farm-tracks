@@ -5,8 +5,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -52,6 +54,18 @@ import jakarta.persistence.Transient;
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 public class Stock {
+
+    private static final Set<String> TERMINAL_STOCK_STATUSES = new HashSet<>(
+        Arrays.asList("inactive", "archived", "butchered", "culled", "died", "sold"));
+
+    private static final Set<String> SALE_STATUS_LISTED_NAMES = new HashSet<>(
+        Arrays.asList("listed", "forsale"));
+
+    private static final Set<String> IMPORT_STATUS_LISTED_NAMES = new HashSet<>(
+        Arrays.asList("listed", "forsale", "for sale", "for-sale"));
+
+    private static final Set<String> IMPORT_STATUS_DEPOSIT_NAMES = new HashSet<>(
+        Arrays.asList("deposit", "deposit taken", "sold w deposit", "sold with deposit"));
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -359,7 +373,9 @@ public class Stock {
     public AgeBetween getAge() {
         LocalDate endDate = LocalDate.now();
         StockStatus stockStatus = getStockStatus();
-        if (stockStatus != null && stockStatus.stopsAgeCalculation() && getStatusDate() != null) {
+        boolean stopAgeFromStatus = stockStatus != null && stockStatus.stopsAgeCalculation();
+        boolean stopAgeFromSaleStatus = getSaleStatus() == StockSaleStatus.SOLD;
+        if ((stopAgeFromStatus || stopAgeFromSaleStatus) && getStatusDate() != null) {
             endDate = getStatusDate().toLocalDate();
         }
         return new AgeBetween(this.doB, endDate);
@@ -439,12 +455,30 @@ public class Stock {
         return status;
     }
 
-    public Badge getStatusBadge() {
-        String status = getStatus();
-        if(status==null || status.isEmpty()){
-            status = "active";
+    @Transient
+    public String getEffectiveStatusKey() {
+        if (getSaleStatus() == StockSaleStatus.SOLD) {
+            return "sold";
         }
-        return UIUtilities.createBadge(null,status, BadgeVariant.SUCCESS);
+
+        String currentStatus = getStatus();
+        if (currentStatus == null || currentStatus.isBlank()) {
+            return "active";
+        }
+        return currentStatus;
+    }
+
+    @Transient
+    public boolean isDisplayStatusOverriddenBySaleStatus() {
+        if (getSaleStatus() != StockSaleStatus.SOLD) {
+            return false;
+        }
+        return !"sold".equalsIgnoreCase(getStatus());
+    }
+
+    public Badge getStatusBadge() {
+        String effectiveStatus = getEffectiveStatusKey();
+        return UIUtilities.createBadge(null, effectiveStatus, BadgeVariant.SUCCESS);
     }
 
     @Access(AccessType.PROPERTY)
@@ -464,6 +498,15 @@ public class Stock {
         return Utility.getInstance().getStockStatus("active");
     }
 
+    @Transient
+    public StockStatus getDisplayStockStatus() {
+        StockStatus stockStatus = Utility.getInstance().getStockStatus(getEffectiveStatusKey());
+        if (stockStatus != null) {
+            return stockStatus;
+        }
+        return Utility.getInstance().getStockStatus("active");
+    }
+
     public LocalDateTime getStatusDate() {
         return statusDate;
     }
@@ -474,13 +517,18 @@ public class Stock {
     
     @Access(AccessType.PROPERTY)
     public Boolean getActive(){
-        if(getStatus()==null) return Boolean.FALSE;
-        if(getStatus().equals("active")){
-            //System.out.println("Stock.getActive: returning TRUE for Status:" + status + " for:" + getDisplayName());
+        if(getSaleStatus() == StockSaleStatus.SOLD){
+            return Boolean.FALSE;
+        }
+
+        String normalizedStatus = getStatus() == null ? "" : getStatus().trim().toLowerCase();
+        if(normalizedStatus.isEmpty()){
             return Boolean.TRUE;
         }
-        //System.out.println("Stock.getActive: returning FALSE for Status:" + status + " for:" + getDisplayName());
-        return Boolean.FALSE;
+        if(TERMINAL_STOCK_STATUSES.contains(normalizedStatus)){
+            return Boolean.FALSE;
+        }
+        return Boolean.TRUE;
     }
 
     @Access(AccessType.PROPERTY)
@@ -646,7 +694,7 @@ public class Stock {
         }else{
             displayName = getName();
         }
-        return displayName + " (" + getStatus() + ")";
+        return displayName + " (" + getEffectiveStatusKey() + ")";
     }
     
     public File getProfileFile(){
@@ -814,9 +862,11 @@ public class Stock {
             header.add(showIcon(getStockType().getBreederName(),Utility.ICONS.TYPE_BREEDER.getIconSource(),false));
         }
         //System.out.println("getHeader: StockStatus:" + getStatus());
-        if(!forPedigree && Utility.getInstance().hasStockStatus(getStatus())){
-            StockStatus stockStatus = Utility.getInstance().getStockStatus(getStatus());
-            header.add(showIcon(stockStatus.getLongName(),stockStatus.getIcon().getIconSource(),false));
+        if(!forPedigree){
+            StockStatus stockStatus = getDisplayStockStatus();
+            if (stockStatus != null && stockStatus.getIcon() != null) {
+                header.add(showIcon(stockStatus.getLongName(),stockStatus.getIcon().getIconSource(),false));
+            }
         }
         return header;
     }
@@ -926,13 +976,48 @@ public class Stock {
             setWeight(Utility.getInstance().WeightConverterStringToOz(getWeightText()));
         }
 
+        // Normalize imported status text to canonical names and keep saleStatus in sync.
+        String normalizedImportedStatus = normalizeImportedStatusName(status);
+        setStatus(normalizedImportedStatus);
+        setSaleStatus(mapSaleStatusFromImportedStatus(normalizedImportedStatus));
+
         //set active based on status
-        if(status==null || status.isEmpty()){
-            status = "active";
-        }
-        //create a new status record from status
         active = getActive();
         needsSaving = Boolean.TRUE;
+    }
+
+    private String normalizeImportedStatusName(String importedStatus) {
+        if (importedStatus == null || importedStatus.isBlank()) {
+            return "active";
+        }
+
+        String normalized = importedStatus.trim().toLowerCase();
+        if (IMPORT_STATUS_LISTED_NAMES.contains(normalized)) {
+            return "listed";
+        }
+        if (IMPORT_STATUS_DEPOSIT_NAMES.contains(normalized)) {
+            return "deposit";
+        }
+        if ("none".equals(normalized) || "n/a".equals(normalized)) {
+            return "active";
+        }
+        if (Utility.getInstance().hasStockStatus(normalized)) {
+            return normalized;
+        }
+        return "active";
+    }
+
+    private StockSaleStatus mapSaleStatusFromImportedStatus(String normalizedStatusName) {
+        if (normalizedStatusName == null || normalizedStatusName.isBlank()) {
+            return StockSaleStatus.NONE;
+        }
+
+        return switch (normalizedStatusName) {
+            case "listed" -> StockSaleStatus.LISTED;
+            case "deposit" -> StockSaleStatus.DEPOSIT;
+            case "sold" -> StockSaleStatus.SOLD;
+            default -> StockSaleStatus.NONE;
+        };
     }
 
     public Boolean isTemp() {
@@ -1023,10 +1108,29 @@ public class Stock {
     }
 
     public StockSaleStatus getSaleStatus() {
-        return saleStatus;
+        if (saleStatus != null) {
+            return saleStatus;
+        }
+
+        // Backward compatibility for legacy sale tracking stored in status history.
+        String normalizedStatus = getStatus() == null ? "" : getStatus().trim().toLowerCase();
+        if (SALE_STATUS_LISTED_NAMES.contains(normalizedStatus)) {
+            return StockSaleStatus.LISTED;
+        }
+        if ("deposit".equals(normalizedStatus)) {
+            return StockSaleStatus.DEPOSIT;
+        }
+        if ("sold".equals(normalizedStatus)) {
+            return StockSaleStatus.SOLD;
+        }
+        return StockSaleStatus.NONE;
     }
 
     public void setSaleStatus(StockSaleStatus saleStatus) {
+        if (saleStatus == null) {
+            this.saleStatus = StockSaleStatus.NONE;
+            return;
+        }
         this.saleStatus = saleStatus;
     }
 
@@ -1035,20 +1139,21 @@ public class Stock {
         if(!includePrefix){
             prefix = null;
         }
-        if(null == saleStatus){
+        StockSaleStatus currentSaleStatus = getSaleStatus();
+        if(null == currentSaleStatus){
             return UIUtilities.createBadge(prefix,"Not for sale", BadgeVariant.CONTRAST);
-        }else switch (saleStatus) {
+        }else switch (currentSaleStatus) {
             case NONE -> {
                 return UIUtilities.createBadge(prefix,"Not for sale", BadgeVariant.CONTRAST);
             }
             case LISTED -> {
-                return UIUtilities.createBadge(prefix,saleStatus.toString(), BadgeVariant.SUCCESS);
+                return UIUtilities.createBadge(prefix,currentSaleStatus.getShortName(), BadgeVariant.SUCCESS);
             }
             case SOLD -> {
-                return UIUtilities.createBadge(prefix,saleStatus.toString(), BadgeVariant.ERROR);
+                return UIUtilities.createBadge(prefix,currentSaleStatus.getShortName(), BadgeVariant.ERROR);
             }
             case DEPOSIT -> {
-                return UIUtilities.createBadge(prefix,saleStatus.toString(), BadgeVariant.WARNING);
+                return UIUtilities.createBadge(prefix,currentSaleStatus.getShortName(), BadgeVariant.WARNING);
             }
             default -> {
             }

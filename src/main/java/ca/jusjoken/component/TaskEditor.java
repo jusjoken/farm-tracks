@@ -96,7 +96,7 @@ public class TaskEditor {
         dialogLayout.setSpacing(false);
         dialogLayout.setPadding(false);
         dialogLayout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        dialogLayout.getStyle().set("width", "270px").set("max-width", "100%");
+        UIUtilities.applyDialogWidth(dialog, dialogLayout, UIUtilities.DialogWidthPreset.LARGE);
 
         dialog.add(dialogLayout);
         dialogCloseButton.addClickListener((e) -> dialogClose());
@@ -119,6 +119,7 @@ public class TaskEditor {
         });
 
         HorizontalLayout footerLayout = new HorizontalLayout(dialogOkButton, dialogCancelButton, taskActionButton);
+        UIUtilities.applyResponsiveDialogFooter(footerLayout);
 
         ShortcutRegistration shortcutRegistration = Shortcuts
                 .addShortcutListener(footerLayout, () -> {}, Key.ENTER)
@@ -196,7 +197,7 @@ public class TaskEditor {
         dialog.setHeaderTitle(dialogTitle);
         dialog.getElement().setAttribute("aria-label", dialogTitle);
         dialog.getHeader().add(dialogCloseButton);
-        dialog.setDraggable(true);
+        UIUtilities.applyDialogDraggableForViewport(dialog);
         dialog.setResizable(true);
 
         VerticalLayout fieldsLayout = UIUtilities.getVerticalLayout(false, true, false);

@@ -33,3 +33,43 @@ CREATE TABLE IF NOT EXISTS `persistent_logins` (
 
 ALTER TABLE `app_user` ADD COLUMN IF NOT EXISTS `display_name` VARCHAR(150) NULL;
 
+INSERT INTO `app_settings` (
+	`id`,
+	`farm_name`,
+	`farm_address_line1`,
+	`farm_address_line2`,
+	`farm_email`,
+	`farm_prefix`,
+	`default_litter_prefix`
+)
+SELECT
+	1,
+	'Breza Homestead & Rabbitry',
+	'RR5 Site 3 Box 21',
+	'Rimbey Alberta T0C 2J0',
+	'equidanes@hotmail.ca',
+	'Breza''s',
+	'BHR'
+WHERE NOT EXISTS (SELECT 1 FROM `app_settings`);
+
+INSERT INTO `app_settings_seq` (
+	`next_not_cached_value`,
+	`minimum_value`,
+	`maximum_value`,
+	`start_value`,
+	`increment`,
+	`cache_size`,
+	`cycle_option`,
+	`cycle_count`
+)
+SELECT
+	51,
+	1,
+	9223372036854775806,
+	1,
+	50,
+	0,
+	0,
+	0
+WHERE NOT EXISTS (SELECT 1 FROM `app_settings_seq`);
+

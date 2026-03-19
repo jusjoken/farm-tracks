@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import ca.jusjoken.data.ColumnSort;
 import ca.jusjoken.data.Utility;
+import ca.jusjoken.data.Utility.StockSaleStatus;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
@@ -146,19 +147,22 @@ public class StockService {
         List<String> ignoreFieldList = new ArrayList<>(Arrays.asList(ignoreFields));
 
         if(savedQuery.getStockStatus().getName().equals("active")){
-            // handled by applyStatusFilter: status in [active, deposit]
+            // handled by applyStatusFilter via Stock.getActive()
             stock.setActive(null);
             stock.setStatus(null);
             ignoreFieldList.add("active");
+            ignoreFieldList.add("status");
         }else if(savedQuery.getStockStatus().getName().equals("inactive")){
-            // handled by applyStatusFilter: status NOT in [active, deposit]
+            // handled by applyStatusFilter via Stock.getActive()
             stock.setActive(null);
             stock.setStatus(null);
             ignoreFieldList.add("active");
+            ignoreFieldList.add("status");
         }else if(savedQuery.getStockStatus().getName().equals("all")){
             stock.setActive(null);
             stock.setStatus(null);
             ignoreFieldList.add("active");
+            ignoreFieldList.add("status");
         }else{
             stock.setStatus(savedQuery.getStockStatus().getName());
             stock.setActive(null);
@@ -185,13 +189,13 @@ public class StockService {
 
         if ("active".equals(queryStatus)) {
             return input.stream()
-                    .filter(s -> Objects.equals("active", s.getStatus()) || Objects.equals("deposit", s.getStatus()) || Objects.equals("forsale", s.getStatus()))
+                    .filter(s -> Boolean.TRUE.equals(s.getActive()))
                     .toList();
         }
 
         if ("inactive".equals(queryStatus)) {
             return input.stream()
-                    .filter(s -> !Objects.equals("active", s.getStatus()) && !Objects.equals("deposit", s.getStatus()) && !Objects.equals("forsale", s.getStatus()))
+                    .filter(s -> !Boolean.TRUE.equals(s.getActive()))
                     .toList();
         }
 
@@ -242,6 +246,45 @@ public class StockService {
         return withName;
     }
 
+    private boolean isPrimarySortBySaleStatus(StockSavedQuery savedQuery) {
+        return savedQuery != null
+            && !savedQuery.getSortOrders().isEmpty()
+            && "saleStatus".equals(savedQuery.getSortOrders().get(0).getColumnName());
+    }
+
+    private int getSaleStatusSortRank(Stock stock) {
+        if (stock == null) {
+            return Integer.MAX_VALUE;
+        }
+
+        StockSaleStatus saleStatus = stock.getSaleStatus();
+        if (saleStatus == null) {
+            return Integer.MAX_VALUE;
+        }
+
+        return switch (saleStatus) {
+            case NONE -> 0;
+            case LISTED -> 1;
+            case DEPOSIT -> 2;
+            case SOLD -> 3;
+        };
+    }
+
+    private List<Stock> applyPrimarySaleStatusSort(List<Stock> input, StockSavedQuery savedQuery) {
+        if (!isPrimarySortBySaleStatus(savedQuery) || input == null || input.size() < 2) {
+            return input;
+        }
+
+        List<Stock> sorted = new ArrayList<>(input);
+        Sort.Direction direction = savedQuery.getSortOrders().get(0).getColumnSortDirection();
+
+        sorted.sort((left, right) -> Integer.compare(getSaleStatusSortRank(left), getSaleStatusSortRank(right)));
+        if (direction == Sort.Direction.DESC) {
+            Collections.reverse(sorted);
+        }
+        return sorted;
+    }
+
     public List<Stock> findStockWithCustomMatcherPageable(Pageable pageable, String name, StockSavedQuery savedQuery) {
         Instant start = Instant.now();
 
@@ -251,6 +294,8 @@ public class StockService {
                 stockRepository.findAll(getExample(name, savedQuery), getSort(savedQuery)),
                 savedQuery
         );
+
+        filtered = applyPrimarySaleStatusSort(filtered, savedQuery);
 
         filtered = moveBlankNamesToEnd(filtered, savedQuery);
 
@@ -276,6 +321,7 @@ public class StockService {
                 stockRepository.findAll(getExample(name, savedQuery), getSort(savedQuery)),
                 savedQuery
         );
+        filtered = applyPrimarySaleStatusSort(filtered, savedQuery);
         return moveBlankNamesToEnd(filtered, savedQuery);
     }
     

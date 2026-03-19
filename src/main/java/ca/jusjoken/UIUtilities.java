@@ -8,6 +8,7 @@ import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Text;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
@@ -33,6 +34,14 @@ import ca.jusjoken.utility.BadgeVariant;
  * @author birch
  */
 public class UIUtilities {
+
+    public static enum DialogWidthPreset {
+        COMPACT,
+        MEDIUM,
+        LARGE,
+        WIDE,
+        XLARGE
+    }
     
     public static enum BorderSize{
         LARGE("6px"), SMALL("2px"), XSMALL("1px");
@@ -182,6 +191,61 @@ public class UIUtilities {
         verticalLayout.setMargin(marginEnabled);
         verticalLayout.setWidthFull();
         return verticalLayout;
+    }
+
+    public static void applyDialogWidth(VerticalLayout layout, DialogWidthPreset preset) {
+        applyDialogWidth(null, layout, preset);
+    }
+
+    public static void applyDialogWidth(Dialog dialog, VerticalLayout layout, DialogWidthPreset preset) {
+        String width;
+        switch (preset) {
+            case COMPACT -> {
+                width = "min(34rem, 92vw)";
+            }
+            case MEDIUM -> {
+                width = "min(44rem, 92vw)";
+            }
+            case LARGE -> {
+                width = "min(48rem, 92vw)";
+            }
+            case WIDE -> {
+                width = "min(64rem, 92vw)";
+            }
+            case XLARGE -> {
+                width = "min(72rem, 92vw)";
+            }
+            default -> {
+                width = "min(48rem, 92vw)";
+            }
+        }
+
+        if (dialog != null) {
+            dialog.setWidth(width);
+            dialog.setMaxWidth("92vw");
+        }
+
+        layout.getStyle()
+                .set("width", "100%")
+                .set("min-width", "0")
+                .set("max-width", "100%");
+    }
+
+    public static void applyResponsiveDialogFooter(HorizontalLayout footerLayout) {
+        footerLayout.setWidthFull();
+        footerLayout.setPadding(false);
+        footerLayout.setMargin(false);
+        footerLayout.setSpacing(true);
+        footerLayout.setWrap(true);
+        footerLayout.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+    }
+
+    public static void applyDialogDraggableForViewport(Dialog dialog) {
+        // Desktop keeps drag support; mobile disables it to avoid accidental shifts.
+        dialog.setDraggable(false);
+        dialog.getElement().executeJs(
+            "this.draggable = !window.matchMedia('(max-width: 767px)').matches;"
+        );
     }
 
     public static String singlePlural(int count, String singular, String plural)

@@ -365,9 +365,9 @@ public class Utility {
         stockStatusList.put("died", new StockStatus("died", ICONS.STATUS_DIED, "Died","Died",Boolean.TRUE,8, "Why did %s die?"));
         
         //TODO:: replace these SALE status' with fields in Stock
-        stockStatusList.put("forsale", new StockStatus("forsale", ICONS.ACTION_MARK_FOR_SALE, "For sale","Mark for Sale",Boolean.FALSE,9, "Do you want to mark %s for sale?"));
+        stockStatusList.put("listed", new StockStatus("listed", ICONS.ACTION_MARK_FOR_SALE, "For sale","Mark for Sale",Boolean.FALSE,9, "Do you want to mark %s for sale?"));
         stockStatusList.put("sold", new StockStatus("sold", ICONS.STATUS_SOLD, "Sold","Sell",Boolean.TRUE,10));
-        stockStatusList.put("deposit", new StockStatus("deposit", ICONS.STATUS_SOLD_W_DEPOSIT, "Sold with deposit","Deposit taken",Boolean.FALSE,11, "Do you want to record a deposit for the sale of %s?"));
+        stockStatusList.put("deposit", new StockStatus("deposit", ICONS.STATUS_SOLD_W_DEPOSIT, "Deposit taken","Deposit taken",Boolean.FALSE,11, "Do you want to record a deposit for the sale of %s?"));
     }
     
     public Boolean hasStockStatus(String name){
