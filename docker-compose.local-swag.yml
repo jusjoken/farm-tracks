@@ -1,0 +1,30 @@
+services:
+  farmtracks:
+    environment:
+      SERVER_SSL_ENABLED: "false"
+      SERVER_PORT: "8080"
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      VAADIN_PRODUCTION_MODE: "true"
+    ports: !reset []
+
+  swag:
+    image: lscr.io/linuxserver/swag:latest
+    container_name: farmtracks-swag
+    depends_on:
+      - farmtracks
+    restart: unless-stopped
+    environment:
+      PUID: ${SWAG_PUID:-1000}
+      PGID: ${SWAG_PGID:-1000}
+      TZ: ${TZ:-UTC}
+      URL: ${SWAG_URL:-localhost}
+      SUBDOMAINS: ${SWAG_SUBDOMAINS:-}
+      VALIDATION: ${SWAG_VALIDATION:-http}
+      STAGING: ${SWAG_STAGING:-true}
+      DISABLE_F2B: ${SWAG_DISABLE_F2B:-true}
+    ports:
+      - "${HTTPS_EXTERNAL_PORT:-44302}:443"
+    volumes:
+      - ${SWAG_CONFIG_DIR:-/home/birch/appdata/farmtracks/swag-config}:/config
+      - ./deploy/local-swag/default.conf:/config/nginx/site-confs/default.conf:ro
+      - ${LOCAL_TLS_CERT_DIR:-/home/birch/appdata/farmtracks/local-certs}:/config/keys/letsencrypt

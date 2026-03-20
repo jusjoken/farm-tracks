@@ -1,0 +1,20 @@
+services:
+  farmtracks:
+    environment:
+      SERVER_SSL_ENABLED: "false"
+      SERVER_PORT: "8080"
+      # Respect reverse-proxy headers (X-Forwarded-Proto/Host)
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    ports: !reset []
+
+  edge-proxy:
+    image: nginx:1.27-alpine
+    container_name: farmtracks-edge-proxy
+    depends_on:
+      - farmtracks
+    restart: unless-stopped
+    ports:
+      - "${HTTPS_EXTERNAL_PORT:-44302}:443"
+    volumes:
+      - ./deploy/local-proxy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${LOCAL_TLS_CERT_DIR:-/home/birch/appdata/farmtracks/local-certs}:/etc/nginx/certs:ro

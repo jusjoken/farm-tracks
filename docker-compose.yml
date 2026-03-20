@@ -1,0 +1,35 @@
+services:
+  farmtracks:
+    image: eclipse-temurin:21-jre
+    container_name: farmtracks-app
+    restart: unless-stopped
+    ports:
+      - "${HTTPS_EXTERNAL_PORT:-44302}:8443"
+    environment:
+      DM_DB_URL: ${DM_DB_URL}
+      DM_DB_USER: ${DM_DB_USER}
+      DM_DB_PASSWORD: ${DM_DB_PASSWORD}
+      PATH_TO_PROFILE_IMAGE: ${PATH_TO_PROFILE_IMAGE}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx1024m}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SERVER_PORT: ${SERVER_PORT:-8443}
+      SERVER_SSL_ENABLED: ${SERVER_SSL_ENABLED:-true}
+      SERVER_SSL_KEY_STORE: ${SERVER_SSL_KEY_STORE:-file:/app/certs/farmtracks.p12}
+      SERVER_SSL_KEY_STORE_PASSWORD: ${SERVER_SSL_KEY_STORE_PASSWORD}
+      SERVER_SSL_KEY_STORE_TYPE: ${SERVER_SSL_KEY_STORE_TYPE:-PKCS12}
+      SERVER_SSL_KEY_ALIAS: ${SERVER_SSL_KEY_ALIAS:-tomcat}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ${JAR_HOST_DIR:-/home/birch/appdata/farmtracks}:/appdata/farmtracks:ro
+      - ${PATH_TO_PROFILE_IMAGE}:${PATH_TO_PROFILE_IMAGE}
+      - ${SSL_CERT_HOST_DIR:-/home/birch/appdata/farmtracks/certs}:/app/certs:ro
+    command:
+      - /bin/sh
+      - -c
+      - >
+        if [ ! -f "/appdata/farmtracks/${JAR_FILE:-app.jar}" ]; then
+          echo "ERROR: Missing /appdata/farmtracks/${JAR_FILE:-app.jar}";
+          echo "Copy your built jar to ${JAR_HOST_DIR:-/home/birch/appdata/farmtracks}/${JAR_FILE:-app.jar} on the host.";
+          exit 1;
+        fi;
+        exec java $$JAVA_OPTS -jar /appdata/farmtracks/${JAR_FILE:-app.jar}
