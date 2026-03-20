@@ -53,6 +53,7 @@ import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.data.service.UserUiSettingsService;
+import ca.jusjoken.services.AppVersionService;
 import ca.jusjoken.views.stock.StockPedigreeEditor;
 import ca.jusjoken.views.stock.StockTypeView;
 import ca.jusjoken.views.stock.StockView;
@@ -75,6 +76,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     private final StockTypeService typeService;
     private final PlanTemplateService planTemplateService;
     private final UserUiSettingsService userUiSettingsService;
+    private final AppVersionService appVersionService;
     
     private Registration planRefreshRegistration;
     private ContextMenu menu;
@@ -91,11 +93,13 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     private static final String LAST_STOCK_QUERY_PREFERENCE_KEY = "main-layout.last-stock-saved-query-id";
     private boolean welcomeAutoRedirectPending = true;
 
-    public MainLayout(AuthenticationContext authContext, AccessAnnotationChecker accessChecker) {
+    public MainLayout(AuthenticationContext authContext, AccessAnnotationChecker accessChecker,
+            AppVersionService appVersionService) {
         this.queryService = Registry.getBean(StockSavedQueryService.class);
         this.typeService = Registry.getBean(StockTypeService.class);
         this.planTemplateService = Registry.getBean(PlanTemplateService.class);
         this.userUiSettingsService = Registry.getBean(UserUiSettingsService.class);
+        this.appVersionService = appVersionService;
         this.authContext = authContext;
         this.accessChecker = accessChecker;
         this.dialogCommon = new StockEditor();
@@ -123,7 +127,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
 
         viewTitle = new H1();
         viewTitle.addClassNames(LumoUtility.FontSize.LARGE, LumoUtility.Margin.NONE, LumoUtility.Width.FULL);
-        
+
         addToNavbar(true, toggle, viewTitle, getUserMenu());
     }
     
@@ -205,7 +209,15 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         heading.getStyle().set("font-weight", "bold");
         heading.getStyle().set("padding", "8px");
     
+        Div versionLabel = new Div();
+        versionLabel.setText("v" + appVersionService.getDisplayVersion());
+        versionLabel.getStyle().set("text-align", "center");
+        versionLabel.getStyle().set("font-size", "var(--lumo-font-size-xs)");
+        versionLabel.getStyle().set("color", "var(--lumo-secondary-text-color)");
+        versionLabel.getStyle().set("padding", "0 8px 6px 8px");
+
         menu.addComponent(heading);
+        menu.addComponent(versionLabel);
         menu.addSeparator();
         //add new stock item for each StockType
         
@@ -345,9 +357,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     }
     
     private Footer createFooter() {
-        Footer layout = new Footer();
-
-        return layout;
+        return new Footer();
     }
 
     private String getCurrentPageTitle() {

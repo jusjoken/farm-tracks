@@ -6,6 +6,7 @@ package ca.jusjoken.views.login;
 
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.html.Main;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.login.LoginForm;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
@@ -15,6 +16,8 @@ import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
+
+import ca.jusjoken.services.AppVersionService;
 
 /**
  *
@@ -26,8 +29,10 @@ import com.vaadin.flow.server.auth.AnonymousAllowed;
 public class LoginView extends Main implements BeforeEnterObserver {
 
     private final LoginForm login;
+    private final AppVersionService appVersionService;
 
-    public LoginView() {
+    public LoginView(AppVersionService appVersionService) {
+        this.appVersionService = appVersionService;
         //addClassNames(LumoUtility.Display.FLEX, LumoUtility.JustifyContent.CENTER,LumoUtility.AlignItems.CENTER);
         login = new LoginForm();
         login.setAction("login");
@@ -35,10 +40,13 @@ public class LoginView extends Main implements BeforeEnterObserver {
             Notification.show("Please contact your administrator to reset your password.",
                     6000, Notification.Position.MIDDLE));
 
+        Span version = new Span("v" + this.appVersionService.getDisplayVersion());
+        version.addClassName("login-version");
+
         VerticalLayout layout = new VerticalLayout();
         layout.setAlignItems(FlexComponent.Alignment.CENTER);
         layout.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
-        layout.add(login);
+        layout.add(login, version);
         layout.setSizeFull();
         add(layout);
         setSizeFull();

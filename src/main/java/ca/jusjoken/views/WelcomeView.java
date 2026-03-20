@@ -4,13 +4,13 @@
  */
 package ca.jusjoken.views;
 
-import ca.jusjoken.component.Layout;
-import com.vaadin.flow.component.Text;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
-import com.vaadin.flow.theme.lumo.LumoUtility;
+
+import ca.jusjoken.component.Layout;
 
 /**
  *
@@ -24,14 +24,7 @@ import com.vaadin.flow.theme.lumo.LumoUtility;
 public class WelcomeView extends Layout {
     
     public WelcomeView() {
-        //String version = env.getProperty("DM_APPLICATION_RELEASE_VERSION");
-        //String header = "Welcome to DeliverMore Admin application (v" + version + ")";
-        String header = "Welcome to Farm Tracks";
-
-        Text welcomeMessage = new Text(header);
-
-        addClassNames(LumoUtility.Margin.AUTO);
-
+        Span welcomeMessage = new Span("Welcome to Farm Tracks");
         add(welcomeMessage);
     }
 }

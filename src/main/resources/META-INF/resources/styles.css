@@ -93,3 +93,11 @@ div.tag-panel-value-responsive {
         padding-bottom: calc(var(--lumo-space-m) + env(safe-area-inset-bottom));
     }
 }
+
+.login-version {
+    margin-top: var(--lumo-space-s);
+    font-size: var(--lumo-font-size-xs);
+    color: var(--lumo-secondary-text-color);
+    opacity: 0.75;
+    letter-spacing: 0.02em;
+}
