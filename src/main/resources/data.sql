@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS `persistent_logins` (
 
 ALTER TABLE `app_user` ADD COLUMN IF NOT EXISTS `display_name` VARCHAR(150) NULL;
 
+INSERT IGNORE INTO `stock_type` (`id`, `name`, `female_name`, `male_name`, `non_breeder_name`, `default_type`, `breeder_name`, `name_singular`, `image_file_name`) VALUES
+(-2, 'Goats',   'Doe',  'Buck', 'Other', CONVERT(b'0', UNSIGNED), 'Breeders', 'Goat',   'goat_blank.jpg'),
+(-1, 'Rabbits', 'Doe',  'Buck', 'Kits',  CONVERT(b'1', UNSIGNED), 'Breeders', 'Rabbit', 'rabbit_blank.jpg');
+
 INSERT INTO `app_settings` (
 	`id`,
 	`farm_name`,

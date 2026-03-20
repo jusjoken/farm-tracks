@@ -63,10 +63,16 @@ if [ "$DEPLOY" = "--deploy" ]; then
     echo "══════════════════════════════════════════════════════════════"
     echo "  Deploying to Docker stack"
     echo "══════════════════════════════════════════════════════════════"
+
+    if [ ! -f ".env.prod" ]; then
+        echo "✗  .env.prod not found. Create it with production datasource credentials."
+        exit 1
+    fi
+
     cp -f "$JAR_SRC" "$JAR_DST"
     echo "  Copied JAR → $JAR_DST"
 
-    $COMPOSE_CMD up -d --force-recreate "$CONTAINER"
+    $COMPOSE_CMD --env-file .env.prod up -d --force-recreate "$CONTAINER"
     echo ""
     echo "  Waiting for application startup (up to 60 s)..."
     for i in $(seq 1 12); do
