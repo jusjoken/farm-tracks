@@ -111,6 +111,7 @@ import jakarta.annotation.security.PermitAll;
 @PermitAll
 public class StockPedigreeEditor extends Main implements ListRefreshNeededListener, HasDynamicTitle, HasUrlParameter<String>   {
 
+    private static final String UNKNOWN_NAME = "[Unknown]";
     private final StockService stockService;
     private final AppSettingsService appSettingsService;
     private Stock stock;
@@ -635,7 +636,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         Button addUnknownParent = new Button(FontAwesome.Solid.QUESTION.create());
         addUnknownParent.setTooltipText("Quick add unknown external " + parentStockTypeName + " and set as " + parentType);
         addUnknownParent.addClickListener(event -> {
-            Stock unknownExternal = stockService.getOrCreateExternalParent("Unknown", viewStockType, item.getSex());
+            Stock unknownExternal = stockService.getOrCreateExternalParent(UNKNOWN_NAME, viewStockType, item.getSex());
             saveParent(item.getChild().getStock(), unknownExternal, item.getSex());
             buildView(stock);
         });
@@ -910,7 +911,11 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
                 if(item.getPrefix()!=null && !item.getPrefix().isEmpty()){
                     nameField = item.getPrefix() + " ";
                 }
-                nameField = nameField + item.getName();
+                if(item.getName().equals(UNKNOWN_NAME)){
+                    nameField = "--";
+                }else{
+                    nameField = nameField + item.getName();
+                }
                 System.out.println("createPedigreePDF: processing:" + counter + " name:" + nameField);
                 Paragraph paraName = new Paragraph(document);
                 paraName.getFormat().setBeforeAutoSpacing(false);
