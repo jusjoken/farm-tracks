@@ -5,6 +5,7 @@ services:
       SERVER_PORT: "8080"
       SERVER_FORWARD_HEADERS_STRATEGY: framework
       VAADIN_PRODUCTION_MODE: "true"
+      VAADIN_PWA_ENABLED: "false"
     ports: !reset []
 
   swag:

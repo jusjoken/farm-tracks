@@ -11,8 +11,10 @@
 #   but skip the frontend build (already done in step 1).
 #
 # USAGE:
-#   ./build-prod.sh            # build only
-#   ./build-prod.sh --deploy   # build + deploy docker stack
+#   ./build-prod.sh              # build only (reuses cached bundle if available)
+#   ./build-prod.sh --clean      # build with fresh frontend (deletes cached bundle)
+#   ./build-prod.sh --deploy     # build + deploy docker stack
+#   ./build-prod.sh --clean --deploy  # fresh build + deploy
 
 set -euo pipefail
 
@@ -23,7 +25,17 @@ JAR_SRC="target/farm-tracks-1.0-SNAPSHOT.jar"
 JAR_DST="/home/birch/appdata/farmtracks/app.jar"
 COMPOSE_CMD="docker compose -f docker-compose.yml -f docker-compose.local-swag.yml"
 CONTAINER="farmtracks"
-DEPLOY="${1:-}"
+
+# Parse command-line arguments
+CLEAN=false
+DEPLOY=false
+for arg in "$@"; do
+    case "$arg" in
+        --clean)  CLEAN=true ;;
+        --deploy) DEPLOY=true ;;
+        *)        echo "Unknown argument: $arg"; exit 1 ;;
+    esac
+done
 
 # ── 1. Handle root-owned target/ left behind by dev-mode inside Docker ─────────
 if [ -d "target" ] && [ "$(stat -c '%u' target)" = "0" ]; then
@@ -33,21 +45,31 @@ if [ -d "target" ] && [ "$(stat -c '%u' target)" = "0" ]; then
     echo "   Done. Run 'sudo rm -rf $STUCK' to clean up later."
 fi
 
-# ── 2. Step 1: build Vaadin frontend (spire hidden via vaadin-frontend-fix) ────
+# ── 2. Handle --clean flag: delete stale prod.bundle to force fresh Vite build ─
+if [ "$CLEAN" = true ]; then
+    BUNDLE="src/main/bundles/prod.bundle"
+    if [ -f "$BUNDLE" ]; then
+        echo "🗑  Deleting stale bundle → $BUNDLE"
+        rm "$BUNDLE"
+        echo "   Will do a full frontend rebuild (slower)"
+    fi
+fi
+
+# ── 3. Step 1: build Vaadin frontend (spire hidden via vaadin-frontend-fix) ────
 echo ""
 echo "══════════════════════════════════════════════════════════════"
 echo "  Step 1/2 — Vaadin frontend build"
 echo "══════════════════════════════════════════════════════════════"
 ./mvnw vaadin:build-frontend -Pproduction,vaadin-frontend-fix -DskipTests
 
-# ── 3. Step 2: compile Java + package JAR (spire on compile classpath) ─────────
+# ── 4. Step 2: compile Java + package JAR (spire on compile classpath) ─────────
 echo ""
 echo "══════════════════════════════════════════════════════════════"
 echo "  Step 2/2 — Java compile + package (frontend already built)"
 echo "══════════════════════════════════════════════════════════════"
 ./mvnw package -Pproduction -DskipTests -Dvaadin.skip=true
 
-# ── 4. Verify JAR was produced ─────────────────────────────────────────────────
+# ── 5. Verify JAR was produced ─────────────────────────────────────────────────
 if [ ! -f "$JAR_SRC" ]; then
     echo ""
     echo "✗  BUILD FAILED — JAR not found at $JAR_SRC"
@@ -57,8 +79,8 @@ JAR_SIZE=$(du -sh "$JAR_SRC" | cut -f1)
 echo ""
 echo "✓  BUILD SUCCESS — $JAR_SRC ($JAR_SIZE)"
 
-# ── 5. Optional deploy ─────────────────────────────────────────────────────────
-if [ "$DEPLOY" = "--deploy" ]; then
+# ── 6. Optional deploy ─────────────────────────────────────────────────────────
+if [ "$DEPLOY" = true ]; then
     echo ""
     echo "══════════════════════════════════════════════════════════════"
     echo "  Deploying to Docker stack"
