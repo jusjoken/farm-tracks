@@ -91,7 +91,6 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
     private H1 viewTitle;
     private static final String DARK_MODE_PREFERENCE_KEY = "main-layout.dark-mode";
     private static final String LAST_STOCK_QUERY_PREFERENCE_KEY = "main-layout.last-stock-saved-query-id";
-    private boolean welcomeAutoRedirectPending = true;
 
     public MainLayout(AuthenticationContext authContext, AccessAnnotationChecker accessChecker,
             AppVersionService appVersionService) {
@@ -282,7 +281,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
         System.out.println("MainLayout: createNavigation");
         nav.removeAll();
 
-        nav.addItem(new SideNavItem("Welcome", WelcomeView.class, FontAwesome.Solid.HOME.create()));
+        nav.addItem(new SideNavItem("Dashboard", DashboardView.class, FontAwesome.Solid.HOME.create()));
 
         if(accessChecker.hasAccess(TaskListView.class)){
             SideNavItem sn = new SideNavItem("Tasks", TaskListView.class);
@@ -397,13 +396,7 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
 
         Component content = getContent();
         if (content instanceof StockView stockView) {
-            welcomeAutoRedirectPending = false;
             saveLastUsedStockSavedQueryId(stockView.getCurrentSavedQueryId());
-        } else if (content instanceof WelcomeView) {
-            if (welcomeAutoRedirectPending) {
-                welcomeAutoRedirectPending = false;
-                navigateToLastUsedStockSavedQueryIfAvailable();
-            }
         }
 
         if (content instanceof PlanTemplateView planTemplateView) {

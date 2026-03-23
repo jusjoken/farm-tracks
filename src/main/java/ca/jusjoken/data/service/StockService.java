@@ -419,6 +419,14 @@ public class StockService {
         return stockList;
     }
 
+    public long countByStockType(StockType stockType) {
+        if (stockType == null) {
+            return 0L;
+        }
+        Long count = stockRepository.countByStockType(stockType);
+        return count == null ? 0L : count;
+    }
+
     public List<Stock> list(Pageable pageable)   {
         return stockRepository.findAll(pageable).getContent();
     }
