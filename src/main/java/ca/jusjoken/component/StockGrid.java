@@ -52,7 +52,6 @@ import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.StockSaleStatus;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
-import ca.jusjoken.data.entity.StockSavedQuery.StockViewStyle;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.service.LitterService;
@@ -315,6 +314,16 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         addColumn(stockEntity -> {return stockTypeService.getGenderForType(stockEntity.getSex(), stockEntity.getStockType());}).setHeader("Gender").setResizable(true).setAutoWidth(true).setKey("gender");
         addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value").setSortable(true);
         addColumn(Stock::getNotes).setHeader("Notes").setResizable(true).setAutoWidth(true).setKey("notes").setSortable(true);
+        if(stockGridType == StockGridType.STOCK){
+            addComponentColumn(stockEntity -> {
+                        if (Boolean.TRUE.equals(stockEntity.getExternal())) {
+                            return new Icon(Utility.ICONS.ACTION_CHECK.getIconSource());
+                        } else {
+                            return null;
+                        }
+                    }).setHeader("External").setResizable(true).setAutoWidth(true).setKey("external")
+                      .setComparator(Stock::getExternal).setSortable(true);
+        }
 
         setMultiSort(true);
         configureSortPersistenceListener();
@@ -855,7 +864,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
         menu.setDynamicContentHandler(stockEntity -> {
             if(stockEntity==null){
-                if(currentStockSavedQuery != null && currentStockSavedQuery.getViewStyle().equals(StockViewStyle.TILE)){
+                if(displayAsTile){
                     return false;
                 }else{
                     menu.removeAll();
@@ -1386,6 +1395,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             case "invoice" -> "invoiceNumber";
             case "value" -> "stockValue";
             case "notes" -> "notes";
+            case "external" -> "external";
             default -> null;
         };
     }
@@ -1413,6 +1423,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             case "invoiceNumber" -> "invoice";
             case "stockValue" -> "value";
             case "notes" -> "notes";
+            case "external" -> "external";
             default -> null;
         };
     }

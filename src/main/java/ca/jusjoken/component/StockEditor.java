@@ -68,6 +68,7 @@ import com.vaadin.flow.dom.ElementFactory;
 import com.vaadin.flow.server.streams.DownloadHandler;
 import com.vaadin.flow.server.streams.InMemoryUploadHandler;
 import com.vaadin.flow.server.streams.UploadHandler;
+import com.vaadin.flow.shared.Registration;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility;
@@ -95,6 +96,8 @@ public class StockEditor extends Component{
     }
 
     private Binder<Stock> binder;
+    private Registration nameChangedReg;
+    private Registration tattooChangedReg;
     private static final String NOT_FOSTERED = "Not fostered";
 
     public enum DisplayMode{
@@ -203,6 +206,9 @@ public class StockEditor extends Component{
     FormItem fieldFosterFormItem;
     FormItem fieldStatusFormItem;
     FormItem fieldAquiredFormItem;
+    FormItem fieldSaleStatusFormItem;
+    FormItem fieldValueFormItem;
+    FormItem fieldInvoiceFormItem;
 
     private final VerticalLayout dialogLayout = new VerticalLayout();
 
@@ -214,6 +220,7 @@ public class StockEditor extends Component{
     private GenotypeEditor genotypeEditor;
     private StatusEditor statusEditor;
     private DisplayMode openedDisplayMode = DisplayMode.STOCK_DETAILS;
+    private boolean lockGenderSelection = false;
 
     private final List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
 
@@ -391,7 +398,9 @@ public class StockEditor extends Component{
         });
         
         fieldExternal.addValueChangeListener(event -> {
-            toggleHiddenFormFields(!event.getValue());
+            boolean showNonExternalFields = !event.getValue();
+            toggleHiddenFormFields(showNonExternalFields);
+            toggleSaleFormFields(showNonExternalFields);
         });
 
     }
@@ -495,7 +504,12 @@ public class StockEditor extends Component{
         }
     }
     public void dialogOpen(Stock stockEntity, DisplayMode currentDisplayMode){
+        dialogOpen(stockEntity, currentDisplayMode, false);
+    }
+
+    public void dialogOpen(Stock stockEntity, DisplayMode currentDisplayMode, boolean lockGenderSelection){
         binder = new Binder<>(Stock.class);
+        this.lockGenderSelection = lockGenderSelection;
         this.stockEntity = stockEntity;
         openedSaleStatus = stockEntity.getSaleStatus() == null ? StockSaleStatus.NONE : stockEntity.getSaleStatus();
         
@@ -558,6 +572,13 @@ public class StockEditor extends Component{
         if (stockEntity == null) {
             return;
         }
+
+        // External entries are not farm-owned stock, so default prefix should be blank.
+        if (Boolean.TRUE.equals(stockEntity.getExternal())) {
+            stockEntity.setPrefix("");
+            return;
+        }
+
         if (stockEntity.getPrefix() != null && !stockEntity.getPrefix().trim().isEmpty()) {
             return;
         }
@@ -842,9 +863,9 @@ public class StockEditor extends Component{
             fieldAquiredFormItem = stockFormLayout.addFormItem(fieldAquiredDate,"Aquired");
             stockFormLayout.addFormItem(fieldBornDate,"Born");
             fieldFosterFormItem = stockFormLayout.addFormItem(fieldFoster,"Foster");
-            stockFormLayout.addFormItem(fieldSaleStatusLayout, "Sale Status");
-            stockFormLayout.addFormItem(fieldValue, "Value");
-            stockFormLayout.addFormItem(fieldInvoiceNumber, "Invoice #");
+            fieldSaleStatusFormItem = stockFormLayout.addFormItem(fieldSaleStatusLayout, "Sale Status");
+            fieldValueFormItem = stockFormLayout.addFormItem(fieldValue, "Value");
+            fieldInvoiceFormItem = stockFormLayout.addFormItem(fieldInvoiceNumber, "Invoice #");
             stockFormLayout.addFormItem(fieldNotes,"Notes");
             
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
@@ -857,9 +878,15 @@ public class StockEditor extends Component{
     }
     
     private void toggleHiddenFormFields(Boolean show){
-        fieldStatusFormItem.setVisible(show);
-        fieldFosterFormItem.setVisible(show);
-        fieldAquiredFormItem.setVisible(show);
+        if(fieldStatusFormItem != null) fieldStatusFormItem.setVisible(show);
+        if(fieldFosterFormItem != null) fieldFosterFormItem.setVisible(show);
+        if(fieldAquiredFormItem != null) fieldAquiredFormItem.setVisible(show);
+    }
+
+    private void toggleSaleFormFields(Boolean show){
+        if(fieldSaleStatusFormItem != null) fieldSaleStatusFormItem.setVisible(show);
+        if(fieldValueFormItem != null) fieldValueFormItem.setVisible(show);
+        if(fieldInvoiceFormItem != null) fieldInvoiceFormItem.setVisible(show);
     }
 
     private void setValues(Stock currentStock, DisplayMode currentDisplayMode){
@@ -888,6 +915,12 @@ public class StockEditor extends Component{
             }else{
                 this.stockEntity = stockService.findById(currentStock.getId());
             }
+
+                boolean lockExternalParentFieldsForThisDialog = lockGenderSelection
+                    && Boolean.TRUE.equals(this.stockEntity.getExternal());
+                fieldGender.setReadOnly(lockExternalParentFieldsForThisDialog);
+                fieldExternal.setReadOnly(lockExternalParentFieldsForThisDialog);
+                fieldBreeder.setReadOnly(lockExternalParentFieldsForThisDialog);
 
             boolean hasGenotypeConfig = this.stockEntity.getStockType() != null
                     && !this.stockEntity.getStockType().getGenotypes().isEmpty();
@@ -924,7 +957,8 @@ public class StockEditor extends Component{
                             "Either Name or ID field must be filled in.")
                     .bind(Stock::getName, Stock::setName);
 
-            fieldTattoo.addValueChangeListener(event -> nameBinding.validate());
+            if (tattooChangedReg != null) tattooChangedReg.remove();
+            tattooChangedReg = fieldTattoo.addValueChangeListener(event -> nameBinding.validate());
 
             Binder.Binding<Stock, String> tattooBinding = binder.forField(fieldTattoo)
                     .withValidator(
@@ -932,15 +966,21 @@ public class StockEditor extends Component{
                             "Either Name or ID field must be filled in.")
                     .bind(Stock::getTattoo, Stock::setTattoo);
 
-            fieldName.addValueChangeListener(event -> tattooBinding.validate());
+            if (nameChangedReg != null) nameChangedReg.remove();
+            nameChangedReg = fieldName.addValueChangeListener(event -> tattooBinding.validate());
 
             binder.bindInstanceFields(this);
             binder.readBean(this.stockEntity);
+
+            boolean showNonExternalFields = !Boolean.TRUE.equals(this.stockEntity.getExternal());
+            toggleHiddenFormFields(showNonExternalFields);
+            toggleSaleFormFields(showNonExternalFields);
+
             syncStatusFieldsFromStock();
             binder.validate(); //force validation so warnings are displayed on form load
 
             binder.addStatusChangeListener(listener -> {
-                boolean isValid = listener.getBinder().isValid();
+                boolean isValid = !listener.hasValidationErrors();
                 boolean hasChanges = listener.getBinder().hasChanges();
                 System.out.println("addStatusChangeListener: isValid:" + isValid + " hasChanges:" + hasChanges);
                 dialogOkButton.setEnabled(hasChanges && isValid);

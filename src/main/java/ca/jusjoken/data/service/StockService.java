@@ -186,20 +186,31 @@ public class StockService {
         }
 
         String queryStatus = savedQuery.getStockStatus().getName();
+        boolean includeExternal = Boolean.TRUE.equals(savedQuery.getIncludeExternalStock());
 
         if ("active".equals(queryStatus)) {
             return input.stream()
-                    .filter(s -> Boolean.TRUE.equals(s.getActive()))
+                    .filter(s -> Boolean.TRUE.equals(s.getActive()) || (includeExternal && Boolean.TRUE.equals(s.getExternal())))
                     .toList();
         }
 
         if ("inactive".equals(queryStatus)) {
             return input.stream()
-                    .filter(s -> !Boolean.TRUE.equals(s.getActive()))
+                    .filter(s -> !Boolean.TRUE.equals(s.getActive()) || (includeExternal && Boolean.TRUE.equals(s.getExternal())))
                     .toList();
         }
 
         return input;
+    }
+
+    private List<Stock> applyExternalStockFilter(List<Stock> input, StockSavedQuery savedQuery) {
+        if (savedQuery == null || Boolean.TRUE.equals(savedQuery.getIncludeExternalStock())) {
+            return input;
+        }
+
+        return input.stream()
+                .filter(s -> !Boolean.TRUE.equals(s.getExternal()))
+                .toList();
     }
 
     private Sort getSort(StockSavedQuery savedQuery){
@@ -295,6 +306,8 @@ public class StockService {
                 savedQuery
         );
 
+        filtered = applyExternalStockFilter(filtered, savedQuery);
+
         filtered = applyPrimarySaleStatusSort(filtered, savedQuery);
 
         filtered = moveBlankNamesToEnd(filtered, savedQuery);
@@ -310,9 +323,12 @@ public class StockService {
     }
 
     public Long findStockWithCustomMatcherCount(String name, StockSavedQuery savedQuery) {
-        return (long) applyStatusFilter(
+        return (long) applyExternalStockFilter(
+            applyStatusFilter(
                 stockRepository.findAll(getExample(name, savedQuery), getSort(savedQuery)),
                 savedQuery
+            ),
+            savedQuery
         ).size();
     }
 
@@ -321,6 +337,7 @@ public class StockService {
                 stockRepository.findAll(getExample(name, savedQuery), getSort(savedQuery)),
                 savedQuery
         );
+        filtered = applyExternalStockFilter(filtered, savedQuery);
         filtered = applyPrimarySaleStatusSort(filtered, savedQuery);
         return moveBlankNamesToEnd(filtered, savedQuery);
     }

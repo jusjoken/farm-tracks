@@ -53,6 +53,7 @@ public class StockSavedQuery {
     private String visibleColumns = null;
     private Boolean displayAsTile = false;
     private Boolean valueLayout = false;
+    private Boolean includeExternalStock = false;
     
     @Transient
     private Boolean dirty = false;
@@ -407,6 +408,14 @@ public class StockSavedQuery {
 
     public void setDisplayAsTile(Boolean displayAsTile) {
         this.displayAsTile = displayAsTile;
+    }
+
+    public Boolean getIncludeExternalStock() {
+        return Boolean.TRUE.equals(includeExternalStock);
+    }
+
+    public void setIncludeExternalStock(Boolean includeExternalStock) {
+        this.includeExternalStock = includeExternalStock;
     }
 
 }

@@ -178,7 +178,7 @@ public class StockDetailsFormLayout extends FormLayout{
 
         // Bind weight as string since fieldWeight is now a TextField
         binder.forField(fieldWeight)
-                .bindReadOnly(stock -> stock.getWeightInLbsOz());
+                .bindReadOnly(stock -> stock.getWeightInLbsOzAsString());
 
         // Bind sale status
         binder.forField(fieldSaleStatus)

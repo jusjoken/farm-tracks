@@ -14,6 +14,7 @@ import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Unit;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
@@ -147,6 +148,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     private Select<StockType> stockTypeChoice = new Select<>();
     private RadioButtonGroup<BreederFilter> breederFilter = new RadioButtonGroup<>();
     private Select<StockStatus> stockStatusFilter = new Select<>();
+    private Checkbox includeExternalStockFilter = new Checkbox();
     private Boolean skipSidebarUpdates = Boolean.FALSE;
     private Integer selectedTabIndex = 0;
     private TaskGrid taskGrid = new TaskGrid();
@@ -304,8 +306,16 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
             currentStockSavedQuery.setStockStatus(event.getValue());
             sidebarChanged(Boolean.TRUE);
         });
+
+        includeExternalStockFilter.setAriaLabel("Include external stock");
+        includeExternalStockFilter.setLabel("Include external stock");
+        includeExternalStockFilter.setValue(Boolean.FALSE);
+        includeExternalStockFilter.addValueChangeListener(event -> {
+            currentStockSavedQuery.setIncludeExternalStock(event.getValue());
+            sidebarChanged(Boolean.TRUE);
+        });
         
-        Layout filterForm = new Layout(stockTypeChoice, breederFilter, stockStatusFilter);
+        Layout filterForm = new Layout(stockTypeChoice, breederFilter, stockStatusFilter, includeExternalStockFilter);
         filterForm.addClassNames(Padding.Horizontal.LARGE);
         filterForm.setFlexDirection(Layout.FlexDirection.COLUMN);
 
@@ -342,6 +352,7 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         }
 
         stockStatusFilter.setValue(currentStockSavedQuery.getStockStatus());
+        includeExternalStockFilter.setValue(currentStockSavedQuery.getIncludeExternalStock());
         skipSidebarUpdates = Boolean.FALSE;
     }
     

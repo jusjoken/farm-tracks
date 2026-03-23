@@ -35,7 +35,7 @@ public class GenotypeSegment {
         return genotypePair.getValue2();
     }
     public void setValue2(String value2) {
-        this.genotypePair.setValue1(value2);
+        this.genotypePair.setValue2(value2);
     }
     public GenotypeValuePair getGenotypePair() {
         return genotypePair;

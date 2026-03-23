@@ -77,3 +77,16 @@ SELECT
 	0
 WHERE NOT EXISTS (SELECT 1 FROM `app_settings_seq`);
 
+INSERT IGNORE INTO `stock_genotypes` (`id`, `genotypes`) VALUES
+(-1, 'A,at,a,_'),
+(-1, 'B,b,_'),
+(-1, 'C,cchd,cchl,c,_'),
+(-1, 'D,d,_'),
+(-1, 'E,Es,ej,e,_'),
+(-1, 'En,en,_'),
+(-1, 'V,v,_'),
+(-1, 'W,w,_'),
+(-1, 'DU,du,_'),
+(-1, 'Si,si,si1,si2,si3,_');
+-- 2026-03-22 21:29:38 UTC
+

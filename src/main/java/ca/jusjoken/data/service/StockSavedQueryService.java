@@ -91,6 +91,7 @@ public class StockSavedQueryService {
             newQuery.setVisibleColumns(query.getVisibleColumns());
             newQuery.setDisplayAsTile(query.getDisplayAsTile());
             newQuery.setValueLayout(query.getValueLayout());
+            newQuery.setIncludeExternalStock(query.getIncludeExternalStock());
             StockSavedQuery addedQuery = queryRepository.save(newQuery);
             return addedQuery.getId();
         }else{
