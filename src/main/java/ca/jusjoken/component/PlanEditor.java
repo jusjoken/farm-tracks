@@ -247,6 +247,15 @@ public class PlanEditor {
         valuesChanged();
     }
 
+    public void dialogOpenForBreedingTask(Stock femaleStock) {
+        dialogOpen(TaskLinkType.BREEDER, femaleStock, DialogMode.CREATE);
+
+        StockType stockType = femaleStock != null ? femaleStock.getStockType() : null;
+        selectDefaultBreedingTemplateForStockType(stockType);
+        refreshGeneratedTemplateTasks();
+        valuesChanged();
+    }
+
     public void dialogOpen(Integer taskPlanId, TaskLinkType taskLinkType, Stock stockEntity, DialogMode mode) {
         System.out.println("Opening PlanEditor dialog with taskPlanId: " + taskPlanId + ", taskLinkType: " + taskLinkType + ", stockEntity: " + stockEntity + ", mode: " + mode);
 
@@ -429,6 +438,37 @@ public class PlanEditor {
 
         selectedPlanTemplate = template;
         planTemplateSelect.setValue(template);
+    }
+
+    private void selectDefaultBreedingTemplateForStockType(StockType stockType) {
+        if (filteredPlanTemplates == null || filteredPlanTemplates.isEmpty()) {
+            selectedPlanTemplate = null;
+            planTemplateSelect.clear();
+            return;
+        }
+
+        PlanTemplate template = filteredPlanTemplates.stream()
+                .filter(t -> stockType != null
+                        && t.getStockType() != null
+                        && t.getStockType().getId() != null
+                        && t.getStockType().getId().equals(stockType.getId()))
+                .filter(t -> templateContainsTaskType(t, TaskType.BREED))
+                .findFirst()
+                .orElse(filteredPlanTemplates.stream()
+                        .filter(t -> templateContainsTaskType(t, TaskType.BREED))
+                        .findFirst()
+                        .orElse(filteredPlanTemplates.get(0)));
+
+        selectedPlanTemplate = template;
+        planTemplateSelect.setValue(template);
+    }
+
+    private boolean templateContainsTaskType(PlanTemplate template, TaskType taskType) {
+        if (template == null || template.getId() == null || taskType == null) {
+            return false;
+        }
+        return planTemplateTaskService.findAllByPlanTemplateId(template.getId()).stream()
+                .anyMatch(task -> taskType == task.getType());
     }
 
     private void buildDialogLayout() {

@@ -307,6 +307,8 @@ public class Utility {
                     return new Icon(TYPE_MEDICAL.getIconSource());
                 case CUSTOM:
                     return new Icon(TYPE_CUSTOM.getIconSource());
+                case BREEDING:
+                    return new Icon(TYPE_BREEDER.getIconSource());
                 default:
                     return null;
             }

@@ -288,31 +288,38 @@ public class TaskGrid extends Grid<Task> {
                     refreshGrid();
                 });
             }
-            //if the current task type has an action associated with it, show the action in the context menu. For example, if the task type is BIRTH then show a "View Offspring" action that opens the stock list view filtered to show the offspring from this birth task.
+            //if the current task type has an action associated with it, show the action in the context menu.
             if (menuEntity.getType() != null && menuEntity.getType().hasAction()) {
-                if (menuEntity.getType() == TaskType.BIRTH) {
-                    GridMenuItem<Task> actionMenu = menu.addItem(new Item(menuEntity.getType().getAction(), menuEntity.getIcon().getIcon()));
-                    actionMenu.addMenuItemClickListener(click -> {
-                        //get the stocktype from the task linkbreederid
-                        Stock stock = stockService.findById(menuEntity.getLinkBreederId());
-                        //set the stocktype filter on the littergrid to the stocktype of the breeder and set the parent filter to the name of the breeder and then open the litter editor
-                        litterEditor.runTaskAction(menuEntity, stock.getStockType());
+                switch (menuEntity.getType()) {
+                    case BIRTH -> {
+                        GridMenuItem<Task> actionMenu = menu.addItem(new Item(menuEntity.getType().getAction(), menuEntity.getIcon().getIcon()));
+                        actionMenu.addMenuItemClickListener(click -> {
+                            runBirthTaskAction(menuEntity);
+                        });
 
-                    });
-                    
-                    //for BIRTH tasks, also add the option to mark the plan as incomplete (missed birth)
-                    if (taskPlanId != null) {
-                        String missedBirthLabel = "Missed Birth";
-                        Item missedBirthItem = new Item(missedBirthLabel, Utility.ICONS.STATUS_INACTIVE.getIconSource());
-                        missedBirthItem.getElement().setAttribute("title", "Mark this breeder plan incomplete due to a missed birth.");
-                        GridMenuItem<Task> missedBirthMenu = menu.addItem(missedBirthItem);
-                        missedBirthMenu.addMenuItemClickListener(click -> {
+                        //for BIRTH tasks, also add the option to mark the plan as incomplete (missed birth)
+                        if (taskPlanId != null) {
+                            String missedBirthLabel = "Missed Birth";
+                            Item missedBirthItem = new Item(missedBirthLabel, Utility.ICONS.STATUS_INACTIVE.getIconSource());
+                            missedBirthItem.getElement().setAttribute("title", "Mark this breeder plan incomplete due to a missed birth.");
+                            GridMenuItem<Task> missedBirthMenu = menu.addItem(missedBirthItem);
+                            missedBirthMenu.addMenuItemClickListener(click -> {
+                                menu.close();
+                                taskPlanService.markIncomplete(taskPlanId);
+                                refreshGrid();
+                            });
+                        }
+                    }
+                    case BREEDING -> {
+                        GridMenuItem<Task> actionMenu = menu.addItem(new Item(menuEntity.getType().getAction(), menuEntity.getIcon().getIcon()));
+                        actionMenu.addMenuItemClickListener(click -> {
                             menu.close();
-                            taskPlanService.markIncomplete(taskPlanId);
-                            refreshGrid();
+                            runBreedingTaskAction(menuEntity);
                         });
                     }
-
+                    default -> {
+                        //no-op
+                    }
                 }
             } else {
                 //if no specific action then add a make complete action for active tasks and a mark incomplete action for completed tasks
@@ -348,6 +355,42 @@ public class TaskGrid extends Grid<Task> {
         });
 
         return menu;
+    }
+
+    private void runBirthTaskAction(Task task) {
+        if (task == null) {
+            return;
+        }
+        Stock stock = stockService.findById(task.getLinkBreederId());
+        if (stock == null || stock.getStockType() == null) {
+            return;
+        }
+        litterEditor.runTaskAction(task, stock.getStockType());
+    }
+
+    private void runBreedingTaskAction(Task task) {
+        if (task == null) {
+            return;
+        }
+
+        Integer breederId = task.getLinkBreederId();
+        if (breederId == null) {
+            UIUtilities.showNotification("Breeding task must be linked to a female breeder.");
+            return;
+        }
+
+        Stock breeder = stockService.findById(breederId);
+        if (breeder == null || breeder.getSex() != Utility.Gender.FEMALE) {
+            UIUtilities.showNotification("Breeding task must be linked to a female breeder.");
+            return;
+        }
+
+        if (!Boolean.TRUE.equals(task.getCompleted())) {
+            taskService.setTaskCompleted(task, true);
+            refreshGrid();
+        }
+
+        getPlanEditor().dialogOpenForBreedingTask(breeder);
     }
 
     private Badge safeGetPlanName(Task task) {

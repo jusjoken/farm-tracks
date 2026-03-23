@@ -84,6 +84,7 @@ public class TaskEditor {
     private Boolean originalCompleted;
 
     private LitterEditor litterEditor = new LitterEditor();
+    private PlanEditor planEditor;
 
     public TaskEditor() {
         taskService = Registry.getBean(TaskService.class);
@@ -114,7 +115,7 @@ public class TaskEditor {
         // taskActionButton.setWidthFull();
         taskActionButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         taskActionButton.addClickListener(event -> {
-            litterEditor.runTaskAction(task, currentStockType);
+            runTaskAction();
             updateTaskActionVisibility();
         });
 
@@ -161,6 +162,14 @@ public class TaskEditor {
         completed.setWidthFull();
 
         type.addValueChangeListener(e -> {
+            if (e.getValue() == TaskType.BREEDING) {
+                if (date.getValue() == null) {
+                    date.setValue(LocalDate.now());
+                }
+                if (linkType.getValue() != Utility.TaskLinkType.BREEDER) {
+                    changeLinkType(Utility.TaskLinkType.BREEDER);
+                }
+            }
             updateSaveEnabled();
             updateTaskActionVisibility();
         });
@@ -265,6 +274,14 @@ public class TaskEditor {
                 && name.getValue() != null
                 && !name.getValue().trim().isEmpty();
 
+        if (valid && type.getValue() == TaskType.BREEDING) {
+            Stock selectedBreeder = linkBreeder.getValue();
+            valid = date.getValue() != null
+                    && linkType.getValue() == Utility.TaskLinkType.BREEDER
+                    && selectedBreeder != null
+                    && selectedBreeder.getSex() == Utility.Gender.FEMALE;
+        }
+
         if (!valid) {
             dialogOkButton.setEnabled(false);
             return;
@@ -344,6 +361,51 @@ public class TaskEditor {
         } else {
             taskActionButton.setText("");
         }
+    }
+
+    private PlanEditor getPlanEditor() {
+        if (planEditor == null) {
+            planEditor = new PlanEditor();
+            planEditor.addListener(this::notifyRefreshNeeded);
+        }
+        return planEditor;
+    }
+
+    private void runTaskAction() {
+        if (task == null || task.getType() == null) {
+            return;
+        }
+
+        switch (task.getType()) {
+            case BIRTH -> litterEditor.runTaskAction(task, currentStockType);
+            case BREEDING -> runBreedingTaskAction();
+            default -> {
+                // future task actions
+            }
+        }
+    }
+
+    private void runBreedingTaskAction() {
+        if (task == null || task.getLinkBreederId() == null) {
+            UIUtilities.showNotification("Breeding task must be linked to a female breeder.");
+            return;
+        }
+
+        Stock breeder = stockService.findById(task.getLinkBreederId());
+        if (breeder == null || breeder.getSex() != Utility.Gender.FEMALE) {
+            UIUtilities.showNotification("Breeding task must be linked to a female breeder.");
+            return;
+        }
+
+        if (!Boolean.TRUE.equals(task.getCompleted())) {
+            taskService.setTaskCompleted(task, true);
+            task.setCompleted(true);
+            completed.setValue(true);
+        }
+
+        notifyRefreshNeeded();
+        dialogClose();
+        getPlanEditor().dialogOpenForBreedingTask(breeder);
     }
 
     private void changeLinkType(Utility.TaskLinkType newLinkType) {

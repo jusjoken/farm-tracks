@@ -8,6 +8,7 @@ import com.vaadin.flow.component.icon.Icon;
 import ca.jusjoken.data.Utility;
 
 public enum TaskType {
+    BREEDING("Breeding", "Create Breed Plan"),
     BREED("Breed"),
     NESTBOX("Nestbox"),
     BIRTH("Birth", "Due Date", "Create Litter"),

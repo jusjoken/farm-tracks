@@ -3,6 +3,7 @@ package ca.jusjoken.component;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.text.NumberFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -63,6 +64,7 @@ import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.data.service.StockWeightHistoryService;
 import ca.jusjoken.data.service.UserUiSettingsService;
 import ca.jusjoken.utility.BadgeVariant;
+import ca.jusjoken.utility.TaskType;
 import ca.jusjoken.views.stock.StockPedigreeEditor;
 import ca.jusjoken.views.utility.LitterListView;
 
@@ -961,8 +963,16 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                     });
                 }
                 menu.addSeparator();
-                //TODO: possible remove the Breed and Birth items as they are in Tasks
-                GridMenuItem<Stock> breedPlanMenu = menu.addItem(new Item("Breed Plan", Utility.ICONS.TYPE_BREEDER.getIconSource()));
+                GridMenuItem<Stock> planBreedingMenu = menu.addItem(new Item("Plan Breeding", Utility.ICONS.TYPE_BREEDER.getIconSource()));
+                planBreedingMenu.addMenuItemClickListener(click -> {
+                    Task newTask = new Task();
+                    newTask.setType(TaskType.BREEDING);
+                    newTask.setLinkType(Utility.TaskLinkType.BREEDER);
+                    newTask.setLinkBreederId(stockEntity.getId());
+                    newTask.setDate(LocalDate.now());
+                    taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, stockEntity.getStockType());
+                });
+                GridMenuItem<Stock> breedPlanMenu = menu.addItem(new Item("Create Breed Plan", Utility.ICONS.TYPE_BREEDER.getIconSource()));
                     breedPlanMenu.addMenuItemClickListener(click -> {
                         //open breed plan dialog
                         planEditor.dialogOpen(Utility.TaskLinkType.BREEDER, stockEntity);
