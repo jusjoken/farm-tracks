@@ -96,11 +96,9 @@ import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.entity.AppSettings;
 import ca.jusjoken.data.entity.Generation;
 import ca.jusjoken.data.entity.Stock;
-import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.service.AppSettingsService;
 import ca.jusjoken.data.service.StockService;
-import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.views.MainLayout;
 import jakarta.annotation.security.PermitAll;
@@ -114,7 +112,6 @@ import jakarta.annotation.security.PermitAll;
 public class StockPedigreeEditor extends Main implements ListRefreshNeededListener, HasDynamicTitle, HasUrlParameter<String>   {
 
     private final StockService stockService;
-    private final StockStatusHistoryService statusService;
     private final AppSettingsService appSettingsService;
     private Stock stock;
     private StockType viewStockType;
@@ -166,9 +163,8 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
 
     private final Span includeFieldsCount = UIUtilities.getSuperScriptSpan("0");
 
-    public StockPedigreeEditor(StockService stockService, StockTypeService typeService, AppSettingsService appSettingsService, StockStatusHistoryService statusService) {
+    public StockPedigreeEditor(StockService stockService, StockTypeService typeService, AppSettingsService appSettingsService) {
         this.stockService = stockService;
-        this.statusService = statusService;
         this.appSettingsService = appSettingsService;
         this.appSettings = appSettingsService.getAppSettings();
         this.resourcePedigreeTemplate = new ClassPathResource("Pedigree_Template.docx");
@@ -553,8 +549,10 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         }else{
             if(sex.equals(Gender.MALE)){
                 stockToSave.setFatherId(newParent.getId());
+                stockToSave.setFatherExtName(null);
             }else{
                 stockToSave.setMotherId(newParent.getId());
+                stockToSave.setMotherExtName(null);
             }
             stockService.save(stockToSave);
         }
@@ -566,8 +564,10 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         }else{
             if(sex.equals(Gender.MALE)){
                 stockToSave.setFatherId(null);
+                stockToSave.setFatherExtName(null);
             }else{
                 stockToSave.setMotherId(null);
+                stockToSave.setMotherExtName(null);
             }
             stockService.save(stockToSave);
         }
@@ -635,17 +635,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         Button addUnknownParent = new Button(FontAwesome.Solid.QUESTION.create());
         addUnknownParent.setTooltipText("Quick add unknown external " + parentStockTypeName + " and set as " + parentType);
         addUnknownParent.addClickListener(event -> {
-            Stock unknownExternal = new Stock();
-            unknownExternal.setName("Unknown");
-            unknownExternal.setPrefix("");
-            unknownExternal.setExternal(true);
-            unknownExternal.setBreeder(true);
-            unknownExternal.setSex(item.getSex());
-            unknownExternal.setStockType(viewStockType);
-            unknownExternal.setWeight(0);
-
-            stockService.save(unknownExternal);
-            statusService.save(new StockStatusHistory(unknownExternal.getId(), "archived", java.time.LocalDateTime.now()), unknownExternal, Boolean.FALSE);
+            Stock unknownExternal = stockService.getOrCreateExternalParent("Unknown", viewStockType, item.getSex());
             saveParent(item.getChild().getStock(), unknownExternal, item.getSex());
             buildView(stock);
         });

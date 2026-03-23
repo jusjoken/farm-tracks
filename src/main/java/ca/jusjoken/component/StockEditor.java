@@ -385,16 +385,16 @@ public class StockEditor extends Component{
         fieldStatusEditButton.getStyle().set("flex-shrink", "0");
 
         fieldFather.addCustomValueSetListener(item -> {
-            //add the custom value to the list and set as value
-            fieldFather.setItems(stockService.getFathers(item.getDetail(), stockEntity.getStockType()));
-            fieldFather.setValue(stockService.getParentExt(item.getDetail(), stockEntity.getStockType()));
-            System.out.println("**Father custom changed to:" + item.getDetail() + " getValue =" + item.getSource().getValue());
+            Stock externalFather = stockService.getOrCreateExternalParent(item.getDetail(), stockEntity.getStockType(), Gender.MALE);
+            fieldFather.setItems(stockService.getFathers(null, stockEntity.getStockType()));
+            fieldFather.setValue(externalFather);
+            System.out.println("**Father custom changed to:" + item.getDetail() + " set parent =" + externalFather);
         });
         fieldMother.addCustomValueSetListener(item -> {
-            //add the custom value to the list and set as value
-            fieldMother.setItems(stockService.getMothers(item.getDetail(), stockEntity.getStockType()));
-            fieldMother.setValue(stockService.getParentExt(item.getDetail(), stockEntity.getStockType()));
-            System.out.println("**Mother custom changed to:" + item.getDetail() + " getValue =" + item.getSource().getValue());
+            Stock externalMother = stockService.getOrCreateExternalParent(item.getDetail(), stockEntity.getStockType(), Gender.FEMALE);
+            fieldMother.setItems(stockService.getMothers(null, stockEntity.getStockType()));
+            fieldMother.setValue(externalMother);
+            System.out.println("**Mother custom changed to:" + item.getDetail() + " set parent =" + externalMother);
         });
         
         fieldExternal.addValueChangeListener(event -> {
@@ -429,23 +429,8 @@ public class StockEditor extends Component{
         
         //update stockEntity from fields
         if(currentDisplayMode.equals(DisplayMode.STOCK_DETAILS)){
-            //Handle user adding a parent manually
-            if(fieldFather!=null && fieldFather.getValue()!=null && fieldFather.getValue().isTemp()){
-                this.stockEntity.setFatherExtName(fieldFather.getValue().getDisplayName());
-                this.stockEntity.setFatherId(null);
-            }else{
-                if(fieldFather.getValue()!=null){
-                    this.stockEntity.setFatherId(fieldFather.getValue().getId());
-                }
-            }
-            if(fieldMother!=null && fieldMother.getValue()!=null && fieldMother.getValue().isTemp()){
-                this.stockEntity.setMotherExtName(fieldMother.getValue().getDisplayName());
-                this.stockEntity.setMotherId(null);
-            }else{
-                if(fieldMother.getValue()!=null){
-                    this.stockEntity.setMotherId(fieldMother.getValue().getId());
-                }
-            }
+            saveSelectedParent(fieldFather == null ? null : fieldFather.getValue(), Gender.MALE);
+            saveSelectedParent(fieldMother == null ? null : fieldMother.getValue(), Gender.FEMALE);
             //write all bound fields back to the entity
             try {
                 binder.writeBean(stockEntity);
@@ -493,6 +478,32 @@ public class StockEditor extends Component{
         log.info("dialogSave: notifying listeners");
         dialog.close();
         notifyRefreshNeeded();
+    }
+
+    private void saveSelectedParent(Stock selectedParent, Gender parentGender) {
+        if (selectedParent == null) {
+            if (parentGender.equals(Gender.MALE)) {
+                this.stockEntity.setFatherId(null);
+                this.stockEntity.setFatherExtName(null);
+            } else if (parentGender.equals(Gender.FEMALE)) {
+                this.stockEntity.setMotherId(null);
+                this.stockEntity.setMotherExtName(null);
+            }
+            return;
+        }
+
+        Stock parentToLink = selectedParent;
+        if (selectedParent.isTemp()) {
+            parentToLink = stockService.getOrCreateExternalParent(selectedParent.getDisplayName(), this.stockEntity.getStockType(), parentGender);
+        }
+
+        if (parentGender.equals(Gender.MALE)) {
+            this.stockEntity.setFatherId(parentToLink == null ? null : parentToLink.getId());
+            this.stockEntity.setFatherExtName(null);
+        } else if (parentGender.equals(Gender.FEMALE)) {
+            this.stockEntity.setMotherId(parentToLink == null ? null : parentToLink.getId());
+            this.stockEntity.setMotherExtName(null);
+        }
     }
 
     public void dialogOpen(Integer stockID, DisplayMode currentDisplayMode){

@@ -6,6 +6,7 @@ package ca.jusjoken.data.service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -27,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import ca.jusjoken.data.ColumnSort;
 import ca.jusjoken.data.Utility;
+import ca.jusjoken.data.Utility.Gender;
 import ca.jusjoken.data.Utility.StockSaleStatus;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
@@ -405,6 +407,47 @@ public class StockService {
     
     public Stock getParentExt(String name, StockType stockType){
         return new Stock(name, Boolean.FALSE, stockType);
+    }
+
+    public Stock getOrCreateExternalParent(String name, StockType stockType, Gender sex){
+        if (name == null || stockType == null || sex == null) {
+            return null;
+        }
+
+        String normalizedName = name.trim();
+        if (normalizedName.isEmpty()) {
+            return null;
+        }
+
+        List<Stock> stockByType = stockRepository.findAllByStockTypeId(stockType.getId());
+        for (Stock candidate : stockByType) {
+            if (candidate == null) {
+                continue;
+            }
+            if (!Boolean.TRUE.equals(candidate.getExternal())) {
+                continue;
+            }
+            if (!sex.equals(candidate.getSex())) {
+                continue;
+            }
+            if (candidate.getName() != null && candidate.getName().equalsIgnoreCase(normalizedName)) {
+                return candidate;
+            }
+        }
+
+        Stock externalParent = new Stock();
+        externalParent.setName(normalizedName);
+        externalParent.setPrefix("");
+        externalParent.setExternal(true);
+        externalParent.setBreeder(true);
+        externalParent.setSex(sex);
+        externalParent.setStockType(stockType);
+        externalParent.setWeight(0);
+        externalParent.setStatus("archived");
+        externalParent.setStatusDate(LocalDateTime.now());
+
+        save(externalParent);
+        return externalParent;
     }
     
     public List<Stock> findAllBreeders(StockType type){
