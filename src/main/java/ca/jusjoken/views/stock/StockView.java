@@ -16,8 +16,6 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
-import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.dataview.GridLazyDataView;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
@@ -40,7 +38,6 @@ import com.vaadin.flow.component.tabs.TabSheetVariant;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
-import com.vaadin.flow.data.renderer.LocalDateTimeRenderer;
 import com.vaadin.flow.data.renderer.TextRenderer;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.BeforeEvent;
@@ -75,6 +72,7 @@ import ca.jusjoken.component.LitterGrid;
 import ca.jusjoken.component.PlanEditor;
 import ca.jusjoken.component.SidebarChangedListener;
 import ca.jusjoken.component.StatusEditor;
+import ca.jusjoken.component.StatusGrid;
 import ca.jusjoken.component.StockDetailsFormLayout;
 import ca.jusjoken.component.StockEditor;
 import ca.jusjoken.component.StockEditorEvent;
@@ -83,25 +81,21 @@ import ca.jusjoken.component.TaskEditor;
 import ca.jusjoken.component.TaskGrid;
 import ca.jusjoken.component.TaskPlanGrid;
 import ca.jusjoken.component.WeightEditor;
+import ca.jusjoken.component.WeightGrid;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.BreederFilter;
 import ca.jusjoken.data.Utility.TabType;
 import ca.jusjoken.data.entity.GenotypeSegment;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
-import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
-import ca.jusjoken.data.entity.StockWeightHistory;
 import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.StockRepository;
 import ca.jusjoken.data.service.StockSavedQueryService;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockStatus;
-import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeRepository;
 import ca.jusjoken.data.service.StockTypeService;
-import ca.jusjoken.data.service.StockWeightHistoryService;
-import ca.jusjoken.data.service.TaskService;
 import ca.jusjoken.views.MainLayout;
 import jakarta.annotation.security.PermitAll;
 
@@ -116,9 +110,6 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     private final LitterService litterService;
     private final StockService stockService;
     private final StockSavedQueryService queryService;
-    private final StockStatusHistoryService statusService;
-    private final StockWeightHistoryService weightService;
-    private final TaskService taskService;
     private final MasterDetailLayout mdLayout = new MasterDetailLayout();
     private String currentSearchName = "";
     private StockSavedQuery currentStockSavedQuery;
@@ -154,22 +145,21 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     private TaskGrid taskGrid = new TaskGrid();
     private TaskPlanGrid planGrid = new TaskPlanGrid();
     private LitterGrid litterGrid = new LitterGrid();
+    private StatusGrid statusGrid = new StatusGrid();
+    private WeightGrid weightGrid = new WeightGrid();
     private boolean mobileDevice = false;
     private static final int MOBILE_BREAKPOINT_PX = 768;   
     private Registration resizeRegistration;
     private Registration taskGridCountRegistration;
     private Registration planGridCountRegistration;
 
-    public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockTypeService stockTypeService, StockService stockService, StockSavedQueryService queryService, StockStatusHistoryService statusService, StockWeightHistoryService weightService, TaskService taskService) {
+    public StockView(StockRepository stockRepository, LitterService litterService, StockTypeRepository stockTypeRepository, StockTypeService stockTypeService, StockService stockService, StockSavedQueryService queryService) {
         this.stockRepository = stockRepository;
         this.stockTypeRepository = stockTypeRepository;
         this.stockTypeService = stockTypeService;
         this.litterService = litterService;
         this.stockService = stockService;
         this.queryService = queryService;
-        this.statusService = statusService;
-        this.weightService = weightService;
-        this.taskService = taskService;
         applyDeviceScopedGridPreferenceKeys();
         this.dialogCommon = new StockEditor();
         this.statusEditor = new StatusEditor();
@@ -197,6 +187,8 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         planEditor.addListener(this);
         list.addListener(this);
         list.addSidebarChangedListener(this);
+        statusGrid.addListener(this);
+        weightGrid.addListener(this);
     }
 
     private Hr createHr() {
@@ -209,6 +201,8 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         taskGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.tasks"));
         planGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.plans"));
         litterGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.litters"));
+        statusGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.statuses"));
+        weightGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.weights"));
     }
 
     private String getDeviceScopedPreferenceKey(String baseKey) {
@@ -861,130 +855,33 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     }
     
     private LazyComponent createTabStatuses(Stock stock) {
-        Layout layout = new Layout();
-        List<StockStatusHistory> statuses = statusService.findByStockId(stock.getId());
-        Grid<StockStatusHistory> grid = new Grid<>(StockStatusHistory.class,false);
-        grid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
-        if(mobileDevice){
-            grid.setHeight("500px");
-        }else{      
-            grid.setHeight("270px");
-        }
-        // grid.setHeight("200px");
+        statusGrid.setStock(stock);
+        statusGrid.setDisplayAsTile(mobileDevice);
+        statusGrid.applyDisplayAsTilePreference();
+        statusGrid.setWidthFull();
+        statusGrid.setHeight(mobileDevice ? "500px" : "270px");
+        statusGrid.createGrid();
 
-        grid.addComponentColumn(item -> {
-            Icon editIcon = new Icon("lumo", "edit");
-            editIcon.addClickListener(e -> {
-                statusEditor.dialogOpen(stock,item.getStatusName(), item, StatusEditor.DialogMode.EDIT);
-            });
-            return editIcon;
-        }).setWidth("50px").setFlexGrow(0).setFrozen(true);
-        //only add the DELETE action column if there are more than 1 status so as to not remove the last one
-        if(statuses.size()>1){
-            grid.addComponentColumn(item -> {
-                Icon detailsDeleteIcon = new Icon("lumo", "cross");
-                detailsDeleteIcon.setTooltipText("Delete status entry");
-                detailsDeleteIcon.setColor("red");
-                detailsDeleteIcon.addClickListener(e -> {
-                    //confirm delete
-                        deleteStockStatusWithConfirm(item, stock);
-                });
-                return detailsDeleteIcon;
-            }).setWidth("50px").setFlexGrow(0);
-        }
-        grid.addColumn(StockStatusHistory::getStatusName).setHeader("Status");
-        grid.addColumn(item -> {
-            return item.getAge(stock, item.getSortDate().toLocalDate());
-        }).setHeader("Age");
-        grid.addColumn(new LocalDateTimeRenderer<>(StockStatusHistory::getSortDate,"MM-dd-YYYY HHmm")).setHeader("Status Date");
-        grid.addColumn(new LocalDateTimeRenderer<>(StockStatusHistory::getCreatedDate,"MM-dd-YYYY HHmm")).setHeader("Created");
-        grid.addColumn(new LocalDateTimeRenderer<>(StockStatusHistory::getLastModifiedDate,"MM-dd-YYYY HHmm")).setHeader("Modified");
-        grid.addColumn(StockStatusHistory::getNote).setHeader("Note");
-
-        grid.setItems(statuses);
-        layout.add(grid);
-        return new LazyComponent(() -> layout);
-    }
-    
-    private void deleteStockStatusWithConfirm(StockStatusHistory status, Stock stock){
-        ConfirmDialog dialog = new ConfirmDialog();
-        dialog.setHeader("Delete \"" + status.getFormattedStatus() + "\"?");
-        dialog.setText(
-                "Are you sure you want to permanently delete " + status.getFormattedStatus() + " for " + stock.getDisplayName() + "?");
-
-        dialog.setCancelable(true);
-
-        dialog.setConfirmText("Delete");
-        dialog.setConfirmButtonTheme("error primary");
-        dialog.addConfirmListener(event -> {
-            statusService.delete(status,stock);
-            listRefreshNeeded();
-        });     
-        dialog.open();
+        return new LazyComponent(() -> {
+            Div container = new Div(statusGrid);
+            container.setWidthFull();
+            return container;
+        });
     }
 
     private LazyComponent createTabWeights(Stock stock) {
-        Layout layout = new Layout();
-        List<StockWeightHistory> weights = weightService.findByStockId(stock.getId());
-        Grid<StockWeightHistory> grid = new Grid<>(StockWeightHistory.class,false);
-        grid.addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
-        // grid.setHeight("200px");
-        if(mobileDevice){
-            grid.setHeight("500px");
-        }else{      
-            grid.setHeight("270px");
-        }
+        weightGrid.setStock(stock);
+        weightGrid.setDisplayAsTile(mobileDevice);
+        weightGrid.applyDisplayAsTilePreference();
+        weightGrid.setWidthFull();
+        weightGrid.setHeight(mobileDevice ? "500px" : "270px");
+        weightGrid.createGrid();
 
-        grid.addComponentColumn(item -> {
-            Icon editIcon = new Icon("lumo", "edit");
-            editIcon.addClickListener(e -> {
-                weightEditor.dialogOpen(stock, item, WeightEditor.DialogMode.EDIT);
-            });
-            return editIcon;
-        }).setWidth("50px").setFlexGrow(0).setFrozen(true);
-        //only add the DELETE action column if there are more than 1 status so as to not remove the last one
-        if(weights.size()>1){
-            grid.addComponentColumn(item -> {
-                Icon detailsDeleteIcon = new Icon("lumo", "cross");
-                detailsDeleteIcon.setTooltipText("Delete weight entry");
-                detailsDeleteIcon.setColor("red");
-                detailsDeleteIcon.addClickListener(e -> {
-                    //confirm delete
-                        deleteStockWeightWithConfirm(item, stock);
-                });
-                return detailsDeleteIcon;
-            }).setWidth("50px").setFlexGrow(0);
-
-        }
-        grid.addColumn(StockWeightHistory::getWeightInLbsOz).setHeader("Weight");
-        grid.addColumn(item -> {
-            return item.getAge(stock, item.getSortDate().toLocalDate());
-        }).setHeader("Age");
-        grid.addColumn(new LocalDateTimeRenderer<>(StockWeightHistory::getSortDate,"MM-dd-YYYY HHmm")).setHeader("Weight Date");
-        grid.addColumn(new LocalDateTimeRenderer<>(StockWeightHistory::getCreatedDate,"MM-dd-YYYY HHmm")).setHeader("Created");
-        grid.addColumn(new LocalDateTimeRenderer<>(StockWeightHistory::getLastModifiedDate,"MM-dd-YYYY HHmm")).setHeader("Modified");
-        grid.addColumn(StockWeightHistory::getNote).setHeader("Note");
-
-        grid.setItems(weights);
-        layout.add(grid);
-        return new LazyComponent(() -> layout);
-    }
-    
-    private void deleteStockWeightWithConfirm(StockWeightHistory weight, Stock stock){
-        ConfirmDialog dialog = new ConfirmDialog();
-        dialog.setHeader("Delete \"" + weight.getWeightInLbsOz() + "\"?");
-        dialog.setText(
-                "Are you sure you want to permanently delete " + weight.getWeightInLbsOz() + " for " + stock.getDisplayName() + "?");
-
-        dialog.setCancelable(true);
-
-        dialog.setConfirmText("Delete");
-        dialog.setConfirmButtonTheme("error primary");
-        dialog.addConfirmListener(event -> {
-            weightService.delete(weight,stock);
-            listRefreshNeeded();
-        });     
-        dialog.open();
+        return new LazyComponent(() -> {
+            Div container = new Div(weightGrid);
+            container.setWidthFull();
+            return container;
+        });
     }
 
     private Layout createTags(Stock stock, Boolean topLayout){
