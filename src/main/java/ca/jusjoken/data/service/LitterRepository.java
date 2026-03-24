@@ -29,6 +29,12 @@ public interface LitterRepository extends JpaRepository<Litter, Integer>  {
     public List<Litter> findByMotherId(Integer id);
 
     public List<Litter> findByFatherId(Integer id);
+
+    @Query("select l.mother.id, count(l) from Litter l where l.mother.id in :ids group by l.mother.id")
+    List<Object[]> countByMotherIds(@Param("ids") List<Integer> ids);
+
+    @Query("select l.father.id, count(l) from Litter l where l.father.id in :ids group by l.father.id")
+    List<Object[]> countByFatherIds(@Param("ids") List<Integer> ids);
     
     @Query("select l from Litter l where l.archived IS NULL and l.stockType = :stocktype")
     public List<Litter> findNotArchived(@Param("stocktype") StockType stockType);

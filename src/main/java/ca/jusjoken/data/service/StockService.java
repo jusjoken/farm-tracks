@@ -4,23 +4,16 @@
  */
 package ca.jusjoken.data.service;
 
-import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.springframework.data.domain.Example;
-import org.springframework.data.domain.ExampleMatcher;
-import org.springframework.data.domain.ExampleMatcher.StringMatcher;
-import static org.springframework.data.domain.ExampleMatcher.matchingAll;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -29,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import ca.jusjoken.data.ColumnSort;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.Gender;
-import ca.jusjoken.data.Utility.StockSaleStatus;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.StockSavedQuery;
@@ -136,214 +128,115 @@ public class StockService {
         return "N/A";
     }
     
-    @SuppressWarnings({"ConvertToStringSwitch", "CollectionsToArray"})
-    private Example<Stock> getExample(String name, StockSavedQuery savedQuery){
-        String[] ignoreFields = {"needsSaving","profileImage","defaultImageSource","sexText","sex","prefix","tattoo","fatherName","motherName","fatherId","motherId",
-        "color","breed","weightText","weight","doB","acquired","regNo","champNo","legs","genotype","kitsCount","notes","litter","fosterLitter","ageInDays",
-        "litterCount","kitCount","createdDate","lastModifiedDate","external","stockValue","saleStatus","invoiceNumber"};   
-        Stock stock = new Stock();
-        stock.setName(name);
-        stock.setStockType(savedQuery.getStockType());
-        stock.setBreeder(savedQuery.getBreeder());
-
-        List<String> ignoreFieldList = new ArrayList<>(Arrays.asList(ignoreFields));
-
-        if(savedQuery.getStockStatus().getName().equals("active")){
-            // handled by applyStatusFilter via Stock.getActive()
-            stock.setActive(null);
-            stock.setStatus(null);
-            ignoreFieldList.add("active");
-            ignoreFieldList.add("status");
-        }else if(savedQuery.getStockStatus().getName().equals("inactive")){
-            // handled by applyStatusFilter via Stock.getActive()
-            stock.setActive(null);
-            stock.setStatus(null);
-            ignoreFieldList.add("active");
-            ignoreFieldList.add("status");
-        }else if(savedQuery.getStockStatus().getName().equals("all")){
-            stock.setActive(null);
-            stock.setStatus(null);
-            ignoreFieldList.add("active");
-            ignoreFieldList.add("status");
-        }else{
-            stock.setStatus(savedQuery.getStockStatus().getName());
-            stock.setActive(null);
-        }
-
-        ignoreFields = ignoreFieldList.toArray(new String[0]);
-
-        ExampleMatcher matcher = matchingAll()
-                .withIgnoreCase()                          // Ignore case for all string matches
-                .withStringMatcher(StringMatcher.CONTAINING)// Use LIKE %value% for strings
-                .withIgnoreNullValues()                    // Ignore null values
-                .withIgnorePaths(ignoreFields)
-                .withMatcher("name", ExampleMatcher.GenericPropertyMatchers.startsWith()); // make name startsWith
-        
-        return Example.of(stock, matcher);
-    }
-
-    private List<Stock> applyStatusFilter(List<Stock> input, StockSavedQuery savedQuery) {
-        if (savedQuery == null || savedQuery.getStockStatus() == null) {
-            return input;
-        }
-
-        String queryStatus = savedQuery.getStockStatus().getName();
-        boolean includeExternal = Boolean.TRUE.equals(savedQuery.getIncludeExternalStock());
-
-        if ("active".equals(queryStatus)) {
-            return input.stream()
-                    .filter(s -> Boolean.TRUE.equals(s.getActive()) || (includeExternal && Boolean.TRUE.equals(s.getExternal())))
-                    .toList();
-        }
-
-        if ("inactive".equals(queryStatus)) {
-            return input.stream()
-                    .filter(s -> !Boolean.TRUE.equals(s.getActive()) || (includeExternal && Boolean.TRUE.equals(s.getExternal())))
-                    .toList();
-        }
-
-        return input;
-    }
-
-    private List<Stock> applyExternalStockFilter(List<Stock> input, StockSavedQuery savedQuery) {
-        if (savedQuery == null || Boolean.TRUE.equals(savedQuery.getIncludeExternalStock())) {
-            return input;
-        }
-
-        return input.stream()
-                .filter(s -> !Boolean.TRUE.equals(s.getExternal()))
-                .toList();
-    }
-
-    private Sort getSort(StockSavedQuery savedQuery){
+    private StockGridQuery toGridQuery(String name, StockSavedQuery savedQuery) {
         if (savedQuery == null) {
-            return Sort.by(Sort.Order.asc("name"));
+            return new StockGridQuery(name, null, null, "all", false, List.of(new ColumnSort("name", Sort.Direction.ASC)));
         }
 
-        List<Sort.Order> orders = savedQuery.getSortOrders().stream()
-                .map(ColumnSort::getSortOrder)
-                .filter(Objects::nonNull)
-                .toList();
+        String stockStatusName = savedQuery.getStockStatus() == null
+                ? "all"
+                : savedQuery.getStockStatus().getName();
 
-        if (orders.isEmpty()) {
-            return Sort.by(Sort.Order.asc("name"));
+        List<ColumnSort> sortOrders = savedQuery.getSortOrders();
+        if (sortOrders == null || sortOrders.isEmpty()) {
+            sortOrders = List.of(new ColumnSort("name", Sort.Direction.ASC));
         }
 
-        return Sort.by(orders);
-    }
-
-    private boolean isPrimarySortByName(StockSavedQuery savedQuery) {
-        return savedQuery != null
-            && !savedQuery.getSortOrders().isEmpty()
-            && "name".equals(savedQuery.getSortOrders().get(0).getColumnName());
-    }
-
-    private List<Stock> moveBlankNamesToEnd(List<Stock> input, StockSavedQuery savedQuery) {
-        if (!isPrimarySortByName(savedQuery) || input == null || input.isEmpty()) {
-            return input;
-        }
-
-        List<Stock> withName = new ArrayList<>();
-        List<Stock> blankName = new ArrayList<>();
-
-        for (Stock s : input) {
-            String n = (s == null) ? null : s.getName();
-            if (n == null || n.trim().isEmpty()) {
-                blankName.add(s);
-            } else {
-                withName.add(s);
-            }
-        }
-
-        withName.addAll(blankName);
-        return withName;
-    }
-
-    private boolean isPrimarySortBySaleStatus(StockSavedQuery savedQuery) {
-        return savedQuery != null
-            && !savedQuery.getSortOrders().isEmpty()
-            && "saleStatus".equals(savedQuery.getSortOrders().get(0).getColumnName());
-    }
-
-    private int getSaleStatusSortRank(Stock stock) {
-        if (stock == null) {
-            return Integer.MAX_VALUE;
-        }
-
-        StockSaleStatus saleStatus = stock.getSaleStatus();
-        if (saleStatus == null) {
-            return Integer.MAX_VALUE;
-        }
-
-        return switch (saleStatus) {
-            case NONE -> 0;
-            case LISTED -> 1;
-            case DEPOSIT -> 2;
-            case SOLD -> 3;
-        };
-    }
-
-    private List<Stock> applyPrimarySaleStatusSort(List<Stock> input, StockSavedQuery savedQuery) {
-        if (!isPrimarySortBySaleStatus(savedQuery) || input == null || input.size() < 2) {
-            return input;
-        }
-
-        List<Stock> sorted = new ArrayList<>(input);
-        Sort.Direction direction = savedQuery.getSortOrders().get(0).getColumnSortDirection();
-
-        sorted.sort((left, right) -> Integer.compare(getSaleStatusSortRank(left), getSaleStatusSortRank(right)));
-        if (direction == Sort.Direction.DESC) {
-            Collections.reverse(sorted);
-        }
-        return sorted;
+        return new StockGridQuery(
+                name,
+                savedQuery.getStockType() == null ? null : savedQuery.getStockType().getId(),
+                savedQuery.getBreeder(),
+                stockStatusName,
+                savedQuery.getIncludeExternalStock(),
+                sortOrders);
     }
 
     public List<Stock> findStockWithCustomMatcherPageable(Pageable pageable, String name, StockSavedQuery savedQuery) {
-        Instant start = Instant.now();
-
-        Pageable newPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), getSort(savedQuery));
-
-        List<Stock> filtered = applyStatusFilter(
-                stockRepository.findAll(getExample(name, savedQuery), getSort(savedQuery)),
-                savedQuery
-        );
-
-        filtered = applyExternalStockFilter(filtered, savedQuery);
-
-        filtered = applyPrimarySaleStatusSort(filtered, savedQuery);
-
-        filtered = moveBlankNamesToEnd(filtered, savedQuery);
-
-        int fromIndex = Math.min((int) newPageable.getOffset(), filtered.size());
-        int toIndex = Math.min(fromIndex + newPageable.getPageSize(), filtered.size());
-        List<Stock> returnList = filtered.subList(fromIndex, toIndex);
-
-        Instant end = Instant.now();
-        Duration duration = Duration.between(start, end);
-        // System.out.println("***Stock query time:" + duration.toMillis() + " milliseconds");
-        return returnList;
+        return stockRepository.findAllForGrid(toGridQuery(name, savedQuery), pageable);
     }
 
     public Long findStockWithCustomMatcherCount(String name, StockSavedQuery savedQuery) {
-        return (long) applyExternalStockFilter(
-            applyStatusFilter(
-                stockRepository.findAll(getExample(name, savedQuery), getSort(savedQuery)),
-                savedQuery
-            ),
-            savedQuery
-        ).size();
+        return stockRepository.countForGrid(toGridQuery(name, savedQuery));
     }
 
-    public List<Stock> listByExample(String name, StockSavedQuery savedQuery){
-        List<Stock> filtered = applyStatusFilter(
-                stockRepository.findAll(getExample(name, savedQuery), getSort(savedQuery)),
-                savedQuery
-        );
-        filtered = applyExternalStockFilter(filtered, savedQuery);
-        filtered = applyPrimarySaleStatusSort(filtered, savedQuery);
-        return moveBlankNamesToEnd(filtered, savedQuery);
+    public List<Stock> listByExample(String name, StockSavedQuery savedQuery) {
+        return stockRepository.findAllForGrid(toGridQuery(name, savedQuery));
     }
-    
+
+    public double sumStockValueForGrid(String name, StockSavedQuery savedQuery) {
+        return stockRepository.sumStockValueForGrid(toGridQuery(name, savedQuery));
+    }
+
+    public Map<Integer, Stock> findStockByIds(List<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Integer> deduped = ids.stream().filter(Objects::nonNull).distinct().toList();
+        if (deduped.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Stock> matches = stockRepository.findAllByIdIn(deduped);
+        Map<Integer, Stock> byId = new HashMap<>();
+        for (Stock stock : matches) {
+            if (stock != null && stock.getId() != null) {
+                byId.put(stock.getId(), stock);
+            }
+        }
+        return byId;
+    }
+
+    public Map<Integer, Long> getKitCountsForParents(List<Stock> parents) {
+        if (parents == null || parents.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Integer> motherIds = new ArrayList<>();
+        List<Integer> fatherIds = new ArrayList<>();
+        for (Stock parent : parents) {
+            if (parent == null || parent.getId() == null || !Boolean.TRUE.equals(parent.getBreeder())) {
+                continue;
+            }
+            if (Utility.Gender.FEMALE.equals(parent.getSex())) {
+                motherIds.add(parent.getId());
+            } else if (Utility.Gender.MALE.equals(parent.getSex())) {
+                fatherIds.add(parent.getId());
+            }
+        }
+
+        Map<Integer, Long> motherCounts = new HashMap<>();
+        if (!motherIds.isEmpty()) {
+            for (Object[] row : stockRepository.countByMotherIds(motherIds)) {
+                if (row != null && row.length == 2 && row[0] != null && row[1] != null) {
+                    motherCounts.put((Integer) row[0], ((Number) row[1]).longValue());
+                }
+            }
+        }
+
+        Map<Integer, Long> fatherCounts = new HashMap<>();
+        if (!fatherIds.isEmpty()) {
+            for (Object[] row : stockRepository.countByFatherIds(fatherIds)) {
+                if (row != null && row.length == 2 && row[0] != null && row[1] != null) {
+                    fatherCounts.put((Integer) row[0], ((Number) row[1]).longValue());
+                }
+            }
+        }
+
+        Map<Integer, Long> result = new HashMap<>();
+        for (Stock parent : parents) {
+            if (parent == null || parent.getId() == null || !Boolean.TRUE.equals(parent.getBreeder())) {
+                continue;
+            }
+            if (Utility.Gender.FEMALE.equals(parent.getSex())) {
+                result.put(parent.getId(), motherCounts.getOrDefault(parent.getId(), 0L));
+            } else if (Utility.Gender.MALE.equals(parent.getSex())) {
+                result.put(parent.getId(), fatherCounts.getOrDefault(parent.getId(), 0L));
+            }
+        }
+
+        return result;
+    }
 
     public Stock findById(Integer id) {
         return stockRepository.findAllById(id);

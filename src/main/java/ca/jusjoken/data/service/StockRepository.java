@@ -20,7 +20,7 @@ import ca.jusjoken.data.entity.StockType;
  *
  * @author birch
  */
-public interface StockRepository extends JpaRepository<Stock, Long>  {
+public interface StockRepository extends JpaRepository<Stock, Long>, StockRepositoryCustom {
     @Query("select s from Stock s where s.name = :stockName and s.tattoo = :stockTattoo")
     Stock findByNameAndTattoo(@Param("stockName") String stockName, @Param("stockTattoo") String stockTattoo);
     
@@ -72,6 +72,14 @@ public interface StockRepository extends JpaRepository<Stock, Long>  {
     public Stock findAllById(Integer id);
     
     public List<Stock> findAllByStockTypeId(Integer id);
+
+    public List<Stock> findAllByIdIn(List<Integer> ids);
+
+    @Query("select s.motherId, count(s) from Stock s where s.motherId in :ids group by s.motherId")
+    List<Object[]> countByMotherIds(@Param("ids") List<Integer> ids);
+
+    @Query("select s.fatherId, count(s) from Stock s where s.fatherId in :ids group by s.fatherId")
+    List<Object[]> countByFatherIds(@Param("ids") List<Integer> ids);
     
     @Transactional
     @Modifying

@@ -5,7 +5,9 @@
 package ca.jusjoken.data.service;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +57,60 @@ public class LitterService {
             return litterRepository.countByFatherId(stock.getId());
         }
         
+    }
+
+    public Map<Integer, Long> getLitterCountsForParents(List<Stock> parents) {
+        if (parents == null || parents.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Integer> motherIds = new java.util.ArrayList<>();
+        List<Integer> fatherIds = new java.util.ArrayList<>();
+        for (Stock parent : parents) {
+            if (parent == null || parent.getId() == null) {
+                continue;
+            }
+            if (!Boolean.TRUE.equals(parent.getBreeder())) {
+                continue;
+            }
+            if (Utility.Gender.FEMALE.equals(parent.getSex())) {
+                motherIds.add(parent.getId());
+            } else if (Utility.Gender.MALE.equals(parent.getSex())) {
+                fatherIds.add(parent.getId());
+            }
+        }
+
+        Map<Integer, Long> motherCounts = new HashMap<>();
+        if (!motherIds.isEmpty()) {
+            for (Object[] row : litterRepository.countByMotherIds(motherIds)) {
+                if (row != null && row.length == 2 && row[0] != null && row[1] != null) {
+                    motherCounts.put((Integer) row[0], ((Number) row[1]).longValue());
+                }
+            }
+        }
+
+        Map<Integer, Long> fatherCounts = new HashMap<>();
+        if (!fatherIds.isEmpty()) {
+            for (Object[] row : litterRepository.countByFatherIds(fatherIds)) {
+                if (row != null && row.length == 2 && row[0] != null && row[1] != null) {
+                    fatherCounts.put((Integer) row[0], ((Number) row[1]).longValue());
+                }
+            }
+        }
+
+        Map<Integer, Long> result = new HashMap<>();
+        for (Stock parent : parents) {
+            if (parent == null || parent.getId() == null || !Boolean.TRUE.equals(parent.getBreeder())) {
+                continue;
+            }
+            if (Utility.Gender.FEMALE.equals(parent.getSex())) {
+                result.put(parent.getId(), motherCounts.getOrDefault(parent.getId(), 0L));
+            } else if (Utility.Gender.MALE.equals(parent.getSex())) {
+                result.put(parent.getId(), fatherCounts.getOrDefault(parent.getId(), 0L));
+            }
+        }
+
+        return result;
     }
     
     public List<Litter> getActiveLitters(StockType stockType){

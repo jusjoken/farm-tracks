@@ -2,8 +2,11 @@ package ca.jusjoken.views.stock;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.Map;
+import java.util.Set;
 
 import com.flowingcode.vaadin.addons.fontawesome.FontAwesome;
 import com.vaadin.flow.component.AttachEvent;
@@ -120,6 +123,8 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     //private Grid<Stock> list = new Grid<>();
     private GridLazyDataView<Stock> listDataView;
     private Stock selectedStock;
+    private int selectedStockAbsoluteIndex = 0;
+    private final Map<Integer, Integer> stockIndexCache = new HashMap<>();
     private Section sidebar;
     private NativeLabel countLabel = new NativeLabel();
     private Button saveOptionsButton = new Button(FontAwesome.Regular.SAVE.create());
@@ -560,9 +565,19 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
 
         //System.out.println("applyFilters: stock(start):" + currentStockSavedQuery.toString() );
         Stock tempSelected = selectedStock;
+        int tempSelectedIndex = selectedStockAbsoluteIndex;
         list.setPageSize(25);
         list.setItemsPageable((pageable) -> {
-            return stockService.findStockWithCustomMatcherPageable(pageable, currentSearchName, currentStockSavedQuery);
+            List<Stock> pageItems = stockService.findStockWithCustomMatcherPageable(pageable, currentSearchName, currentStockSavedQuery);
+            preloadPageMetadata(pageItems);
+            if (pageable.getOffset() == 0) {
+                stockIndexCache.clear();
+            }
+            int pageOffset = (int) pageable.getOffset();
+            for (int i = 0; i < pageItems.size(); i++) {
+                stockIndexCache.put(pageItems.get(i).getId(), pageOffset + i);
+            }
+            return pageItems;
         }, countCallback -> {
             stockListCount = stockService.findStockWithCustomMatcherCount(currentSearchName, currentStockSavedQuery);
             updateCounts();
@@ -570,20 +585,8 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         });
         //the above loses the selected item - so restore it from the temp one saved before
         selectedStock = tempSelected;
+        selectedStockAbsoluteIndex = tempSelectedIndex;
         
-        if(selectedStock==null){
-            list.scrollToIndex(0);
-        }else{
-            try {
-                list.scrollToItem(selectedStock);
-            } catch (NoSuchElementException e) {
-                // System.out.println("applyFilters: scrollToItem cannot find the item in the list:" + selectedStock);
-                //e.printStackTrace();
-            }
-            //runBeforeClientResponse(ui -> list.scrollToItem(selectedStock));
-            listDataView.refreshItem(selectedStock);
-        }
-
         list.setStockGridType(StockGrid.StockGridType.STOCK);
         list.setDisplayAsTile(Boolean.TRUE.equals(currentStockSavedQuery.getDisplayAsTile()));
         list.setValueLayout(Boolean.TRUE.equals(currentStockSavedQuery.getValueLayout()));
@@ -592,6 +595,20 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         list.setCurrentSearchName(currentSearchName);
 
         list.createGrid();
+        listDataView = list.getLazyDataView();
+
+        // Scroll AFTER createGrid(). Use requestAnimationFrame so the scroll
+        // executes after the client has fully processed sort/data-reset changes.
+        if (selectedStock == null) {
+            list.scrollToIndex(0);
+        } else {
+            final int scrollTo = selectedStockAbsoluteIndex;
+            final Stock scrollStock = selectedStock;
+            getUI().ifPresent(ui -> ui.beforeClientResponse(list, context ->
+                list.getElement().executeJs("requestAnimationFrame(() => this.scrollToIndex($0))", scrollTo)
+            ));
+            listDataView.refreshItem(scrollStock);
+        }
         sidebarSetValues();
         clearPendingOptionChanges();
     }
@@ -639,7 +656,13 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     private Component createList(){
         list.setPageSize(25);
         list.setItemsPageable((pageable) -> {
-            return stockService.findStockWithCustomMatcherPageable(pageable, currentSearchName, currentStockSavedQuery);
+            List<Stock> pageItems = stockService.findStockWithCustomMatcherPageable(pageable, currentSearchName, currentStockSavedQuery);
+            preloadPageMetadata(pageItems);
+            int pageOffset = (int) pageable.getOffset();
+            for (int i = 0; i < pageItems.size(); i++) {
+                stockIndexCache.put(pageItems.get(i).getId(), pageOffset + i);
+            }
+            return pageItems;
         }, countCallback -> {
             stockListCount = stockService.findStockWithCustomMatcherCount(currentSearchName, currentStockSavedQuery);
             updateCounts();
@@ -647,32 +670,83 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         });
 
         listDataView = list.getLazyDataView();
-        listDataView.setItemIndexProvider((item, query) -> {
-            if(item==null) return null;
-            // Use the same query to fetch the full data set with filter and sort
-            List<Stock> items = stockService.listByExample(currentSearchName, currentStockSavedQuery);
-            // Find the index of the matching item in the filtered and sorted list
-            int index = items.indexOf(item);
-            // System.out.println("createList: setItemIndexProvider: index:" + index + " looking for item:" + item);
-            return index >= 0 ? index : null;            
-        });   
         
         list.setWidthFull();
         list.getStyle().set("flex", "1 1 auto");
         list.getStyle().set("min-height", "0");
         list.asSingleSelect().addValueChangeListener(event -> {
             Stock selected = event.getValue();
+            boolean suppressDetailOpen = list.consumeSuppressDetailOpenOnNextSelection();
             if(selected==null){
                 selectedStock = null;
                 mdLayout.setDetail(null);
             }else{
                 selectedStock = selected;
-                mdLayout.setDetail(createTabbedContentArea(selectedStock));
-                taskGrid.setStockId(selectedStock.getId());
-                litterGrid.setStockId(selectedStock.getId());
+                selectedStockAbsoluteIndex = stockIndexCache.getOrDefault(selected.getId(), 0);
+                if (!suppressDetailOpen) {
+                    mdLayout.setDetail(createTabbedContentArea(selectedStock));
+                    taskGrid.setStockId(selectedStock.getId());
+                    litterGrid.setStockId(selectedStock.getId());
+                }
             }
         });
         return list;        
+    }
+
+    private void preloadPageMetadata(List<Stock> pageItems) {
+        if (pageItems == null || pageItems.isEmpty()) {
+            list.setPreloadedParentNames(Map.of(), Map.of());
+            list.setPreloadedBreederCounts(Map.of(), Map.of());
+            return;
+        }
+
+        Set<Integer> parentIds = new LinkedHashSet<>();
+        for (Stock stock : pageItems) {
+            if (stock == null) {
+                continue;
+            }
+            if (stock.getFatherId() != null && (stock.getFatherExtName() == null || stock.getFatherExtName().isBlank())) {
+                parentIds.add(stock.getFatherId());
+            }
+            if (stock.getMotherId() != null && (stock.getMotherExtName() == null || stock.getMotherExtName().isBlank())) {
+                parentIds.add(stock.getMotherId());
+            }
+        }
+
+        Map<Integer, Stock> parentsById = stockService.findStockByIds(parentIds.stream().toList());
+        Map<Integer, String> fatherNamesByStockId = new java.util.HashMap<>();
+        Map<Integer, String> motherNamesByStockId = new java.util.HashMap<>();
+        for (Stock stock : pageItems) {
+            if (stock == null || stock.getId() == null) {
+                continue;
+            }
+
+            if (stock.getFatherExtName() != null && !stock.getFatherExtName().isBlank()) {
+                fatherNamesByStockId.put(stock.getId(), stock.getFatherExtName());
+            } else if (stock.getFatherId() != null) {
+                Stock father = parentsById.get(stock.getFatherId());
+                if (father != null) {
+                    fatherNamesByStockId.put(stock.getId(), father.getDisplayName());
+                }
+            }
+
+            if (stock.getMotherExtName() != null && !stock.getMotherExtName().isBlank()) {
+                motherNamesByStockId.put(stock.getId(), stock.getMotherExtName());
+            } else if (stock.getMotherId() != null) {
+                Stock mother = parentsById.get(stock.getMotherId());
+                if (mother != null) {
+                    motherNamesByStockId.put(stock.getId(), mother.getDisplayName());
+                }
+            }
+        }
+        list.setPreloadedParentNames(fatherNamesByStockId, motherNamesByStockId);
+
+        List<Stock> breedersOnPage = pageItems.stream()
+                .filter(stock -> stock != null && stock.getId() != null && Boolean.TRUE.equals(stock.getBreeder()))
+                .toList();
+        list.setPreloadedBreederCounts(
+                litterService.getLitterCountsForParents(breedersOnPage),
+                stockService.getKitCountsForParents(breedersOnPage));
     }
     
     private VerticalLayout createTabbedContentArea(Stock stock){

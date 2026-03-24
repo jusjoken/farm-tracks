@@ -101,6 +101,11 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private Registration sortListenerRegistration;
     private boolean restoringSortOrder = false;
     private boolean suppressSortPersistence = false;
+    private boolean suppressDetailOpenOnNextSelection = false;
+    private Map<Integer, String> preloadedFatherNamesByStockId = Map.of();
+    private Map<Integer, String> preloadedMotherNamesByStockId = Map.of();
+    private Map<Integer, Long> preloadedLitterCountsByParentId = Map.of();
+    private Map<Integer, Long> preloadedKitCountsByParentId = Map.of();
 
     public static enum StockGridType {
         LITTER, STOCK, KITS
@@ -229,7 +234,9 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private String getValueFooter() {
         List<Stock> currentStockList;
         if(stockGridType == StockGridType.STOCK){
-            currentStockList = stockService.listByExample(currentSearchName, currentStockSavedQuery);
+            double totalValue = stockService.sumStockValueForGrid(currentSearchName, currentStockSavedQuery);
+            NumberFormat usFormat = NumberFormat.getCurrencyInstance(Locale.US);
+            return "Total value: " + usFormat.format(totalValue);
         } else {
             if(this.dataProvider == null){
                 currentStockList = List.of();
@@ -311,14 +318,10 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             return stockEntity.getAge().getAgeFormattedString();
         }).setHeader("Age").setResizable(true).setAutoWidth(true).setKey("age");
         addColumn(stockEntity -> {
-            Stock parent = stockService.getFather(stockEntity);
-            if(parent==null) return null;
-            return parent.getDisplayName();
+            return getFatherDisplayName(stockEntity);
         }).setHeader("Father").setResizable(true).setAutoWidth(true).setKey("father");
         addColumn(stockEntity -> {
-            Stock parent = stockService.getMother(stockEntity);
-            if(parent==null) return null;
-            return parent.getDisplayName();
+            return getMotherDisplayName(stockEntity);
         }).setHeader("Mother").setResizable(true).setAutoWidth(true).setKey("mother");
         addColumn(stockEntity -> {return stockTypeService.getGenderForType(stockEntity.getSex(), stockEntity.getStockType());}).setHeader("Gender").setResizable(true).setAutoWidth(true).setKey("gender");
         addColumn(new NumberRenderer<>(Stock::getStockValue, "$ %(,.2f",Locale.US, "$ 0.00")).setHeader("Value").setResizable(true).setAutoWidth(true).setKey("value").setSortable(true);
@@ -400,8 +403,14 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         }
 
         if(stock.getBreeder()){
-            card.addToFooter(UIUtilities.createBadge("Litters",litterService.getLitterCountForParent(stock).toString(), BadgeVariant.CONTRAST));
-            card.addToFooter(UIUtilities.createBadge(stock.getStockType().getNonBreederName(), stockService.getKitCountForParent(stock).toString(), BadgeVariant.CONTRAST));
+            long litterCount = preloadedLitterCountsByParentId.containsKey(stock.getId())
+                ? preloadedLitterCountsByParentId.getOrDefault(stock.getId(), 0L)
+                : litterService.getLitterCountForParent(stock);
+            long kitCount = preloadedKitCountsByParentId.containsKey(stock.getId())
+                ? preloadedKitCountsByParentId.getOrDefault(stock.getId(), 0L)
+                : stockService.getKitCountForParent(stock);
+            card.addToFooter(UIUtilities.createBadge("Litters", Long.toString(litterCount), BadgeVariant.CONTRAST));
+            card.addToFooter(UIUtilities.createBadge(stock.getStockType().getNonBreederName(), Long.toString(kitCount), BadgeVariant.CONTRAST));
         }
 
         card.addToFooter(UIUtilities.createBadge(null,stock.getAge().getAgeFormattedString()));
@@ -705,6 +714,36 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         return String.CASE_INSENSITIVE_ORDER.compare(left, right);
     }
 
+    private String getFatherDisplayName(Stock stockEntity) {
+        if (stockEntity == null) {
+            return null;
+        }
+        if (stockEntity.getFatherExtName() != null && !stockEntity.getFatherExtName().isBlank()) {
+            return stockEntity.getFatherExtName();
+        }
+        String preloaded = preloadedFatherNamesByStockId.get(stockEntity.getId());
+        if (preloaded != null) {
+            return preloaded;
+        }
+        Stock parent = stockService.getFather(stockEntity);
+        return parent == null ? null : parent.getDisplayName();
+    }
+
+    private String getMotherDisplayName(Stock stockEntity) {
+        if (stockEntity == null) {
+            return null;
+        }
+        if (stockEntity.getMotherExtName() != null && !stockEntity.getMotherExtName().isBlank()) {
+            return stockEntity.getMotherExtName();
+        }
+        String preloaded = preloadedMotherNamesByStockId.get(stockEntity.getId());
+        if (preloaded != null) {
+            return preloaded;
+        }
+        Stock parent = stockService.getMother(stockEntity);
+        return parent == null ? null : parent.getDisplayName();
+    }
+
     private <T extends Comparable<? super T>> int compareComparable(T left, T right) {
         if (left == null && right == null) {
             return 0;
@@ -805,6 +844,16 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         this.currentSearchName = currentSearchName;
     }
 
+    public void setPreloadedParentNames(Map<Integer, String> fatherNamesByStockId, Map<Integer, String> motherNamesByStockId) {
+        this.preloadedFatherNamesByStockId = fatherNamesByStockId == null ? Map.of() : fatherNamesByStockId;
+        this.preloadedMotherNamesByStockId = motherNamesByStockId == null ? Map.of() : motherNamesByStockId;
+    }
+
+    public void setPreloadedBreederCounts(Map<Integer, Long> litterCountsByParentId, Map<Integer, Long> kitCountsByParentId) {
+        this.preloadedLitterCountsByParentId = litterCountsByParentId == null ? Map.of() : litterCountsByParentId;
+        this.preloadedKitCountsByParentId = kitCountsByParentId == null ? Map.of() : kitCountsByParentId;
+    }
+
     private VerticalLayout createColumnSelector(){
         Set<String> resetColumnList = getVisibleColumnNames();
         VerticalLayout columnSelector = UIUtilities.getVerticalLayout(true, true, false);
@@ -885,6 +934,13 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                 }
 
             }else{
+                // Ensure row actions also establish grid selection so parent views
+                // can restore position after dialogs save/refresh.
+                if (!stockEntity.equals(asSingleSelect().getValue())) {
+                    suppressDetailOpenOnNextSelection = true;
+                    asSingleSelect().setValue(stockEntity);
+                }
+
                 menu.removeAll();
                 GridMenuItem<Stock> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
                 displayAsTileMenu.setCheckable(true);
@@ -1016,6 +1072,12 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         });
 
         return menu;
+    }
+
+    public boolean consumeSuppressDetailOpenOnNextSelection() {
+        boolean suppress = suppressDetailOpenOnNextSelection;
+        suppressDetailOpenOnNextSelection = false;
+        return suppress;
     }
 
     private List<Column<Stock>> getCleanColumnList(List<Column<Stock>> originalList){

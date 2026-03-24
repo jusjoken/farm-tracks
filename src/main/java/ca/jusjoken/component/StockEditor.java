@@ -421,7 +421,7 @@ public class StockEditor extends Component{
         returnId = null;
         returnStock = null;
         DisplayMode currentDisplayMode = openedDisplayMode;
-        System.out.println("dialogSave: stockEntity start save:" + stockEntity);
+        //System.out.println("dialogSave: stockEntity start save:" + stockEntity);
         //save here
         
         //retrieve the stock entity from the database before saving so it is the same entity
@@ -438,7 +438,7 @@ public class StockEditor extends Component{
                 System.out.println("dialogSave: Validation Error writing bean stockEntity:" + ex);
             }
 
-            System.out.println("dialogSave: stockEntity before save:" + stockEntity);
+            //System.out.println("dialogSave: stockEntity before save:" + stockEntity);
             stockService.save(this.stockEntity);
 
             //handle NEW stock items
@@ -461,7 +461,7 @@ public class StockEditor extends Component{
 
             returnId = this.stockEntity.getId();
             returnStock = this.stockEntity;
-            System.out.println("dialogSave: stockEntity after save:" + stockEntity);
+            //System.out.println("dialogSave: stockEntity after save:" + stockEntity);
         }else if(currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)){
             //write the profile image to file
             try (OutputStream outputStream = Files.newOutputStream(stockEntity.getProfileFileToBeSaved().toPath())) {
