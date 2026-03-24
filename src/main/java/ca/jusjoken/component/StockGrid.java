@@ -33,6 +33,7 @@ import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -93,6 +94,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private final PlanEditor planEditor;
     private List<Column<Stock>> columnList;
     private Boolean menuCreated = false;
+    private static final String ACTION_COLUMN_KEY = "row-actions";
     private Boolean displayAsTile = false;
     private Boolean valueLayout = false;
     private String preferenceScopeKey;
@@ -196,6 +198,8 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         setColumnReorderingAllowed(false);
         setMultiSort(true);
 
+        addRowActionsColumn();
+
         addComponentColumn(stockEntity -> {
             return stockEntity.getnameAndPrefix(false,true, true);
         }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(false).setKey("name")
@@ -258,6 +262,9 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
         //setHeight("270px");
         setColumnReorderingAllowed(true);
+
+        addRowActionsColumn();
+
         addComponentColumn(stockEntity -> {
             return createNameCell(stockEntity);
                 }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(false).setKey("name")
@@ -370,6 +377,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
         card.setHeaderPrefix(avatar);
         card.setHeader(stock.getHeader());
+        card.setHeaderSuffix(createRowMenuButton());
 
         FosterPlacement fosterPlacement = getFosterPlacementForCurrentLitter(stock);
         if (fosterPlacement == FosterPlacement.FOSTER_OUT) {
@@ -430,6 +438,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
         card.setHeaderPrefix(avatar);
         card.setHeader(stock.getHeader());
+        card.setHeaderSuffix(createRowMenuButton());
 
         FosterPlacement fosterPlacement = getFosterPlacementForCurrentLitter(stock);
         if (fosterPlacement == FosterPlacement.FOSTER_OUT) {
@@ -1011,8 +1020,37 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
     private List<Column<Stock>> getCleanColumnList(List<Column<Stock>> originalList){
         List<Column<Stock>> returnList = new ArrayList<>(originalList);
-        returnList.remove(0);
+        returnList.removeIf(column -> ACTION_COLUMN_KEY.equals(column.getKey()));
+        if (!returnList.isEmpty()) {
+            returnList.remove(0);
+        }
         return returnList;
+    }
+
+    private void addRowActionsColumn() {
+        addComponentColumn(stockEntity -> createRowMenuButton())
+                .setHeader("")
+                .setAutoWidth(false)
+                .setFlexGrow(0)
+                .setWidth("3.25em")
+                .setFrozen(true)
+                .setResizable(false)
+                .setSortable(false)
+                .setKey(ACTION_COLUMN_KEY);
+    }
+
+    private Button createRowMenuButton() {
+        Button menuButton = new Button(VaadinIcon.ELLIPSIS_DOTS_V.create());
+        menuButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
+        menuButton.getElement().setAttribute("title", "Actions");
+        menuButton.getElement().setAttribute("aria-label", "Open row menu");
+        menuButton.getStyle().set("flex-shrink", "0");
+        menuButton.addClickListener(event -> menuButton.getElement().executeJs(
+                "const rect=this.getBoundingClientRect();"
+                        + "this.dispatchEvent(new MouseEvent('contextmenu', {"
+                        + "bubbles:true,cancelable:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom" 
+                        + "}));"));
+        return menuButton;
     }
 
     private List<String> getColumnNames(){

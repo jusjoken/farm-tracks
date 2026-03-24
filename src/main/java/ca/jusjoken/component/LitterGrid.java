@@ -11,6 +11,7 @@ import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.card.Card;
 import com.vaadin.flow.component.card.CardVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
@@ -20,6 +21,7 @@ import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.provider.SortDirection;
@@ -69,6 +71,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     private final Map<Integer, Integer> assignedKitCountsByLitterId = new HashMap<>();
     private Boolean displayAsTile = false;
     private String preferenceScopeKey;
+    private static final String ACTION_COLUMN_KEY = "row-actions";
 
     public enum LitterDisplayMode {
         ALL,
@@ -167,6 +170,8 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         addThemeVariants(GridVariant.LUMO_COMPACT,GridVariant.LUMO_ROW_STRIPES,GridVariant.LUMO_NO_BORDER);
         setPartNameGenerator(item -> null);
 
+        addRowActionsColumn();
+
         //setHeight("200px");
 
         addComponentColumn(litter -> {
@@ -232,7 +237,8 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         card.addThemeVariants(CardVariant.LUMO_ELEVATED);
 
         card.setHeader(litter.getnameAndPrefix(false,true));
-        card.setHeaderSuffix(new Span(litter.getParentsFormatted()));
+
+        card.setHeaderSuffix(createTileHeaderSuffix(litter.getParentsFormatted()));
 
         String born = litter.getDoB().format(DateTimeFormatter.ofPattern("MM-dd-YYYY"));
         if(!born.isEmpty()){
@@ -256,6 +262,50 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         }));        
 
         return card;
+    }
+
+    private void addRowActionsColumn() {
+        addComponentColumn(litter -> createRowMenuButton())
+                .setHeader("")
+                .setAutoWidth(false)
+                .setFlexGrow(0)
+                .setWidth("3.25em")
+                .setFrozen(true)
+                .setResizable(false)
+                .setSortable(false)
+                .setKey(ACTION_COLUMN_KEY);
+    }
+
+    private Button createRowMenuButton() {
+        Button menuButton = new Button(VaadinIcon.ELLIPSIS_DOTS_V.create());
+        menuButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
+        menuButton.getElement().setAttribute("title", "Actions");
+        menuButton.getElement().setAttribute("aria-label", "Open row menu");
+        menuButton.getStyle().set("flex-shrink", "0");
+        menuButton.addClickListener(event -> menuButton.getElement().executeJs(
+                "const rect=this.getBoundingClientRect();"
+                        + "this.dispatchEvent(new MouseEvent('contextmenu', {"
+                        + "bubbles:true,cancelable:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom"
+                        + "}));"));
+        return menuButton;
+    }
+
+    private HorizontalLayout createTileHeaderSuffix(String text) {
+        Span textSpan = new Span(text == null ? "" : text);
+        textSpan.getStyle().set("overflow", "hidden");
+        textSpan.getStyle().set("text-overflow", "ellipsis");
+        textSpan.getStyle().set("white-space", "nowrap");
+        textSpan.getStyle().set("min-width", "0");
+        textSpan.getStyle().set("flex", "1 1 auto");
+
+        HorizontalLayout headerSuffix = UIUtilities.getHorizontalLayoutNoWidthCentered();
+        headerSuffix.setPadding(false);
+        headerSuffix.setSpacing(true);
+        headerSuffix.setAlignItems(HorizontalLayout.Alignment.CENTER);
+        headerSuffix.getStyle().set("min-width", "0");
+        headerSuffix.getStyle().set("max-width", "100%");
+        headerSuffix.add(textSpan, createRowMenuButton());
+        return headerSuffix;
     }
 
     private void setStockValues() {

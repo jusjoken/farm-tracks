@@ -6,6 +6,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.card.Card;
 import com.vaadin.flow.component.card.CardVariant;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
@@ -16,6 +18,8 @@ import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
 import com.vaadin.flow.component.grid.contextmenu.GridSubMenu;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.data.provider.ListDataProvider;
 import com.vaadin.flow.data.provider.SortDirection;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
@@ -70,6 +74,7 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
     private Integer expandedPlanId;
     private Boolean displayAsTile = false;
     private boolean menuCreated = false;
+    private static final String ACTION_COLUMN_KEY = "row-actions";
 
         private final ComponentRenderer<Component, TaskPlan> planCardRenderer = new ComponentRenderer<>(
             this::createPlanCard);
@@ -124,6 +129,8 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
 
     private void configureListView() {
         addThemeVariants(GridVariant.LUMO_COMPACT, GridVariant.LUMO_ROW_STRIPES, GridVariant.LUMO_NO_BORDER);
+
+        addRowActionsColumn();
 
         addComponentColumn(this::buildPlanHeader)
             .setHeader("Plan")
@@ -276,7 +283,8 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
         headerLayout.add(buildPlanHeader(plan));
 
         card.setHeader(headerLayout);
-        card.setHeaderSuffix(new Span(getPlanTypeLabel(plan)));
+
+        card.setHeaderSuffix(createTileHeaderSuffix(getPlanTypeLabel(plan)));
 
         // Footer chips for visual parity with TaskGrid
         // Status badge first
@@ -297,6 +305,49 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
         card.addToFooter(UIUtilities.createBadge(null, remaining, BadgeVariant.CONTRAST));
 
         return card;
+    }
+
+    private void addRowActionsColumn() {
+        addComponentColumn(plan -> createRowMenuButton())
+                .setHeader("")
+                .setAutoWidth(false)
+                .setFlexGrow(0)
+                .setWidth("3.25em")
+                .setFrozen(true)
+                .setResizable(false)
+                .setSortable(false)
+                .setKey(ACTION_COLUMN_KEY);
+    }
+
+    private Button createRowMenuButton() {
+        Button menuButton = new Button(VaadinIcon.ELLIPSIS_DOTS_V.create());
+        menuButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
+        menuButton.getElement().setAttribute("title", "Actions");
+        menuButton.getElement().setAttribute("aria-label", "Open row menu");
+        menuButton.getStyle().set("flex-shrink", "0");
+        menuButton.addClickListener(event -> menuButton.getElement().executeJs(
+                "const rect=this.getBoundingClientRect();"
+                        + "this.dispatchEvent(new MouseEvent('contextmenu', {"
+                        + "bubbles:true,cancelable:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom"
+                        + "}));"));
+        return menuButton;
+    }
+
+    private HorizontalLayout createTileHeaderSuffix(String text) {
+        Span textSpan = new Span(text == null ? "" : text);
+        textSpan.getStyle().set("overflow", "hidden");
+        textSpan.getStyle().set("text-overflow", "ellipsis");
+        textSpan.getStyle().set("white-space", "nowrap");
+        textSpan.getStyle().set("min-width", "0");
+        textSpan.getStyle().set("flex", "1 1 auto");
+
+        HorizontalLayout headerSuffix = new HorizontalLayout(textSpan, createRowMenuButton());
+        headerSuffix.setPadding(false);
+        headerSuffix.setSpacing(true);
+        headerSuffix.setAlignItems(HorizontalLayout.Alignment.CENTER);
+        headerSuffix.getStyle().set("min-width", "0");
+        headerSuffix.getStyle().set("max-width", "100%");
+        return headerSuffix;
     }
 
     private Component createTaskDetailsLayout(TaskPlan plan) {
