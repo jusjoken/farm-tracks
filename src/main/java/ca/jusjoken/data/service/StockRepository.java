@@ -59,6 +59,15 @@ public interface StockRepository extends JpaRepository<Stock, Long>, StockReposi
     @Query("select count(s) from Stock s where (s.fosterLitter.id = :litterId) or (s.fosterLitter is null and s.litter.id = :litterId)")
     Long countAllKitsAssignedToLitterId(@Param("litterId") Integer litterId);
 
+    @Query("""
+        select coalesce(s.fosterLitter.id, s.litter.id), count(s)
+        from Stock s
+        where (s.fosterLitter.id in :litterIds)
+           or (s.fosterLitter is null and s.litter.id in :litterIds)
+        group by coalesce(s.fosterLitter.id, s.litter.id)
+    """)
+    List<Object[]> countAllKitsAssignedToLitterIds(@Param("litterIds") List<Integer> litterIds);
+
     public List<Stock> findAllByMotherId(Integer id);
 
     public List<Stock> findAllByFatherId(Integer id);

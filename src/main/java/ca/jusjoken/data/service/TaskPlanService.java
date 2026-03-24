@@ -141,18 +141,26 @@ public class TaskPlanService {
 
     //add a method to create a displayname for a taskplan that includes the father, mother and the date for the task associated with a sequence of 1
     public String getDisplayName(TaskPlan taskPlan) {
+        if (taskPlan == null) {
+            return "Plan";
+        }
+
         String fatherName = "Unknown Father";
         String motherName = "Unknown Mother";
         String dateInfo = "";
 
         if (taskPlan.getLinkFatherId() != null) {
             Stock fatherOpt = stockService.findById(taskPlan.getLinkFatherId());
-            fatherName = fatherOpt.getName();
+            if (fatherOpt != null && fatherOpt.getName() != null && !fatherOpt.getName().isBlank()) {
+                fatherName = fatherOpt.getName();
+            }
         }
 
         if (taskPlan.getLinkMotherId() != null) {
             Stock motherOpt = stockService.findById(taskPlan.getLinkMotherId());
-            motherName = motherOpt.getName();
+            if (motherOpt != null && motherOpt.getName() != null && !motherOpt.getName().isBlank()) {
+                motherName = motherOpt.getName();
+            }
         }
 
         List<Task> tasks = taskService.findByPlanId(taskPlan.getId());
@@ -169,6 +177,11 @@ public class TaskPlanService {
     public HorizontalLayout getHeader(TaskPlan plan) {
         HorizontalLayout headerLayout = new HorizontalLayout();
         headerLayout.setSpacing(true);
+
+        if (plan == null) {
+            headerLayout.add("General Plan");
+            return headerLayout;
+        }
 
         // Icon for plan type
         Icon typeIcon = null;
@@ -188,11 +201,14 @@ public class TaskPlanService {
         String dateInfo = "";
         String linkTypeInfo = "";
 
-        linkTypeInfo = switch (plan.getType()) {
-            case BREEDER -> "Breeder";
-            case LITTER -> "Litter";
-            default -> "General";
-        };
+        Utility.TaskLinkType linkType = plan != null ? plan.getType() : null;
+        if (linkType == Utility.TaskLinkType.BREEDER) {
+            linkTypeInfo = "Breeder";
+        } else if (linkType == Utility.TaskLinkType.LITTER) {
+            linkTypeInfo = "Litter";
+        } else {
+            linkTypeInfo = "General";
+        }
         List<Task> tasks = taskService.findByPlanId(plan.getId());
         if (!tasks.isEmpty()) {
             var firstTask = tasks.get(0);
@@ -208,14 +224,23 @@ public class TaskPlanService {
 
 
     public Badge getDisplayNameBadge(TaskPlan taskPlan) {
+        if (taskPlan == null) {
+            Badge fallbackBadge = new Badge("General Plan");
+            fallbackBadge.addThemeVariants(BadgeVariant.PILL, BadgeVariant.WARNING);
+            return fallbackBadge;
+        }
+
         String dateInfo = "";
         String linkTypeInfo = "";
 
-        linkTypeInfo = switch (taskPlan.getType()) {
-            case BREEDER -> "Breeder";
-            case LITTER -> "Litter";
-            default -> "General";
-        };
+        Utility.TaskLinkType linkType = taskPlan != null ? taskPlan.getType() : null;
+        if (linkType == Utility.TaskLinkType.BREEDER) {
+            linkTypeInfo = "Breeder";
+        } else if (linkType == Utility.TaskLinkType.LITTER) {
+            linkTypeInfo = "Litter";
+        } else {
+            linkTypeInfo = "General";
+        }
         List<Task> tasks = taskService.findByPlanId(taskPlan.getId());
         if (!tasks.isEmpty()) {
             var firstTask = tasks.get(0);

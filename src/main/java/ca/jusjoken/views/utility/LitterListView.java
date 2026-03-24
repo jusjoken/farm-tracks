@@ -25,14 +25,12 @@ import jakarta.annotation.security.PermitAll;
 @PageTitle("Litter List")
 public class LitterListView extends Main implements ListRefreshNeededListener, BeforeEnterObserver{
     private final LitterGrid litterGrid = new LitterGrid();
-    private final StockTypeService stockTypeService;
     private boolean mobileDevice = false;
     private static final int MOBILE_BREAKPOINT_PX = 768;   
     private Registration resizeRegistration;
     private Integer queryLitterIdFilter;
 
     public LitterListView(StockTypeService stockTypeService) {
-        this.stockTypeService = stockTypeService;
         applyDeviceScopedPreferenceKey();
 
         setSizeFull();
@@ -46,9 +44,14 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
         stockTypeSelect.setLabel("Stock Type");
         stockTypeSelect.setItems(stockTypeService.findAllStockTypes());
         stockTypeSelect.setItemLabelGenerator(StockType::getName);
+                // Keep select in sync with the grid default without triggering an immediate duplicate reload.
+                stockTypeSelect.setValue(litterGrid.getStockType());
         stockTypeSelect.addValueChangeListener(e -> {
-           litterGrid.setStockType(e.getValue());
-           litterGrid.refreshGrid();
+                        if (sameStockType(e.getOldValue(), e.getValue())) {
+                                return;
+                        }
+                        litterGrid.setStockType(e.getValue());
+                        litterGrid.refreshGrid();
         });
 
         //add a filter that filters the littergrid by the name of the father or mother
@@ -58,7 +61,6 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
         parentFilter.setValueChangeMode(ValueChangeMode.EAGER);
         parentFilter.addValueChangeListener(e -> {
            litterGrid.setParentNameFilter(e.getValue());
-           litterGrid.refreshGrid();
         });
 
         //add a vaadin radiobuttongroup to filter the littergrid by active, inactive or all litters
@@ -85,7 +87,6 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
         });
         displayModeSelect.addValueChangeListener(e -> {
             litterGrid.setLitterDisplayMode(e.getValue());
-            litterGrid.refreshGrid();
         });
         displayModeSelect.setValue(LitterGrid.LitterDisplayMode.ALL);
 
@@ -99,25 +100,17 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
 
         parentFilter.setAutofocus(true);
 
-        //default to stocktype rabbits
-        stockTypeSelect.setValue(stockTypeService.findRabbits());
-
         add(litterGrid);
         litterGrid.setWidthFull();
         litterGrid.getStyle().set("flex", "1 1 auto");
         litterGrid.getStyle().set("min-height", "0");
-
-        // litterGrid.createGrid();
-        listRefreshNeeded();
     }
 
     private void updateMobileFlag(int width) {
         boolean isMobileNow = width < MOBILE_BREAKPOINT_PX;
-        System.out.println("Window width: " + width + "px. Mobile breakpoint: " + MOBILE_BREAKPOINT_PX + "px. isMobileNow: " + isMobileNow);
         if (this.mobileDevice != isMobileNow) {
             this.mobileDevice = isMobileNow;
             applyDeviceScopedPreferenceKey();
-            System.out.println("Mobile device flag updated to: " + mobileDevice + " calling listRefreshNeeded to update grid view style.");
             listRefreshNeeded();
         }
     }
@@ -155,14 +148,20 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
 
     @Override
     public void listRefreshNeeded() {
-        System.out.println("listRefreshNeeded. MobileDevice: " + mobileDevice );
+        boolean previousDisplayMode = Boolean.TRUE.equals(litterGrid.getDisplayAsTile());
         // Use mobile as the default only when no saved preference exists.
         litterGrid.setDisplayAsTile(mobileDevice);
         litterGrid.loadDisplayAsTilePreference();
+        boolean currentDisplayMode = Boolean.TRUE.equals(litterGrid.getDisplayAsTile());
         litterGrid.setLitterIdFilter(queryLitterIdFilter);
 
-        litterGrid.createGrid();
-        litterGrid.expandFilteredLitterDetails();
+        if (previousDisplayMode != currentDisplayMode) {
+            litterGrid.createGrid();
+        }
+
+        if (queryLitterIdFilter != null) {
+            litterGrid.expandFilteredLitterDetails();
+        }
     }
 
     @Override
@@ -174,8 +173,11 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
                 .orElse(null);
 
         queryLitterIdFilter = parseIntegerOrNull(litterIdValue);
-        // Rebuild after query-param filtering so deep-link navigation reliably auto-expands/highlights.
-        listRefreshNeeded();
+        // Only rebuild here for deep links. Initial page load already sets the default stock type
+        // and refreshes via the stock type selector listener.
+        if (queryLitterIdFilter != null) {
+            listRefreshNeeded();
+        }
     }
 
     private Integer parseIntegerOrNull(String value) {
@@ -187,6 +189,21 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private boolean sameStockType(StockType left, StockType right) {
+        if (left == right) {
+            return true;
+        }
+        if (left == null || right == null) {
+            return false;
+        }
+        Integer leftId = left.getId();
+        Integer rightId = right.getId();
+        if (leftId != null && rightId != null) {
+            return leftId.equals(rightId);
+        }
+        return left.equals(right);
     }
 
 }

@@ -750,6 +750,10 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
         if (plan.getType() == Utility.TaskLinkType.GENERAL) {
             return "Plan: General Plan";
         }
-        return "Plan: " + taskPlanService.getDisplayName(plan);
+        try {
+            return "Plan: " + taskPlanService.getDisplayName(plan);
+        } catch (Exception ex) {
+            return "Plan";
+        }
     }
 }

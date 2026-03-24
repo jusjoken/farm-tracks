@@ -881,7 +881,6 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     
     private LazyComponent createTabLitters(Stock stock) {
         Layout layout = new Layout();
-        litterGrid.setStockId(stock.getId());
         // litterGrid.setHeight("270px");
         System.out.println("createTabLitters: mobileDevice:" + mobileDevice);
         // Use mobile as the default only when no saved preference exists.

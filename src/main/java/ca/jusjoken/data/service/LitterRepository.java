@@ -6,6 +6,7 @@ package ca.jusjoken.data.service;
 
 import java.util.List;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -26,8 +27,10 @@ public interface LitterRepository extends JpaRepository<Litter, Integer>  {
 
     public Long countByFatherId(Integer fatherId);
 
+    @EntityGraph(attributePaths = { "mother", "father", "stockType" })
     public List<Litter> findByMotherId(Integer id);
 
+    @EntityGraph(attributePaths = { "mother", "father", "stockType" })
     public List<Litter> findByFatherId(Integer id);
 
     @Query("select l.mother.id, count(l) from Litter l where l.mother.id in :ids group by l.mother.id")
@@ -37,9 +40,11 @@ public interface LitterRepository extends JpaRepository<Litter, Integer>  {
     List<Object[]> countByFatherIds(@Param("ids") List<Integer> ids);
     
     @Query("select l from Litter l where l.archived IS NULL and l.stockType = :stocktype")
+    @EntityGraph(attributePaths = { "mother", "father", "stockType" })
     public List<Litter> findNotArchived(@Param("stocktype") StockType stockType);
 
     @Query("select l from Litter l where l.archived IS NULL")
+    @EntityGraph(attributePaths = { "mother", "father", "stockType" })
     public List<Litter> findNotArchived();
     
 
@@ -50,7 +55,12 @@ public interface LitterRepository extends JpaRepository<Litter, Integer>  {
     public void deleteByFatherId(Integer stockId);
     public void deleteByMotherId(Integer stockId);
 
+    @EntityGraph(attributePaths = { "mother", "father", "stockType" })
     public List<Litter> findAllByStockType(StockType stockType);
+
+    @Override
+    @EntityGraph(attributePaths = { "mother", "father", "stockType" })
+    public List<Litter> findAll();
 
     @Query("""
         select l.name

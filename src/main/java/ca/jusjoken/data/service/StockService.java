@@ -99,6 +99,29 @@ public class StockService {
         return count == null ? 0L : count;
     }
 
+    public Map<Integer, Long> getKitsAssignedCountsForLitters(List<Integer> litterIds) {
+        if (litterIds == null || litterIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Integer> deduped = litterIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (deduped.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Integer, Long> countsByLitterId = new HashMap<>();
+        for (Object[] row : stockRepository.countAllKitsAssignedToLitterIds(deduped)) {
+            if (row == null || row.length < 2 || row[0] == null || row[1] == null) {
+                continue;
+            }
+            Integer litterId = ((Number) row[0]).intValue();
+            Long count = ((Number) row[1]).longValue();
+            countsByLitterId.put(litterId, count);
+        }
+
+        return countsByLitterId;
+    }
+
     public List<Stock> getKitsForParent(Stock stock){
         List<Stock> kitsForParent = new ArrayList<>();
         if(stock.getSex().equals(Utility.Gender.FEMALE)){

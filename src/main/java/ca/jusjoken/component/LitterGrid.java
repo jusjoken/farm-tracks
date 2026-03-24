@@ -257,10 +257,6 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         card.addToFooter(UIUtilities.createBadge("Survived: ", String.valueOf(getDisplayKitsSurvivedCount(litter)), BadgeVariant.CONTRAST));
         card.addToFooter(UIUtilities.createBadge("Rate: ", getDisplaySurvivalRate(litter), BadgeVariant.CONTRAST));
 
-        setItemDetailsRenderer(new ComponentRenderer<>(item -> {
-            return createKitsInLitterLayout(item);
-        }));        
-
         return card;
     }
 
@@ -353,7 +349,6 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     public void refreshGrid() {
         setLitterDataProvider();
         updateSortOrder();
-        updateFooterStats();
     }
 
     private void updateSortOrder() {
@@ -408,7 +403,25 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     }
 
     public void setStockType(StockType stockType) {
+        if (sameStockType(this.stockType, stockType)) {
+            return;
+        }
         this.stockType = stockType;
+    }
+
+    private boolean sameStockType(StockType left, StockType right) {
+        if (left == right) {
+            return true;
+        }
+        if (left == null || right == null) {
+            return false;
+        }
+        Integer leftId = left.getId();
+        Integer rightId = right.getId();
+        if (leftId != null && rightId != null) {
+            return leftId.equals(rightId);
+        }
+        return left.equals(right);
     }
 
     public void setParentNameFilter(String value) {
@@ -595,7 +608,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     }
 
     private boolean matchesDisplayMode(Litter litter) {
-        Boolean active = resolveActiveState(litter);
+        Boolean active = litter == null ? null : litter.getActive();
         if (active == null) {
             return true;
         }
@@ -606,28 +619,6 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
             return !active;
         }
         return true;
-    }
-
-    private Boolean resolveActiveState(Litter litter) {
-        try {
-            Object value = litter.getClass().getMethod("isActive").invoke(litter);
-            if (value instanceof Boolean) {
-                return (Boolean) value;
-            }
-        } catch (Exception ignored) {
-            // ...existing code...
-        }
-
-        try {
-            Object value = litter.getClass().getMethod("getActive").invoke(litter);
-            if (value instanceof Boolean) {
-                return (Boolean) value;
-            }
-        } catch (Exception ignored) {
-            // ...existing code...
-        }
-
-        return null;
     }
 
     private int safeInt(Integer value) {
@@ -667,12 +658,23 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         if (dataProvider == null || !initializeServicesIfNeeded() || stockService == null) {
             return;
         }
+
+        List<Integer> litterIds = new ArrayList<>();
         for (Litter litter : dataProvider.getItems()) {
             if (litter == null || litter.getId() == null) {
                 continue;
             }
-            Long count = stockService.getKitsAssignedCountForLitter(litter.getId());
-            assignedKitCountsByLitterId.put(litter.getId(), count == null ? 0 : count.intValue());
+            litterIds.add(litter.getId());
+        }
+
+        if (litterIds.isEmpty()) {
+            return;
+        }
+
+        Map<Integer, Long> countsByLitterId = stockService.getKitsAssignedCountsForLitters(litterIds);
+        for (Integer litterId : litterIds) {
+            Long count = countsByLitterId.getOrDefault(litterId, 0L);
+            assignedKitCountsByLitterId.put(litterId, count.intValue());
         }
     }
 
