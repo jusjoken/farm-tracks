@@ -97,16 +97,27 @@ SELECT
 	0
 WHERE NOT EXISTS (SELECT 1 FROM `app_settings_seq`);
 
-INSERT IGNORE INTO `stock_genotypes` (`id`, `genotypes`) VALUES
-(-1, 'A,at,a,_'),
-(-1, 'B,b,_'),
-(-1, 'C,cchd,cchl,c,_'),
-(-1, 'D,d,_'),
-(-1, 'E,Es,ej,e,_'),
-(-1, 'En,en,_'),
-(-1, 'V,v,_'),
-(-1, 'W,w,_'),
-(-1, 'DU,du,_'),
-(-1, 'Si,si,si1,si2,si3,_');
+-- Idempotent seed: INSERT IGNORE alone is not enough here because this table has no
+-- uniqueness constraint on (id, genotypes). Use NOT EXISTS per row to prevent duplicates.
+INSERT INTO `stock_genotypes` (`id`, `genotypes`)
+SELECT seed.`id`, seed.`genotypes`
+FROM (
+	SELECT -1 AS `id`, 'A,at,a,_' AS `genotypes`
+	UNION ALL SELECT -1, 'B,b,_'
+	UNION ALL SELECT -1, 'C,cchd,cchl,c,_'
+	UNION ALL SELECT -1, 'D,d,_'
+	UNION ALL SELECT -1, 'E,Es,ej,e,_'
+	UNION ALL SELECT -1, 'En,en,_'
+	UNION ALL SELECT -1, 'V,v,_'
+	UNION ALL SELECT -1, 'W,w,_'
+	UNION ALL SELECT -1, 'DU,du,_'
+	UNION ALL SELECT -1, 'Si,si,si1,si2,si3,_'
+) AS seed
+WHERE NOT EXISTS (
+	SELECT 1
+	FROM `stock_genotypes` existing
+	WHERE existing.`id` = seed.`id`
+	  AND existing.`genotypes` = seed.`genotypes`
+);
 -- 2026-03-22 21:29:38 UTC
 

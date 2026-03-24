@@ -7,8 +7,10 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import com.vaadin.flow.component.HasValue;
 import com.vaadin.flow.component.button.Button;
@@ -25,6 +27,7 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.IntegerField;
+import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.binder.BeanValidationBinder;
 import com.vaadin.flow.data.binder.Binder;
@@ -52,6 +55,7 @@ public class StockTypeView extends VerticalLayout {
 
     private final FormLayout form = new FormLayout();
     private final TextField idField = new TextField("Id");
+    private final TextArea genotypeLinesField = new TextArea("Genotypes");
 
     private final Button newButton = new Button("New");
     private final Button saveButton = new Button("Save");
@@ -119,6 +123,7 @@ public class StockTypeView extends VerticalLayout {
 
         for (PropertyDescriptor pd : properties) {
             if ("id".equals(pd.getName())) continue; // shown read-only via idField
+            if ("genotypes".equals(pd.getName()) || "genotypeSegments".equals(pd.getName())) continue;
             if (pd.getWriteMethod() == null) continue; // view-only property
 
             HasValue<?, ?> field = createField(pd);
@@ -128,6 +133,12 @@ public class StockTypeView extends VerticalLayout {
                 form.add(c);
             }
         }
+
+        genotypeLinesField.setWidthFull();
+        genotypeLinesField.setMinHeight("12em");
+        genotypeLinesField.setPlaceholder("One genotype segment per line, e.g.\nA,at,a,_\nB,b,_");
+        genotypeLinesField.setHelperText("Each non-empty line becomes one stock_genotypes row for this stock type.");
+        form.add(genotypeLinesField, 2);
 
     }
 
@@ -171,6 +182,8 @@ public class StockTypeView extends VerticalLayout {
             return;
         }
 
+        editing.setGenotypes(parseGenotypeLines(genotypeLinesField.getValue()));
+
         stockTypeRepository.save(editing);
         Notification.show("Stock type saved.");
         refreshGrid();
@@ -196,6 +209,7 @@ public class StockTypeView extends VerticalLayout {
     private void clearEditor() {
         editing = null;
         idField.clear();
+        genotypeLinesField.clear();
         binder.readBean(null);
         grid.deselectAll();
         deleteButton.setEnabled(false);
@@ -211,6 +225,7 @@ public class StockTypeView extends VerticalLayout {
 
         editing = stockType;
         idField.setValue(stockType.getId() == null ? "" : String.valueOf(stockType.getId()));
+        genotypeLinesField.setValue(toGenotypeLines(stockType.getGenotypes()));
         binder.readBean(stockType);
         deleteButton.setEnabled(stockType.getId() != null);
         masterDetailLayout.setDetail(buildEditorLayout());
@@ -397,5 +412,32 @@ public class StockTypeView extends VerticalLayout {
                 // ...existing code...
             }
         );
+    }
+
+    private String toGenotypeLines(List<String> genotypes) {
+        if (genotypes == null || genotypes.isEmpty()) {
+            return "";
+        }
+        return String.join("\n", genotypes);
+    }
+
+    private List<String> parseGenotypeLines(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return new ArrayList<>();
+        }
+
+        Set<String> unique = new LinkedHashSet<>();
+        for (String line : raw.split("\\R")) {
+            if (line == null) {
+                continue;
+            }
+            String normalized = line.trim();
+            if (normalized.isEmpty()) {
+                continue;
+            }
+            unique.add(normalized);
+        }
+
+        return new ArrayList<>(unique);
     }
 }
