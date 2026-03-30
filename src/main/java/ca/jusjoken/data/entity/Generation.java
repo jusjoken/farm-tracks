@@ -8,9 +8,11 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.details.Details;
 import com.vaadin.flow.component.details.DetailsVariant;
 import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.page.ExtendedClientDetails;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 
 import ca.jusjoken.UIUtilities;
@@ -24,6 +26,10 @@ import ca.jusjoken.data.Utility.Gender;
  * @author birch
  */
 public class Generation {
+    private static final int MOBILE_BREAKPOINT_PX = 768;
+    private static final int DESKTOP_INDENT_PX = 80;
+    private static final int MOBILE_INDENT_PX = 40;
+
     private Integer level;
     private Generation father;
     private Generation mother;
@@ -264,10 +270,11 @@ public class Generation {
         header.addClassNames(LumoUtility.Margin.End.XLARGE);
         header.setAlignItems(Layout.AlignItems.START);
         header.setJustifyContent(Layout.JustifyContent.BETWEEN);
+        int indentMultiplierPx = resolveIndentMultiplierPx();
         for(int i = 1; i < getLevel(); i++){
             //System.out.println("getHeader: loop:" + name + " i:" + i);
             Div spacer = new Div("");
-            spacer.setWidth("80px");
+            spacer.setWidth(indentMultiplierPx + "px");
             spacer.getStyle().set("flex-shrink", "0");
             header.add(spacer);
         }
@@ -277,6 +284,22 @@ public class Generation {
         header.add(stockHeader);
         header.setWidth("90%");
         return header;
+    }
+
+    private int resolveIndentMultiplierPx() {
+        UI ui = UI.getCurrent();
+        if (ui == null) {
+            return DESKTOP_INDENT_PX;
+        }
+
+        ExtendedClientDetails clientDetails = ui.getInternals().getExtendedClientDetails();
+        if (clientDetails == null || clientDetails.getBodyClientWidth() <= 0) {
+            return DESKTOP_INDENT_PX;
+        }
+
+        return clientDetails.getBodyClientWidth() < MOBILE_BREAKPOINT_PX
+                ? MOBILE_INDENT_PX
+                : DESKTOP_INDENT_PX;
     }
     
     public AvatarDiv getAvatar(){

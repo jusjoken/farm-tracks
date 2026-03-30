@@ -19,6 +19,7 @@ import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.dataview.GridLazyDataView;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
@@ -917,14 +918,79 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     }
 
     private Component createTabNotes(Stock stock) {
-        //Add Edit and Save on this panel for notes
-        Layout layout = new Layout();
+        VerticalLayout layout = new VerticalLayout();
+        layout.setPadding(false);
+        layout.setSpacing(false);
+        layout.setWidthFull();
+
+        Button editNotesButton = new Button(FontAwesome.Solid.PENCIL_ALT.create());
+        editNotesButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        editNotesButton.setAriaLabel("Edit notes");
+        editNotesButton.setTooltipText("Edit notes");
+
+        HorizontalLayout buttonBar = new HorizontalLayout(editNotesButton);
+        buttonBar.setWidthFull();
+        buttonBar.setPadding(false);
+        buttonBar.setSpacing(false);
+        buttonBar.setJustifyContentMode(HorizontalLayout.JustifyContentMode.START);
+
         TextArea notes = new TextArea();
+        notes.setLabel("Notes");
         notes.setWidthFull();
-        notes.setValue(stock.getNotes());
+        notes.setValue(stock.getNotes() == null ? "" : stock.getNotes());
         notes.setReadOnly(true);
-        layout.add(notes);
+
+        editNotesButton.addClickListener(click -> openNotesEditor(stock, notes));
+
+        layout.add(buttonBar, notes);
         return layout;
+    }
+
+    private void openNotesEditor(Stock stock, TextArea notesPreview) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Edit Notes");
+        dialog.setCloseOnEsc(true);
+        dialog.setCloseOnOutsideClick(true);
+        dialog.setWidth("34rem");
+
+        TextArea notesEditor = new TextArea("Notes");
+        notesEditor.setWidthFull();
+        notesEditor.setMinHeight("12rem");
+        notesEditor.setValue(notesPreview.getValue() == null ? "" : notesPreview.getValue());
+
+        Button cancelButton = new Button("Cancel", event -> dialog.close());
+        Button saveButton = new Button("Save", event -> {
+            String updatedNotes = notesEditor.getValue() == null ? "" : notesEditor.getValue();
+            stock.setNotes(updatedNotes);
+            stockService.save(stock);
+
+            notesPreview.setValue(stock.getNotes() == null ? "" : stock.getNotes());
+            if (selectedStock != null && selectedStock.getId() != null && selectedStock.getId().equals(stock.getId())) {
+                selectedStock.setNotes(stock.getNotes());
+            }
+            if (listDataView != null) {
+                listDataView.refreshItem(stock);
+            }
+
+            if (selectedStock != null && selectedStock.getId() != null && selectedStock.getId().equals(stock.getId())) {
+                mdLayout.setDetail(createTabbedContentArea(selectedStock));
+            }
+
+            UIUtilities.showNotification("Notes saved");
+            dialog.close();
+        });
+        saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+        HorizontalLayout footer = new HorizontalLayout(cancelButton, saveButton);
+        footer.setWidthFull();
+        footer.setJustifyContentMode(HorizontalLayout.JustifyContentMode.END);
+
+        VerticalLayout content = new VerticalLayout(notesEditor, footer);
+        content.setPadding(false);
+        content.setSpacing(true);
+
+        dialog.add(content);
+        dialog.open();
     }
     
     private LazyComponent createTabStatuses(Stock stock) {

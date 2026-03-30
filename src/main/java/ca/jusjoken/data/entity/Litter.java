@@ -405,14 +405,15 @@ public class Litter {
         StringBuilder sb = new StringBuilder();
         sb.append("Litter{");
         sb.append("id=").append(id);
-        sb.append(", stockType=").append(stockType);
+        sb.append(", stockTypeId=").append(stockType != null ? stockType.getId() : null);
+        sb.append(", stockTypeName=").append(stockType != null ? stockType.getName() : null);
         sb.append(", prefix=").append(prefix);
         sb.append(", name=").append(name);
         sb.append(", breed=").append(breed);
         sb.append(", fatherName=").append(fatherName);
         sb.append(", motherName=").append(motherName);
-        sb.append(", father=").append(father);
-        sb.append(", mother=").append(mother);
+        sb.append(", fatherId=").append(father != null ? father.getId() : null);
+        sb.append(", motherId=").append(mother != null ? mother.getId() : null);
         sb.append(", bred=").append(bred);
         sb.append(", doB=").append(doB);
         sb.append(", kitsCount=").append(kitsCount);

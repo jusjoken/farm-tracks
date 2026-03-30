@@ -85,6 +85,8 @@ public class LitterEditor {
     private VerticalLayout dialogLayout;
     private List<ListRefreshNeededListener> listRefreshNeededListeners = new ArrayList<>();
     private PlanEditor planEditor;
+    private String pendingOverrideNextLitterNumber;
+    private String pendingOverrideSuggestedLitterName;
 
     public LitterEditor() {
         litterService = Registry.getBean(LitterService.class);
@@ -183,6 +185,8 @@ public class LitterEditor {
         this.litter = litterEntity;
         this.dialogMode = mode;
         this.currentStockType = stockType;
+        this.pendingOverrideNextLitterNumber = null;
+        this.pendingOverrideSuggestedLitterName = null;
 
         dialogTitle = (dialogMode == DialogMode.CREATE) ? "Create new litter" : "Edit litter";
         dialogLayout.removeAll();
@@ -271,8 +275,37 @@ public class LitterEditor {
 
     private String getNextLitterName() {
         String prefixToUse = appSettingsService.getAppSettings().getDefaultLitterPrefix();
+        if(appSettingsService.getAppSettings().getOverrideNextLitterNumber() != null && !appSettingsService.getAppSettings().getOverrideNextLitterNumber().trim().isEmpty()) {
+            String nextName = appSettingsService.getAppSettings().getOverrideNextLitterNumber().trim();
+            // Keep override pending until a litter save confirms this generated value was used.
+            pendingOverrideNextLitterNumber = nextName;
+            pendingOverrideSuggestedLitterName = prefixToUse + nextName;
+            return pendingOverrideSuggestedLitterName;
+        }
         String nextName = litterService.getNextLitterName(prefixToUse);
         return nextName;
+    }
+
+    private void clearOverrideNextLitterNumberIfConsumed(Litter savedLitter) {
+        if (savedLitter == null || pendingOverrideNextLitterNumber == null || pendingOverrideNextLitterNumber.isBlank()) {
+            return;
+        }
+
+        String savedName = savedLitter.getName() == null ? "" : savedLitter.getName().trim();
+        if (pendingOverrideSuggestedLitterName == null || !savedName.equals(pendingOverrideSuggestedLitterName)) {
+            return;
+        }
+
+        var appSettings = appSettingsService.getAppSettings();
+        String currentOverride = appSettings.getOverrideNextLitterNumber();
+        if (currentOverride == null || currentOverride.trim().isEmpty()) {
+            return;
+        }
+
+        if (currentOverride.trim().equals(pendingOverrideNextLitterNumber)) {
+            appSettings.setOverrideNextLitterNumber("");
+            appSettingsService.save(appSettings);
+        }
     }
 
     private void updateSaveEnabled() {
@@ -310,6 +343,7 @@ public class LitterEditor {
             confirm.setConfirmText("Yes");
             confirm.addConfirmListener(event -> {
                 Litter saved = litterService.save(litter);
+                clearOverrideNextLitterNumberIfConsumed(saved);
                 //mark the associated birth task as complete
                 Task birthTask = taskService.findByPlanId(taskPlanSelect.getValue().getId()).stream()
                         .filter(t -> t.getType() == TaskType.BIRTH)
@@ -327,6 +361,7 @@ public class LitterEditor {
             });
             confirm.addCancelListener(event -> {
                 Litter saved = litterService.save(litter);
+                clearOverrideNextLitterNumberIfConsumed(saved);
                 notifyRefreshNeeded();
                 dialogClose();
             });
@@ -334,7 +369,8 @@ public class LitterEditor {
             return;
         }
 
-        litterService.save(litter);
+        Litter saved = litterService.save(litter);
+        clearOverrideNextLitterNumberIfConsumed(saved);
         notifyRefreshNeeded();
         dialogClose();
     }

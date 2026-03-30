@@ -175,10 +175,16 @@ public class StockType {
 
     @Override
     public String toString() {
-        return "StockType [id=" + id + ", name=" + name + ", nameSingular=" + nameSingular + ", maleName=" + maleName
-                + ", femaleName=" + femaleName + ", breederName=" + breederName + ", nonBreederName=" + nonBreederName
-                + ", defaultType=" + defaultType + ", imageFileName=" + imageFileName + ", genotypes=" + genotypes
-                + "]";
+        return "StockType[id=" + id
+            + ", name=" + name
+            + ", nameSingular=" + nameSingular
+            + ", maleName=" + maleName
+            + ", femaleName=" + femaleName
+            + ", breederName=" + breederName
+            + ", nonBreederName=" + nonBreederName
+            + ", defaultType=" + defaultType
+            + ", imageFileName=" + imageFileName
+            + "]";
     }
 
     

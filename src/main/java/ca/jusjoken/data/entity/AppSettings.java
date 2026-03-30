@@ -20,6 +20,8 @@ public class AppSettings {
     private String farmEmail = "equidanes@hotmail.ca";
     private String farmPrefix = "Breza's";
     private String defaultLitterPrefix = "BHR";
+    private String overrideNextLitterNumber = ""; //if set then this and the Prefix will be used as the next litter name instead of calculating the next litter number
+    
 
     public AppSettings() {
     }
@@ -85,6 +87,14 @@ public class AppSettings {
         return "AppSettings [id=" + id + ", farmName=" + farmName + ", farmAddressLine1=" + farmAddressLine1
                 + ", farmAddressLine2=" + farmAddressLine2 + ", farmEmail=" + farmEmail + ", farmPrefix=" + farmPrefix
                 + ", defaultLitterPrefix=" + defaultLitterPrefix + "]";
+    }
+
+    public String getOverrideNextLitterNumber() {
+        return overrideNextLitterNumber;
+    }
+
+    public void setOverrideNextLitterNumber(String overrideNextLitterNumber) {
+        this.overrideNextLitterNumber = overrideNextLitterNumber;
     }
 
 }

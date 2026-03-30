@@ -56,6 +56,7 @@ public class LoginView extends Main implements BeforeEnterObserver {
     @Override
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent);
+
         // Unauthenticated users do not have saved UI settings yet; follow system preference,
         // and keep following it if the OS theme changes while login is open.
         attachEvent.getUI().getPage().executeJs(

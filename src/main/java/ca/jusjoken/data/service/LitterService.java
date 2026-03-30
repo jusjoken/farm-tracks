@@ -157,7 +157,7 @@ public class LitterService {
         System.out.println("Next litter name: " + nextName);
         //increase the number after the prefix by 1, if there is no number after the prefix then add 1
         if(nextName == null) {
-            return prefixToUse + " 1";
+            return prefixToUse + "1";
         }
         String numberPart = nextName.substring(prefixToUse.length()).trim();
         int nextNumber = 1;
@@ -165,8 +165,8 @@ public class LitterService {
             try {
                 nextNumber = Integer.parseInt(numberPart) + 1;
             } catch (NumberFormatException e) {
-                // If parsing fails, just return the prefix with " 1"
-                return prefixToUse + " 1";
+                // If parsing fails, just return the prefix with "1"
+                return prefixToUse + "1";
             }
         }
         return prefixToUse + nextNumber;

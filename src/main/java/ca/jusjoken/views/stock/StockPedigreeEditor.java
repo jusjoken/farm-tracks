@@ -68,6 +68,7 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayoutVariant;
 import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.page.ExtendedClientDetails;
 import com.vaadin.flow.component.page.WebStorage;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.TextField;
@@ -81,6 +82,7 @@ import com.vaadin.flow.router.HasDynamicTitle;
 import com.vaadin.flow.router.HasUrlParameter;
 import com.vaadin.flow.router.OptionalParameter;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.streams.DownloadHandler;
 import com.vaadin.flow.server.streams.DownloadResponse;
 import com.vaadin.flow.theme.lumo.LumoUtility;
@@ -110,6 +112,13 @@ import jakarta.annotation.security.PermitAll;
 @Route(value = "pedigree-editor", layout = MainLayout.class)
 @PermitAll
 public class StockPedigreeEditor extends Main implements ListRefreshNeededListener, HasDynamicTitle, HasUrlParameter<String>   {
+
+    private static final String SESSION_SELECTED_STOCK_ID_KEY = "pedigree.selectedStockId";
+    private static final int MOBILE_BREAKPOINT_PX = 768;
+    private static final String TREE_COLUMN_WIDTH_DESKTOP = "100px";
+    private static final String TREE_COLUMN_WIDTH_MOBILE = "50px";
+    private static final String MAIN_COLUMN_WIDTH_DESKTOP = "400px";
+    private static final String MAIN_COLUMN_WIDTH_MOBILE = "250px";
 
     private static final String UNKNOWN_NAME = "[Unknown]";
     private final StockService stockService;
@@ -142,6 +151,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     private final StockEditor dialogCommon;
     private final Select<Stock> stockSelect = new Select<>();
     private final Select<StockType> stockTypeChoice = new Select<>();
+    private boolean pendingParentCreateLink;
 
     private final Checkbox includeDob = new Checkbox();
     private final Checkbox includeColor = new Checkbox();
@@ -190,6 +200,35 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
 
     private void setupListeners(){
         dialogCommon.addListener(this);
+
+        stockSelect.setItemLabelGenerator(Stock::getDisplayNameWithStatus);
+        stockSelect.addValueChangeListener(item -> {
+            if (!item.isFromClient()) return;
+            Stock selected = item.getValue();
+            System.out.println("addValueChangeListener: stockId=" + (selected == null ? null : selected.getId()));
+            if (selected != null && selected.getId() != null) {
+                selectedGeneration = null;
+                selectedGenerationIndex = null;
+                UI.getCurrent().navigate(StockPedigreeEditor.class, selected.getId().toString());
+            } else {
+                stock = null;
+                persistSelectedStockId(null);
+                selectedGeneration = null;
+                selectedGenerationIndex = null;
+                buildView(null);
+            }
+        });
+
+        stockTypeChoice.setAriaLabel("Stock type");
+        stockTypeChoice.addClassNames(MinWidth.NONE, Padding.Top.MEDIUM);
+        stockTypeChoice.setItemLabelGenerator(StockType::getName);
+        stockTypeChoice.addValueChangeListener(event -> {
+            System.out.println("addValueChangeListener: type:" + event.getValue());
+            if (viewStockType != null && !viewStockType.equals(event.getValue())) {
+                viewStockType = event.getValue();
+                refreshBreederList();
+            }
+        });
     }
     
     private void createTopLevelList(){
@@ -261,27 +300,6 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         headerForm.setLabelSpacing("0px");
         headerForm.setColumnWidth(50, Unit.EM);
 
-        stockSelect.setItemLabelGenerator(Stock::getDisplayNameWithStatus);
-        stockSelect.addValueChangeListener(item -> {
-            if (!item.isFromClient()) return;
-            System.out.println("addValueChangeListener: stock:" + item.getValue());
-            stock = item.getValue();
-            selectedGeneration = null;
-            selectedGenerationIndex = null;
-            buildView(stock);
-        });
-
-        stockTypeChoice.setAriaLabel("Stock type");
-        stockTypeChoice.addClassNames(MinWidth.NONE, Padding.Top.MEDIUM);
-        stockTypeChoice.setItemLabelGenerator(StockType::getName);
-        stockTypeChoice.addValueChangeListener(event -> {
-            System.out.println("addValueChangeListener: type:" + event.getValue());
-            if(!viewStockType.equals(event.getValue())){
-                viewStockType = event.getValue();
-                refreshBreederList();
-            }
-        });
-        
         headerForm.addFormItem(stockSelect, "Pedigree for:");
         headerForm.addFormItem(stockTypeChoice,"Stock Type");
         
@@ -299,9 +317,15 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         //tree design
         Column<Generation> treeColumn = tree.addComponentHierarchyColumn(gen -> {
             return new Div("");
-        }).setWidth("100px").setFlexGrow(0);
+        }).setFlexGrow(0);
 
-        Column<Generation> mainColumn = tree.addComponentColumn(Generation::getHeader).setHeader("").setWidth("400px").setFlexGrow(1);
+        Column<Generation> mainColumn = tree.addComponentColumn(Generation::getHeader).setHeader("").setFlexGrow(1);
+        applyTreeColumnWidths(treeColumn, mainColumn, isMobileViewport());
+
+        UI.getCurrent().getPage().retrieveExtendedClientDetails(details -> {
+            applyTreeColumnWidths(treeColumn, mainColumn, details.getBodyClientWidth() < MOBILE_BREAKPOINT_PX);
+        });
+
         HeaderRow headerRow = tree.prependHeaderRow();
         headerRow.join(treeColumn,mainColumn).setComponent(headerForm);
 
@@ -322,12 +346,35 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         }else{
             breedersList = stockService.findAllBreeders(viewStockType);
         }
+
+        if (stock != null && stock.getId() != null) {
+            boolean hasSelected = breedersList.stream()
+                    .anyMatch(item -> item != null && Objects.equals(item.getId(), stock.getId()));
+            if (!hasSelected) {
+                breedersList.add(0, stock);
+            }
+        }
+
         stockSelect.setItems(breedersList);
     }
     
     private void runBeforeClientResponse(SerializableConsumer<UI> command) {
         getElement().getNode().runWhenAttached(ui -> ui.beforeClientResponse(this, context -> command.accept(ui)));
-    }       
+    }
+
+    private boolean isMobileViewport() {
+        UI ui = UI.getCurrent();
+        if (ui == null) {
+            return false;
+        }
+        ExtendedClientDetails details = ui.getInternals().getExtendedClientDetails();
+        return details != null && details.getBodyClientWidth() > 0 && details.getBodyClientWidth() < MOBILE_BREAKPOINT_PX;
+    }
+
+    private void applyTreeColumnWidths(Column<Generation> treeColumn, Column<Generation> mainColumn, boolean isMobile) {
+        treeColumn.setWidth(isMobile ? TREE_COLUMN_WIDTH_MOBILE : TREE_COLUMN_WIDTH_DESKTOP);
+        mainColumn.setWidth(isMobile ? MAIN_COLUMN_WIDTH_MOBILE : MAIN_COLUMN_WIDTH_DESKTOP);
+    }
     
     private Component createItemEditor(Generation item) {
         VerticalLayout editorLayout = UIUtilities.getVerticalLayout(Boolean.TRUE, Boolean.TRUE, Boolean.FALSE);
@@ -581,21 +628,46 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         parentLayout.setAlignItems(FlexComponent.Alignment.BASELINE);
         Select<Stock> parentSelect = new Select<>();
         parentSelect.setWidthFull();
-        //parentSelect.setItemLabelGenerator(Stock::getDisplayName);
         parentSelect.setItemLabelGenerator(labelItem -> {
             String label = labelItem.getDisplayName();
-            if(labelItem.getFatherId()!=null) label = label + " (" + stockService.findById(labelItem.getFatherId()).getDisplayName() + ")";
-            if(labelItem.getMotherId()!=null) label = label + " (" + stockService.findById(labelItem.getMotherId()).getDisplayName() + ")";
+            if(labelItem.getFatherId()!=null) {
+                Stock father = stockService.findById(labelItem.getFatherId());
+                if (father != null) {
+                    label = label + " (" + father.getDisplayName() + ")";
+                }
+            }
+            if(labelItem.getMotherId()!=null) {
+                Stock mother = stockService.findById(labelItem.getMotherId());
+                if (mother != null) {
+                    label = label + " (" + mother.getDisplayName() + ")";
+                }
+            }
             return label;
         });
+
+        List<Stock> parentOptions;
         if(item.getSex().equals(Gender.MALE)){
-            parentSelect.setItems(stockService.getFathers(childStock.getFatherExtName(),childStock.getStockType()));
+            parentOptions = new ArrayList<>(stockService.getFathers(childStock.getFatherExtName(),childStock.getStockType()));
         }else{
-            parentSelect.setItems(stockService.getMothers(childStock.getMotherExtName(),childStock.getStockType()));
+            parentOptions = new ArrayList<>(stockService.getMothers(childStock.getMotherExtName(),childStock.getStockType()));
         }
+
+        Stock currentParent = item.getStock();
+        if (currentParent != null && currentParent.getId() != null) {
+            boolean containsCurrent = parentOptions.stream()
+                    .anyMatch(option -> option != null && Objects.equals(option.getId(), currentParent.getId()));
+            if (!containsCurrent) {
+                parentOptions.add(0, currentParent);
+            }
+        }
+
+        parentSelect.setItems(parentOptions);
+
         Span layoutLabel = new Span(parentTypeAction + " " + parentType + " for:" + childStock.getDisplayName());
-        parentSelect.setValue(item.getStock());
-        System.out.println("createParentSelect: item name:" + item.getName() + " actionStr:" + parentTypeAction + " setValue to:" + childStock);
+        if (currentParent != null && currentParent.getId() != null) {
+            parentSelect.setValue(currentParent);
+        }
+        System.out.println("createParentSelect: item=" + item.getName() + " action=" + parentTypeAction + " childId=" + childStock.getId());
         parentSelect.addValueChangeListener(selection -> {
             if (!selection.isFromClient()) return;
             selectedParent = selection.getValue();
@@ -628,6 +700,10 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
             external.setSex(item.getSex());
             external.setStockType(viewStockType);
             external.setWeight(0);
+
+            // Mark this dialog flow so listRefreshNeeded links the created stock as
+            // the selected parent but does not change the pedigree root stock.
+            pendingParentCreateLink = true;
             
             dialogCommon.setDialogTitle("Create new");
             dialogCommon.dialogOpen(external,StockEditor.DisplayMode.STOCK_DETAILS, true);
@@ -754,7 +830,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     }
     
     private void createPedigreePDF(Generation baseItem){
-        System.out.println("createPedigreePDF: baseItem:" + baseItem);
+        // System.out.println("createPedigreePDF: baseItem:" + baseItem);
         pdfFileName = "Pedigree_" + stock.getDisplayName() + ".pdf";
         
         try {
@@ -916,7 +992,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
                 }else{
                     nameField = nameField + item.getName();
                 }
-                System.out.println("createPedigreePDF: processing:" + counter + " name:" + nameField);
+                // System.out.println("createPedigreePDF: processing:" + counter + " name:" + nameField);
                 Paragraph paraName = new Paragraph(document);
                 paraName.getFormat().setBeforeAutoSpacing(false);
                 paraName.getFormat().setAfterAutoSpacing(false);
@@ -1116,19 +1192,26 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
     
     @Override
     public void listRefreshNeeded() {
-        if(dialogCommon.getReturnId()!=null){
-            //new parent has been created so set the parent
+        // When adding a brand-new parent from the pedigree selector, attach it to
+        // the selected child slot without changing the current pedigree root.
+        if (pendingParentCreateLink
+                && dialogCommon.getReturnId() != null
+                && selectedGeneration != null
+                && selectedGeneration.getChild() != null
+                && selectedGeneration.getChild().getStock() != null) {
             Stock childToUpdate = selectedGeneration.getChild().getStock();
-            if(selectedGeneration.getSex().equals(Gender.MALE)){
+            if (selectedGeneration.getSex().equals(Gender.MALE)) {
                 childToUpdate.setFatherId(dialogCommon.getReturnId());
-            }else{
+            } else {
                 childToUpdate.setMotherId(dialogCommon.getReturnId());
             }
             stockService.save(childToUpdate);
-            System.out.println("listRefreshNeeded: selected:" + selectedGeneration.getName());
-            System.out.println("listRefreshNeeded: selected Child:" + selectedGeneration.getChild().getName());
-            
+            System.out.println("listRefreshNeeded: selected=" + selectedGeneration.getName());
+            System.out.println("listRefreshNeeded: selectedChild=" + selectedGeneration.getChild().getName());
         }
+
+        pendingParentCreateLink = false;
+
         buildView(stock);
     }
 
@@ -1143,10 +1226,10 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         System.out.println("setParameter: called with:" + parameter);
         if(parameter!=null){
             stock = stockService.findById(Integer.valueOf(parameter));
-            stockSelect.setValue(stock);
         }else{
-            stock = null;
+            stock = restoreSelectedStockFromSession();
         }
+        persistSelectedStockId(stock);
         buildView(stock);
     }
 
@@ -1157,10 +1240,43 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         }else{
             hasStock = Boolean.TRUE;
             viewStockType = stock.getStockType();
+            persistSelectedStockId(stock);
             //name = stock.getDisplayName();
         }
+
+        refreshBreederList();
+        if (stock != null) {
+            stockSelect.setValue(stock);
+        } else {
+            stockSelect.clear();
+        }
+
         removeAll();
         add(createContent());
+    }
+
+    private void persistSelectedStockId(Stock selectedStock) {
+        VaadinSession session = VaadinSession.getCurrent();
+        if (session == null) {
+            return;
+        }
+        if (selectedStock == null || selectedStock.getId() == null) {
+            session.setAttribute(SESSION_SELECTED_STOCK_ID_KEY, null);
+            return;
+        }
+        session.setAttribute(SESSION_SELECTED_STOCK_ID_KEY, selectedStock.getId());
+    }
+
+    private Stock restoreSelectedStockFromSession() {
+        VaadinSession session = VaadinSession.getCurrent();
+        if (session == null) {
+            return null;
+        }
+        Object value = session.getAttribute(SESSION_SELECTED_STOCK_ID_KEY);
+        if (!(value instanceof Integer selectedStockId)) {
+            return null;
+        }
+        return stockService.findById(selectedStockId);
     }
     
     private void showPedigreePDF(ByteArrayOutputStream pdfStream){

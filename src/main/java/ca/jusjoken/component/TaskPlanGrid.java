@@ -193,7 +193,11 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
     }
 
     private void configureTileView() {
-        addColumn(planCardRenderer).setKey("plan");
+        addColumn(planCardRenderer)
+                .setHeader(createTileHeaderActions())
+            .setSortable(true)
+            .setComparator(this::getPlanDisplayName)
+                .setKey("plan");
         setSelectionMode(Grid.SelectionMode.NONE);
         setItemDetailsRenderer(null);
         if (selectionListenerRegistration != null) {
@@ -309,7 +313,7 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
 
     private void addRowActionsColumn() {
         addComponentColumn(plan -> createRowMenuButton())
-                .setHeader("")
+                .setHeader(createHeaderMenuButton())
                 .setAutoWidth(false)
                 .setFlexGrow(0)
                 .setWidth("3.25em")
@@ -317,6 +321,34 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
                 .setResizable(false)
                 .setSortable(false)
                 .setKey(ACTION_COLUMN_KEY);
+    }
+
+    private Button createHeaderMenuButton() {
+        Button menuButton = new Button(VaadinIcon.ELLIPSIS_DOTS_V.create());
+        menuButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
+        menuButton.getElement().setAttribute("title", "Grid actions");
+        menuButton.getElement().setAttribute("aria-label", "Open task plan grid menu");
+        menuButton.getStyle().set("flex-shrink", "0");
+        menuButton.addClickListener(event -> menuButton.getElement().executeJs(
+                "const btn=this;"
+                        + "const grid=btn.closest('vaadin-grid');"
+                        + "if(!grid){return;}"
+                        + "const rect=btn.getBoundingClientRect();"
+                        + "grid.dispatchEvent(new MouseEvent('contextmenu', {"
+                        + "bubbles:true,cancelable:true,composed:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom"
+                        + "}));"));
+        return menuButton;
+    }
+
+    private HorizontalLayout createTileHeaderActions() {
+        Span title = new Span("Plans");
+        HorizontalLayout header = new HorizontalLayout(title, createHeaderMenuButton());
+        header.setWidthFull();
+        header.setPadding(false);
+        header.setSpacing(true);
+        header.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+        header.setJustifyContentMode(HorizontalLayout.JustifyContentMode.BETWEEN);
+        return header;
     }
 
     private Button createRowMenuButton() {

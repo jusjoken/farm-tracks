@@ -2,6 +2,36 @@
 
 Track your stock with confidence.
 
+## Local HTTPS (Desktop + Mobile)
+
+This project is configured to run HTTPS locally by default.
+
+1. Generate local certificates (PEM for SWAG + PKCS12 for Spring Boot):
+
+```bash
+./deploy/local-proxy/generate-local-cert.sh /home/birch/appdata/farmtracks/local-certs 192.168.0.99
+```
+
+Use your machine's LAN IP as the second argument so mobile clients can validate the certificate SAN.
+
+2. Debug directly with Spring Boot over HTTPS:
+
+- Use `Debug Application (stable)` in VS Code.
+- Open `https://<your-lan-ip>:8443` from desktop/mobile.
+
+3. Run through local SWAG (HTTPS edge):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local-swag.yml up -d --force-recreate farmtracks swag
+```
+
+- Open `https://<your-lan-ip>:44302` from desktop/mobile.
+
+Notes:
+
+- For mobile, trust/install the generated cert if your browser/OS does not trust it automatically.
+- HTTP is not required for normal local development flows.
+
 ## Deploying to Production
 
 Use the project script to run the validated production build flow.

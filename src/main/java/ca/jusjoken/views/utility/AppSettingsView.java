@@ -34,6 +34,7 @@ public class AppSettingsView extends Div {
     private final TextField farmEmail = new TextField("Farm Email");
     private final TextField farmPrefix = new TextField("Farm Prefix");
     private final TextField defaultLitterPrefix = new TextField("Default Litter Prefix");
+    private final TextField overrideNextLitterNumber = new TextField("Override Next Litter Number");
 
     private final Button saveButton = new Button("Save");
     private final Button reloadButton = new Button("Reload");
@@ -57,7 +58,7 @@ public class AppSettingsView extends Div {
         farmEmail.setWidthFull();
         farmPrefix.setWidthFull();
         defaultLitterPrefix.setWidthFull();
-
+        overrideNextLitterNumber.setWidthFull();
         binder.forField(farmName)
                 .asRequired("Farm name is required")
                 .bind(AppSettings::getFarmName, AppSettings::setFarmName);
@@ -81,6 +82,9 @@ public class AppSettingsView extends Div {
                 .asRequired("Default litter prefix is required")
                 .bind(AppSettings::getDefaultLitterPrefix, AppSettings::setDefaultLitterPrefix);
 
+        binder.forField(overrideNextLitterNumber)
+                .bind(AppSettings::getOverrideNextLitterNumber, AppSettings::setOverrideNextLitterNumber);
+
         saveButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         saveButton.addClickListener(click -> save());
 
@@ -90,7 +94,7 @@ public class AppSettingsView extends Div {
     private VerticalLayout buildContent() {
         FormLayout formLayout = new FormLayout();
         formLayout.setWidthFull();
-        formLayout.add(farmName, farmAddressLine1, farmAddressLine2, farmEmail, farmPrefix, defaultLitterPrefix);
+        formLayout.add(farmName, farmAddressLine1, farmAddressLine2, farmEmail, farmPrefix, defaultLitterPrefix, overrideNextLitterNumber);
         formLayout.setResponsiveSteps(
                 new FormLayout.ResponsiveStep("0", 1),
                 new FormLayout.ResponsiveStep("48em", 2));
