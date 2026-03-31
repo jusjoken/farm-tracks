@@ -20,6 +20,7 @@ import com.vaadin.flow.component.grid.GridSortOrder;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
+import com.vaadin.flow.component.grid.contextmenu.GridSubMenu;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -163,7 +164,9 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
     private void configureTileView() {
         setPartNameGenerator(item -> null);
-        addColumn(litterCardRenderer).setKey("name");
+        addColumn(litterCardRenderer)
+            .setKey("name")
+            .setHeader(createTileHeaderActions());
     }
 
     private void configureListView() {
@@ -262,7 +265,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
     private void addRowActionsColumn() {
         addComponentColumn(litter -> createRowMenuButton())
-                .setHeader("")
+                .setHeader(createHeaderMenuButton())
                 .setAutoWidth(false)
                 .setFlexGrow(0)
                 .setWidth("3.25em")
@@ -270,6 +273,23 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
                 .setResizable(false)
                 .setSortable(false)
                 .setKey(ACTION_COLUMN_KEY);
+    }
+
+    private Button createHeaderMenuButton() {
+        Button menuButton = new Button(VaadinIcon.ELLIPSIS_DOTS_V.create());
+        menuButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
+        menuButton.getElement().setAttribute("title", "Grid actions");
+        menuButton.getElement().setAttribute("aria-label", "Open litter grid menu");
+        menuButton.getStyle().set("flex-shrink", "0");
+        menuButton.addClickListener(event -> menuButton.getElement().executeJs(
+                "const btn=this;"
+                        + "const grid=btn.closest('vaadin-grid');"
+                        + "if(!grid){return;}"
+                        + "const rect=btn.getBoundingClientRect();"
+                        + "grid.dispatchEvent(new MouseEvent('contextmenu', {"
+                        + "bubbles:true,cancelable:true,composed:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom"
+                        + "}));"));
+        return menuButton;
     }
 
     private Button createRowMenuButton() {
@@ -284,6 +304,17 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
                         + "bubbles:true,cancelable:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom"
                         + "}));"));
         return menuButton;
+    }
+
+    private HorizontalLayout createTileHeaderActions() {
+        Span title = new Span("Litters");
+        HorizontalLayout header = new HorizontalLayout(title, createHeaderMenuButton());
+        header.setWidthFull();
+        header.setPadding(false);
+        header.setSpacing(true);
+        header.setDefaultVerticalComponentAlignment(HorizontalLayout.Alignment.CENTER);
+        header.setJustifyContentMode(HorizontalLayout.JustifyContentMode.BETWEEN);
+        return header;
     }
 
     private HorizontalLayout createTileHeaderSuffix(String text) {
@@ -682,70 +713,178 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         if (value == null) {
             return null;
         }
-        if (value instanceof Number) {
-            return ((Number) value).doubleValue();
+        if (value instanceof Number number) {
+            return number.doubleValue();
         }
         String text = value.toString().trim().replace("%", "");
         if (text.isEmpty()) {
             return null;
         }
         try {
-            return Double.parseDouble(text);
+            return Double.valueOf(text);
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    private String buildKitTattoo(Litter litter, int sequenceNumber) {
+        String litterName = litter == null || litter.getName() == null ? "" : litter.getName().trim();
+        return litterName + "-" + sequenceNumber;
+    }
+
+    private void addFilterMenus(GridContextMenu<Litter> menu) {
+        GridMenuItem<Litter> stockTypeMenu = menu.addItem(new Item("Filter by Stock Type", Utility.ICONS.ACTION_FILTER.getIconSource()));
+        GridSubMenu<Litter> stockTypeSubMenu = stockTypeMenu.getSubMenu();
+
+        GridMenuItem<Litter> allTypesItem = stockTypeSubMenu.addItem("All Stock Types");
+        allTypesItem.setCheckable(true);
+        allTypesItem.setChecked(stockType == null);
+        allTypesItem.addMenuItemClickListener(click -> {
+            if (stockType == null) {
+                return;
+            }
+            setStockType(null);
+            refreshGrid();
+            notifyRefreshNeeded();
+        });
+
+        if (initializeServicesIfNeeded() && stockTypeService != null) {
+            for (StockType availableStockType : stockTypeService.findAllStockTypes()) {
+                if (availableStockType == null) {
+                    continue;
+                }
+                GridMenuItem<Litter> stockTypeItem = stockTypeSubMenu.addItem(availableStockType.getName());
+                stockTypeItem.setCheckable(true);
+                stockTypeItem.setChecked(sameStockType(stockType, availableStockType));
+                stockTypeItem.addMenuItemClickListener(click -> {
+                    if (sameStockType(stockType, availableStockType)) {
+                        return;
+                    }
+                    setStockType(availableStockType);
+                    refreshGrid();
+                    notifyRefreshNeeded();
+                });
+            }
+        }
+
+        GridMenuItem<Litter> displayModeMenu = menu.addItem(new Item("Include Litters", Utility.ICONS.ACTION_FILTER.getIconSource()));
+        GridSubMenu<Litter> displayModeSubMenu = displayModeMenu.getSubMenu();
+        for (LitterDisplayMode mode : LitterDisplayMode.values()) {
+            GridMenuItem<Litter> modeItem = displayModeSubMenu.addItem(getDisplayModeLabel(mode));
+            modeItem.setCheckable(true);
+            modeItem.setChecked(litterDisplayMode == mode);
+            modeItem.addMenuItemClickListener(click -> {
+                if (litterDisplayMode == mode) {
+                    return;
+                }
+                setLitterDisplayMode(mode);
+                updateSortOrder();
+                notifyRefreshNeeded();
+            });
+        }
+    }
+
+    private String getDisplayModeLabel(LitterDisplayMode mode) {
+        if (mode == null) {
+            return "All Litters";
+        }
+        return switch (mode) {
+            case ALL -> "All Litters";
+            case ACTIVE -> "Active Litters";
+            case ARCHIVED -> "Archived Litters";
+        };
     }
 
     private GridContextMenu<Litter> createContextMenu(Grid<Litter> grid) {
         GridContextMenu<Litter> menu = new GridContextMenu<>(grid);
 
         menu.setDynamicContentHandler(litterEntity -> {
-            if(litterEntity==null){ //this is when the header row is right clicked
-                return false;
-            }else{
-                menu.removeAll();
-                GridMenuItem<Litter> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
-                displayAsTileMenu.setCheckable(true);
-                displayAsTileMenu.setChecked(displayAsTile);
-                displayAsTileMenu.addMenuItemClickListener(click -> {
-                    displayAsTile = displayAsTileMenu.isChecked();
-                    saveDisplayAsTilePreference();
-                    configureGrid();
-                    listRefreshNeeded();
-                });
+            menu.removeAll();
+            GridMenuItem<Litter> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
+            displayAsTileMenu.setCheckable(true);
+            displayAsTileMenu.setChecked(displayAsTile);
+            displayAsTileMenu.addMenuItemClickListener(click -> {
+                displayAsTile = displayAsTileMenu.isChecked();
+                saveDisplayAsTilePreference();
+                configureGrid();
+                listRefreshNeeded();
+            });
+
+            addFilterMenus(menu);
+            menu.addSeparator();
+
+            String litterName = litterEntity == null ? "Litter Menu" : litterEntity.getDisplayName();
+
+            // //add a label at the top with the stock name
+            menu.addComponentAsFirst(UIUtilities.getContextMenuHeader(litterName));
+
+            String addNewMenuTitle = "Add new litter";
+            GridMenuItem<Litter> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+            addNewMenu.addMenuItemClickListener(click -> {
+                //open litter edit dialog - to be create yet
+                LitterEditor editor = getOrCreateLitterEditor();
+                if (editor != null) {
+                    editor.dialogOpen(new Litter(), LitterEditor.DialogMode.CREATE, litterEntity == null ? null : litterEntity.getStockType());
+                }
+                
+            });
+
+            GridMenuItem<Litter> addTaskMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+            addTaskMenu.addMenuItemClickListener(click -> {
+                //open task edit dialog
+                //create a new task for this litter with default values
+                Task newTask = new Task();
+                newTask.setLinkType(Utility.TaskLinkType.LITTER);
+                newTask.setLinkLitterId(litterEntity == null ? null : litterEntity.getId());
+
+                TaskEditor editor = getOrCreateTaskEditor();
+                if (editor != null) {
+                    editor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, litterEntity == null ? null : litterEntity.getStockType());
+                }
+                
+            });
+
+            if(litterEntity!= null){
                 menu.addSeparator();
-
-                String litterName = litterEntity.getDisplayName();
-
-                // //add a label at the top with the stock name
-                menu.addComponentAsFirst(UIUtilities.getContextMenuHeader(litterName));
-
-                String addNewMenuTitle = "Add new litter";
-                GridMenuItem<Litter> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));
-                addNewMenu.addMenuItemClickListener(click -> {
-                    //open litter edit dialog - to be create yet
-                    LitterEditor editor = getOrCreateLitterEditor();
-                    if (editor != null) {
-                        editor.dialogOpen(new Litter(), LitterEditor.DialogMode.CREATE, litterEntity.getStockType());
+                GridMenuItem<Litter> addKitMenu = menu.addItem(new Item("Add kit to Litter", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+                addKitMenu.addMenuItemClickListener(click -> {
+                    if (!initializeServicesIfNeeded() || litterService == null || litterEntity.getId() == null) {
+                        UIUtilities.showNotificationError("Unable to add a kit to this litter.");
+                        return;
                     }
-                    
-                });
 
-                GridMenuItem<Litter> addTaskMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
-                addTaskMenu.addMenuItemClickListener(click -> {
-                    //open task edit dialog
-                    //create a new task for this litter with default values
-                    Task newTask = new Task();
-                    newTask.setLinkType(Utility.TaskLinkType.LITTER);
-                    newTask.setLinkLitterId(litterEntity.getId());
+                    int nextKitNumber = litterService.getNextKitSequenceNumber(litterEntity.getId());
+                    String nextKitTattoo = buildKitTattoo(litterEntity, nextKitNumber);
+                    String nextKitPrefix = litterEntity.getPrefix() == null ? "" : litterEntity.getPrefix().trim();
+                    int currentKitCount = getDisplayKitsCount(litterEntity);
 
-                    TaskEditor editor = getOrCreateTaskEditor();
-                    if (editor != null) {
-                        editor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, litterEntity.getStockType());
-                    }
-                    
+                    ConfirmDialog confirm = new ConfirmDialog();
+                    confirm.setHeader("Add kit to litter: " + litterName);
+                    confirm.setText(String.format("""
+                        Add the next kit for this litter?
+
+                        Tattoo: %s
+                        Prefix: %s
+                        Litter total: %d -> %d
+                        """,
+                        nextKitTattoo,
+                        nextKitPrefix.isEmpty() ? "(blank)" : nextKitPrefix,
+                        currentKitCount,
+                        currentKitCount + 1));
+                    confirm.setCancelable(true);
+                    confirm.setCancelText("No");
+                    confirm.setConfirmText("Yes");
+                    confirm.addConfirmListener(event -> {
+                        Stock addedKit = litterService.addKitToLitter(litterEntity.getId());
+                        if (addedKit == null) {
+                            UIUtilities.showNotificationError("Unable to add the kit to this litter.");
+                            return;
+                        }
+                        listRefreshNeeded();
+                        UIUtilities.showNotification("Added kit " + addedKit.getDisplayName() + " to litter " + litterEntity.getName() + ".");
+                    });
+                    confirm.open();
                 });
-                menu.addSeparator();
 
                 GridMenuItem<Litter> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
                 editMenu.addMenuItemClickListener(click -> {
@@ -777,11 +916,10 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
                         confirm.close();
                     });
                     confirm.open();
-                    return;
                 });
-
-                return true;
             }
+
+            return true;
         });
 
         return menu;

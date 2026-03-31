@@ -5,8 +5,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import org.springframework.transaction.support.TransactionTemplate;
-
 import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.ShortcutRegistration;
 import com.vaadin.flow.component.Shortcuts;
@@ -32,7 +30,6 @@ import ca.jusjoken.UIUtilities;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Litter;
 import ca.jusjoken.data.entity.Stock;
-import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.entity.StockType;
 import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.entity.TaskPlan;
@@ -41,7 +38,6 @@ import ca.jusjoken.data.service.LitterService;
 import ca.jusjoken.data.service.PlanTemplateService;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
-import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.TaskPlanService;
 import ca.jusjoken.data.service.TaskService;
 import ca.jusjoken.utility.TaskType;
@@ -75,8 +71,6 @@ public class LitterEditor {
     private final TaskPlanService taskPlanService;
     private final PlanTemplateService planTemplateService;
     private final TaskService taskService;
-    private final StockStatusHistoryService stockStatusHistoryService;
-    private final TransactionTemplate transactionTemplate;
 
     private StockType currentStockType;
     private LitterService litterService;
@@ -96,8 +90,6 @@ public class LitterEditor {
         taskPlanService = Registry.getBean(TaskPlanService.class);
         planTemplateService = Registry.getBean(PlanTemplateService.class);
         taskService = Registry.getBean(TaskService.class);
-        stockStatusHistoryService = Registry.getBean(StockStatusHistoryService.class);
-        transactionTemplate = Registry.getBean(TransactionTemplate.class);
 
         dialogConfigure();
     }
@@ -223,8 +215,8 @@ public class LitterEditor {
         doB.setValue(litter.getDoB());
         father.setValue(litter.getFather());
         mother.setValue(litter.getMother());
-        kitsCount.setValue(litter.getKitsCount() == null ? 0 : litter.getKitsCount());
-        diedKitsCount.setValue(litter.getDiedKitsCount() == null ? 0 : litter.getDiedKitsCount());
+        kitsCount.setValue(zeroIfNull(litter.getKitsCount()));
+        diedKitsCount.setValue(zeroIfNull(litter.getDiedKitsCount()));
         notes.setValue(litter.getNotes() == null ? "" : litter.getNotes());
 
         if (taskPlan != null) {
@@ -352,7 +344,7 @@ public class LitterEditor {
                 if (birthTask != null) {
                     taskService.setTaskCompleted(birthTask, true);
                 }
-                createKitStocks(saved.getId(), zeroIfNull(saved.getKitsCount()), zeroIfNull(saved.getDiedKitsCount()));
+                litterService.createKitStocks(saved.getId(), zeroIfNull(saved.getKitsCount()), zeroIfNull(saved.getDiedKitsCount()));
 
                 notifyRefreshNeeded();
                 dialogClose();
@@ -373,42 +365,6 @@ public class LitterEditor {
         clearOverrideNextLitterNumberIfConsumed(saved);
         notifyRefreshNeeded();
         dialogClose();
-    }
-
-    private void createKitStocks(Integer litterId, int count, int diedCount) {
-        if (litterId == null || count <= 0) {
-            return;
-        }
-
-        transactionTemplate.executeWithoutResult(status -> {
-            Litter managedLitter = litterService.findById(litterId);
-            if (managedLitter == null) {
-                return;
-            }
-
-            for (int i = 1; i <= count; i++) {
-                Stock kit = new Stock();
-                kit.setStockType(managedLitter.getStockType());
-                kit.setLitter(managedLitter);
-                kit.setTattoo(managedLitter.getName() + "-" + i);
-                kit.setPrefix(managedLitter.getPrefix());
-                kit.setBreed(managedLitter.getBreed());
-                kit.setDoB(managedLitter.getDoB());
-                kit.setAcquired(managedLitter.getDoB());
-                kit.setFatherId(managedLitter.getFather().getId());
-                kit.setMotherId(managedLitter.getMother().getId());
-
-                stockService.save(kit);
-
-                if (managedLitter.getDoB() != null && i > count - diedCount) {
-                    stockStatusHistoryService.save(
-                        new StockStatusHistory(kit.getId(), "died", managedLitter.getDoB().atStartOfDay()),
-                        kit,
-                        Boolean.FALSE
-                    );
-                }
-            }
-        });
     }
 
     private String trimOrNull(String value) {

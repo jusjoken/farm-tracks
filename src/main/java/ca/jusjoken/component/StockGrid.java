@@ -32,6 +32,7 @@ import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.grid.contextmenu.GridContextMenu;
 import com.vaadin.flow.component.grid.contextmenu.GridMenuItem;
 import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
@@ -257,11 +258,16 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
 
     private void configureTileView() {
-        addColumn(stockCardRenderer).setKey("name");
+        addColumn(stockCardRenderer)
+            .setHeader(createTileHeaderActions())
+            .setKey("name");
     }
 
     private void configureValueTileView() {
-        addColumn(stockValueCardRenderer).setKey("name").setFooter(getValueFooter());
+        addColumn(stockValueCardRenderer)
+            .setHeader(createTileHeaderActions())
+            .setKey("name")
+            .setFooter(getValueFooter());
     }
 
     private void configureListView() {
@@ -1028,20 +1034,32 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                     });
                 }
                 menu.addSeparator();
-                GridMenuItem<Stock> planBreedingMenu = menu.addItem(new Item("Plan Breeding", Utility.ICONS.TYPE_BREEDER.getIconSource()));
-                planBreedingMenu.addMenuItemClickListener(click -> {
-                    Task newTask = new Task();
-                    newTask.setType(TaskType.BREEDING);
-                    newTask.setLinkType(Utility.TaskLinkType.BREEDER);
-                    newTask.setLinkBreederId(stockEntity.getId());
-                    newTask.setDate(LocalDate.now());
-                    taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, stockEntity.getStockType());
-                });
-                GridMenuItem<Stock> breedPlanMenu = menu.addItem(new Item("Create Breed Plan", Utility.ICONS.TYPE_BREEDER.getIconSource()));
-                    breedPlanMenu.addMenuItemClickListener(click -> {
-                        //open breed plan dialog
-                        planEditor.dialogOpen(Utility.TaskLinkType.BREEDER, stockEntity);
+                if(stockEntity.getBreeder()){
+                    GridMenuItem<Stock> planBreedingMenu = menu.addItem(new Item("Plan Breeding", Utility.ICONS.TYPE_BREEDER.getIconSource()));
+                    planBreedingMenu.addMenuItemClickListener(click -> {
+                        Task newTask = new Task();
+                        newTask.setType(TaskType.BREEDING);
+                        newTask.setLinkType(Utility.TaskLinkType.BREEDER);
+                        newTask.setLinkBreederId(stockEntity.getId());
+                        newTask.setDate(LocalDate.now());
+                        taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, stockEntity.getStockType());
                     });
+                    GridMenuItem<Stock> breedPlanMenu = menu.addItem(new Item("Create Breed Plan", Utility.ICONS.TYPE_BREEDER.getIconSource()));
+                        breedPlanMenu.addMenuItemClickListener(click -> {
+                            //open breed plan dialog
+                            planEditor.dialogOpen(Utility.TaskLinkType.BREEDER, stockEntity);
+                        });
+                }else{
+                    //add a menu item to convert stockEntity into Breeder
+                    GridMenuItem<Stock> convertToBreederMenu = menu.addItem(new Item("Convert to Breeder", Utility.ICONS.TYPE_BREEDER.getIconSource()));
+                    convertToBreederMenu.addMenuItemClickListener(click -> {
+                        //open the stockeditor with the breeder checkbox checked and save on close
+                        stockEntity.setBreeder(true);
+                        stockService.save(stockEntity);
+                        dialogCommon.setDialogTitle("Convert to Breeder");
+                        dialogCommon.dialogOpen(stockEntity,StockEditor.DisplayMode.STOCK_DETAILS);
+                    });
+                }
                 menu.addSeparator();
                 createStatusMenuItem(menu, stockEntity, "listed");
                 createStatusMenuItem(menu, stockEntity, "deposit");
@@ -1091,7 +1109,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
     private void addRowActionsColumn() {
         addComponentColumn(stockEntity -> createRowMenuButton())
-                .setHeader("")
+                .setHeader(createHeaderMenuButton())
                 .setAutoWidth(false)
                 .setFlexGrow(0)
                 .setWidth("3.25em")
@@ -1099,6 +1117,23 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                 .setResizable(false)
                 .setSortable(false)
                 .setKey(ACTION_COLUMN_KEY);
+    }
+
+    private Button createHeaderMenuButton() {
+        Button menuButton = new Button(VaadinIcon.ELLIPSIS_DOTS_V.create());
+        menuButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
+        menuButton.getElement().setAttribute("title", "Grid actions");
+        menuButton.getElement().setAttribute("aria-label", "Open stock grid menu");
+        menuButton.getStyle().set("flex-shrink", "0");
+        menuButton.addClickListener(event -> menuButton.getElement().executeJs(
+                "const btn=this;"
+                        + "const grid=btn.closest('vaadin-grid');"
+                        + "if(!grid){return;}"
+                        + "const rect=btn.getBoundingClientRect();"
+                        + "grid.dispatchEvent(new MouseEvent('contextmenu', {"
+                        + "bubbles:true,cancelable:true,composed:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom"
+                        + "}));"));
+        return menuButton;
     }
 
     private Button createRowMenuButton() {
@@ -1113,6 +1148,17 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                         + "bubbles:true,cancelable:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom" 
                         + "}));"));
         return menuButton;
+    }
+
+    private HorizontalLayout createTileHeaderActions() {
+        Span title = new Span("Stock");
+        HorizontalLayout header = new HorizontalLayout(title, createHeaderMenuButton());
+        header.setWidthFull();
+        header.setPadding(false);
+        header.setSpacing(true);
+        header.setDefaultVerticalComponentAlignment(Alignment.CENTER);
+        header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        return header;
     }
 
     private List<String> getColumnNames(){

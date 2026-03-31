@@ -4,7 +4,6 @@ import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.html.Main;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
-import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.BeforeEnterEvent;
@@ -15,8 +14,6 @@ import com.vaadin.flow.shared.Registration;
 
 import ca.jusjoken.component.ListRefreshNeededListener;
 import ca.jusjoken.component.LitterGrid;
-import ca.jusjoken.data.entity.StockType;
-import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.views.MainLayout;
 import jakarta.annotation.security.PermitAll;
 
@@ -30,7 +27,7 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
     private Registration resizeRegistration;
     private Integer queryLitterIdFilter;
 
-    public LitterListView(StockTypeService stockTypeService) {
+    public LitterListView() {
         applyDeviceScopedPreferenceKey();
 
         setSizeFull();
@@ -38,21 +35,6 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
         getStyle().set("flex-direction", "column");
         getStyle().set("overflow", "hidden");
         getStyle().set("min-height", "0");
-
-        //add a select component to choose the stocktype for the litter grid and then set the littergrid stocktype based on the selection
-        Select<StockType> stockTypeSelect = new Select<>();
-        stockTypeSelect.setLabel("Stock Type");
-        stockTypeSelect.setItems(stockTypeService.findAllStockTypes());
-        stockTypeSelect.setItemLabelGenerator(StockType::getName);
-                // Keep select in sync with the grid default without triggering an immediate duplicate reload.
-                stockTypeSelect.setValue(litterGrid.getStockType());
-        stockTypeSelect.addValueChangeListener(e -> {
-                        if (sameStockType(e.getOldValue(), e.getValue())) {
-                                return;
-                        }
-                        litterGrid.setStockType(e.getValue());
-                        litterGrid.refreshGrid();
-        });
 
         //add a filter that filters the littergrid by the name of the father or mother
         TextField parentFilter = new TextField();
@@ -63,39 +45,12 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
            litterGrid.setParentNameFilter(e.getValue());
         });
 
-        //add a vaadin radiobuttongroup to filter the littergrid by active, inactive or all litters
-        Select<LitterGrid.LitterDisplayMode> displayModeSelect = new Select<>();
-        displayModeSelect.setLabel("Include Litters");
-        displayModeSelect.setItems(
-            LitterGrid.LitterDisplayMode.ALL,
-            LitterGrid.LitterDisplayMode.ACTIVE,
-            LitterGrid.LitterDisplayMode.ARCHIVED
-        );
-        displayModeSelect.setItemLabelGenerator(mode -> {
-            switch (mode) {
-                case ALL -> {
-                    return "All Litters";   
-                }
-                case ACTIVE -> {
-                    return "Active Litters";
-                }
-                case ARCHIVED -> {
-                    return "Archived Litters";
-                }
-            }
-            return "";
-        });
-        displayModeSelect.addValueChangeListener(e -> {
-            litterGrid.setLitterDisplayMode(e.getValue());
-        });
-        displayModeSelect.setValue(LitterGrid.LitterDisplayMode.ALL);
-
         HorizontalLayout filterLayout = new HorizontalLayout();
         filterLayout.setPadding(true);
         filterLayout.setSpacing(true);
         filterLayout.setWidthFull();
         filterLayout.getStyle().set("flex", "0 0 auto");
-        filterLayout.add(parentFilter, stockTypeSelect, displayModeSelect);
+        filterLayout.add(parentFilter);
         add(filterLayout);
 
         parentFilter.setAutofocus(true);
@@ -189,21 +144,6 @@ public class LitterListView extends Main implements ListRefreshNeededListener, B
         } catch (NumberFormatException ex) {
             return null;
         }
-    }
-
-    private boolean sameStockType(StockType left, StockType right) {
-        if (left == right) {
-            return true;
-        }
-        if (left == null || right == null) {
-            return false;
-        }
-        Integer leftId = left.getId();
-        Integer rightId = right.getId();
-        if (leftId != null && rightId != null) {
-            return leftId.equals(rightId);
-        }
-        return left.equals(right);
     }
 
 }

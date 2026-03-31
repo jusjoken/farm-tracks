@@ -529,8 +529,6 @@ public class StockEditor extends Component{
             applyDefaultFarmPrefixForNewStock();
         }else isNewStock = Boolean.FALSE;
         
-        System.out.println("dialogOpen: external:" + stockEntity.getExternal());
-        
         openedDisplayMode = currentDisplayMode;
         if (currentDisplayMode.equals(DisplayMode.PROFILE_IMAGE)) {
             UIUtilities.applyDialogWidth(dialog, dialogLayout, UIUtilities.DialogWidthPreset.COMPACT);

@@ -151,6 +151,140 @@ public class LitterService {
         return litterRepository.save(litter);
     }
 
+    @Transactional
+    public void createKitStocks(Integer litterId, int count, int diedCount) {
+        if (litterId == null || count <= 0) {
+            return;
+        }
+
+        Litter managedLitter = findById(litterId);
+        if (managedLitter == null) {
+            return;
+        }
+
+        int nextSequenceNumber = getNextKitSequenceNumber(managedLitter);
+        int deadStartIndex = Math.max(0, count - Math.max(0, diedCount));
+        for (int offset = 0; offset < count; offset++) {
+            boolean markDead = offset >= deadStartIndex;
+            createKitStock(managedLitter, nextSequenceNumber + offset, markDead);
+        }
+    }
+
+    @Transactional
+    public Stock addKitToLitter(Integer litterId) {
+        if (litterId == null) {
+            return null;
+        }
+
+        Litter managedLitter = findById(litterId);
+        if (managedLitter == null) {
+            return null;
+        }
+
+        int nextSequenceNumber = getNextKitSequenceNumber(managedLitter);
+        managedLitter.setKitsCount(safeInt(managedLitter.getKitsCount()) + 1);
+        litterRepository.save(managedLitter);
+
+        return createKitStock(managedLitter, nextSequenceNumber, false);
+    }
+
+    public int getNextKitSequenceNumber(Integer litterId) {
+        if (litterId == null) {
+            return 1;
+        }
+
+        Litter managedLitter = findById(litterId);
+        if (managedLitter == null) {
+            return 1;
+        }
+
+        return getNextKitSequenceNumber(managedLitter);
+    }
+
+    private int getNextKitSequenceNumber(Litter litter) {
+        if (litter == null || litter.getId() == null) {
+            return 1;
+        }
+
+        List<Stock> kitsForLitter = stockService.getKitsForLitter(litter.getId());
+        String tattooPrefix = buildKitTattooPrefix(litter);
+        int maxSequenceNumber = 0;
+        for (Stock stock : kitsForLitter) {
+            int parsedSequence = parseKitSequenceNumber(stock, tattooPrefix);
+            if (parsedSequence > maxSequenceNumber) {
+                maxSequenceNumber = parsedSequence;
+            }
+        }
+        return maxSequenceNumber + 1;
+    }
+
+    private Stock createKitStock(Litter litter, int sequenceNumber, boolean markDead) {
+        Stock kit = new Stock();
+        kit.setStockType(litter.getStockType());
+        kit.setLitter(litter);
+        kit.setTattoo(buildKitTattoo(litter, sequenceNumber));
+        kit.setPrefix(litter.getPrefix());
+        kit.setBreed(litter.getBreed());
+        kit.setDoB(litter.getDoB());
+        kit.setAcquired(litter.getDoB());
+        if (litter.getFather() != null) {
+            kit.setFatherId(litter.getFather().getId());
+        }
+        if (litter.getMother() != null) {
+            kit.setMotherId(litter.getMother().getId());
+        }
+
+        stockService.save(kit);
+
+        if (markDead && litter.getDoB() != null) {
+            stockStatusHistoryService.save(
+                new ca.jusjoken.data.entity.StockStatusHistory(kit.getId(), "died", litter.getDoB().atStartOfDay()),
+                kit,
+                Boolean.FALSE
+            );
+        }
+
+        return kit;
+    }
+
+    private String buildKitTattoo(Litter litter, int sequenceNumber) {
+        return buildKitTattooPrefix(litter) + sequenceNumber;
+    }
+
+    private String buildKitTattooPrefix(Litter litter) {
+        String litterName = litter == null || litter.getName() == null ? "" : litter.getName().trim();
+        return litterName + "-";
+    }
+
+    private int parseKitSequenceNumber(Stock stock, String tattooPrefix) {
+        if (stock == null) {
+            return 0;
+        }
+
+        String tattoo = stock.getTattoo();
+        if (tattoo == null || tattoo.isBlank()) {
+            return 0;
+        }
+
+        String normalizedPrefix = tattooPrefix == null ? "" : tattooPrefix;
+        if (!normalizedPrefix.isEmpty()) {
+            if (!tattoo.startsWith(normalizedPrefix)) {
+                return 0;
+            }
+            tattoo = tattoo.substring(normalizedPrefix.length());
+        }
+
+        try {
+            return Integer.parseInt(tattoo.trim());
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
+    }
+
+    private int safeInt(Integer value) {
+        return value == null ? 0 : value;
+    }
+
     public String getNextLitterName(String prefixToUse) {
         List<String> litterNames = litterRepository.findLitterNamesByPrefixAndStockType(prefixToUse);
         String nextName = litterNames.isEmpty() ? null : litterNames.get(0);
