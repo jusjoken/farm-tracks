@@ -110,16 +110,14 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
 
         setEmptyStateText("No plans available to display");
 
-        setMultiSort(true);
-        if (sortListenerRegistration != null) {
-            sortListenerRegistration.remove();
-        }
-        sortListenerRegistration = addSortListener(event -> saveSortPreference(event.getSortOrder()));
-
         setDataProviderForFilter();
-        updateSortOrder();
-        if (!displayAsTile) {
-            restoreExpandedDetails();
+        if (displayAsTile) {
+            // Tile mode should not carry list-mode sorting UI/state.
+            if (sortListenerRegistration != null) {
+                sortListenerRegistration.remove();
+                sortListenerRegistration = null;
+            }
+            sort(List.of());
         }
         if (!menuCreated) {
             createContextMenu(this);
@@ -171,6 +169,14 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
             .setComparator(this::getRemainingTaskCount)
             .setKey("remaining");
 
+        setMultiSort(true);
+        if (sortListenerRegistration != null) {
+            sortListenerRegistration.remove();
+        }
+        sortListenerRegistration = addSortListener(event -> saveSortPreference(event.getSortOrder()));
+        updateSortOrder();
+        restoreExpandedDetails();
+
         setSelectionMode(Grid.SelectionMode.SINGLE);
         setItemDetailsRenderer(new ComponentRenderer<>(this::createTaskDetailsLayout));
         if (selectionListenerRegistration != null) {
@@ -195,9 +201,7 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
     private void configureTileView() {
         addColumn(planCardRenderer)
                 .setHeader(createTileHeaderActions())
-            .setSortable(true)
-            .setComparator(this::getPlanDisplayName)
-                .setKey("plan");
+                .setKey("plan").setSortable(false);
         setSelectionMode(Grid.SelectionMode.NONE);
         setItemDetailsRenderer(null);
         if (selectionListenerRegistration != null) {
@@ -404,42 +408,42 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
         menu.setDynamicContentHandler(planEntity -> {
             menu.removeAll();
 
-            GridMenuItem<TaskPlan> addPlanMenu = menu.addItem(new Item("Add Plan", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
-            addPlanMenu.addMenuItemClickListener(click -> {
-                menu.close();
-                planEditor.dialogOpen(currentTypeFilter, null, PlanEditor.DialogMode.CREATE);
-            });
-            menu.addSeparator();
-
-            GridMenuItem<TaskPlan> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
-            displayAsTileMenu.setCheckable(true);
-            displayAsTileMenu.setChecked(displayAsTile);
-            displayAsTileMenu.addMenuItemClickListener(click -> {
-                displayAsTile = displayAsTileMenu.isChecked();
-                saveDisplayAsTilePreference();
-                configureGrid();
-                refreshGrid();
-            });
-            menu.addSeparator();
-
-            GridMenuItem<TaskPlan> filterMenu = menu.addItem(new Item("Filter by Status", Utility.ICONS.ACTION_FILTER.getIconSource()));
-            GridSubMenu<TaskPlan> filterSubMenu = filterMenu.getSubMenu();
-            for (StatusFilter filter : StatusFilter.values()) {
-                GridMenuItem<TaskPlan> filterItem = filterSubMenu.addItem(filter.label);
-                filterItem.setCheckable(true);
-                filterItem.setChecked(currentStatusFilter == filter);
-                filterItem.addMenuItemClickListener(click -> {
-                    currentStatusFilter = filter;
+            if (planEntity == null) {
+                GridMenuItem<TaskPlan> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
+                displayAsTileMenu.setCheckable(true);
+                displayAsTileMenu.setChecked(displayAsTile);
+                displayAsTileMenu.addMenuItemClickListener(click -> {
+                    displayAsTile = displayAsTileMenu.isChecked();
+                    saveDisplayAsTilePreference();
+                    configureGrid();
                     refreshGrid();
                 });
-            }
+                menu.addSeparator();
 
-            if (planEntity == null) {
+                GridMenuItem<TaskPlan> filterMenu = menu.addItem(new Item("Filter by Status", Utility.ICONS.ACTION_FILTER.getIconSource()));
+                GridSubMenu<TaskPlan> filterSubMenu = filterMenu.getSubMenu();
+                for (StatusFilter filter : StatusFilter.values()) {
+                    GridMenuItem<TaskPlan> filterItem = filterSubMenu.addItem(filter.label);
+                    filterItem.setCheckable(true);
+                    filterItem.setChecked(currentStatusFilter == filter);
+                    filterItem.addMenuItemClickListener(click -> {
+                        currentStatusFilter = filter;
+                        refreshGrid();
+                    });
+                }
+
+                menu.addSeparator();
+
+                GridMenuItem<TaskPlan> addPlanMenu = menu.addItem(new Item("Add Plan", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+                addPlanMenu.addMenuItemClickListener(click -> {
+                    menu.close();
+                    planEditor.dialogOpen(currentTypeFilter, null, PlanEditor.DialogMode.CREATE);
+                });
+
                 menu.addComponentAsFirst(UIUtilities.getContextMenuHeader("Plan Grid"));
                 return true;
             }
 
-            menu.addSeparator();
             menu.addComponentAsFirst(UIUtilities.getContextMenuHeader(getContextMenuHeaderText(planEntity)));
 
             GridMenuItem<TaskPlan> viewPlanMenu = menu.addItem(new Item("View Plan", Utility.ICONS.ACTION_VIEW.getIconSource()));
@@ -528,8 +532,12 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
 
     public void refreshGrid() {
         setDataProviderForFilter();
-        updateSortOrder();
-        restoreExpandedDetails();
+        if (!displayAsTile) {
+            updateSortOrder();
+            restoreExpandedDetails();
+        } else {
+            sort(List.of());
+        }
         notifyRefreshListeners();
     }
 

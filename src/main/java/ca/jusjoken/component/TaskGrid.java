@@ -295,51 +295,50 @@ public class TaskGrid extends Grid<Task> {
         menu.setDynamicContentHandler(menuEntity -> {
             menu.removeAll();
 
-            GridMenuItem<Task> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
-            displayAsTileMenu.setCheckable(true);
-            displayAsTileMenu.setChecked(displayAsTile);
-            displayAsTileMenu.addMenuItemClickListener(click -> {
-                displayAsTile = displayAsTileMenu.isChecked();
-                saveDisplayAsTilePreference();
-                configureGrid();
-                refreshGrid();
-            });
-            menu.addSeparator();
-
-            // Always provide filter access, even when no rows are visible.
-            GridMenuItem<Task> filterByCompletionMenu = menu.addItem(new Item("Filter by Completion", Utility.ICONS.ACTION_FILTER.getIconSource()));
-            GridSubMenu<Task> filterSubMenu = filterByCompletionMenu.getSubMenu();
-            for (Utility.TaskCompletionFilter filter : Utility.TaskCompletionFilter.values()) {
-                GridMenuItem<Task> menuItem = filterSubMenu.addItem(filter.filterName);
-                menuItem.setCheckable(true);
-                menuItem.setChecked(currentCompletionFilter.equals(filter.filterName));
-                menuItem.addMenuItemClickListener(click -> {
-                    currentCompletionFilter = filter.filterName;
-                    updateCompletionFilter(currentCompletionFilter);
-                    updateSortOrder();
-                    notifyRefreshListeners();
-                });
-            }
-
-            GridMenuItem<Task> addNewMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
-            addNewMenu.addMenuItemClickListener(click -> {
-                if(stockId != null){
-                    Stock stock = stockService.findById(stockId);
-                    Task newTask = new Task();
-                    newTask.setLinkType(Utility.TaskLinkType.BREEDER);
-                    newTask.setLinkBreederId(stockId);
-                    taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, stock.getStockType());
-                } else {
-                    taskEditor.dialogOpen();
-                }
-            });
-
             if (menuEntity == null) {
+                GridMenuItem<Task> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
+                displayAsTileMenu.setCheckable(true);
+                displayAsTileMenu.setChecked(displayAsTile);
+                displayAsTileMenu.addMenuItemClickListener(click -> {
+                    displayAsTile = displayAsTileMenu.isChecked();
+                    saveDisplayAsTilePreference();
+                    configureGrid();
+                    refreshGrid();
+                });
+                menu.addSeparator();
+
+                // Always provide filter access, even when no rows are visible.
+                GridMenuItem<Task> filterByCompletionMenu = menu.addItem(new Item("Filter by Completion", Utility.ICONS.ACTION_FILTER.getIconSource()));
+                GridSubMenu<Task> filterSubMenu = filterByCompletionMenu.getSubMenu();
+                for (Utility.TaskCompletionFilter filter : Utility.TaskCompletionFilter.values()) {
+                    GridMenuItem<Task> menuItem = filterSubMenu.addItem(filter.filterName);
+                    menuItem.setCheckable(true);
+                    menuItem.setChecked(currentCompletionFilter.equals(filter.filterName));
+                    menuItem.addMenuItemClickListener(click -> {
+                        currentCompletionFilter = filter.filterName;
+                        updateCompletionFilter(currentCompletionFilter);
+                        updateSortOrder();
+                        notifyRefreshListeners();
+                    });
+                }
+
+                GridMenuItem<Task> addNewMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+                addNewMenu.addMenuItemClickListener(click -> {
+                    if(stockId != null){
+                        Stock stock = stockService.findById(stockId);
+                        Task newTask = new Task();
+                        newTask.setLinkType(Utility.TaskLinkType.BREEDER);
+                        newTask.setLinkBreederId(stockId);
+                        taskEditor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, stock.getStockType());
+                    } else {
+                        taskEditor.dialogOpen();
+                    }
+                });
+
                 menu.addComponentAsFirst(UIUtilities.getContextMenuHeader("Task Grid"));
                 return true;
             }
 
-            menu.addSeparator();
             menu.addComponentAsFirst(UIUtilities.getContextMenuHeader("Task: " + menuEntity.getName()));
 
             // Context menu opened on a task, show option to edit

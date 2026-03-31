@@ -800,51 +800,61 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
         menu.setDynamicContentHandler(litterEntity -> {
             menu.removeAll();
-            GridMenuItem<Litter> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
-            displayAsTileMenu.setCheckable(true);
-            displayAsTileMenu.setChecked(displayAsTile);
-            displayAsTileMenu.addMenuItemClickListener(click -> {
-                displayAsTile = displayAsTileMenu.isChecked();
-                saveDisplayAsTilePreference();
-                configureGrid();
-                listRefreshNeeded();
-            });
 
-            addFilterMenus(menu);
-            menu.addSeparator();
+            if (litterEntity == null) {
+                GridMenuItem<Litter> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
+                displayAsTileMenu.setCheckable(true);
+                displayAsTileMenu.setChecked(displayAsTile);
+                displayAsTileMenu.addMenuItemClickListener(click -> {
+                    displayAsTile = displayAsTileMenu.isChecked();
+                    saveDisplayAsTilePreference();
+                    configureGrid();
+                    listRefreshNeeded();
+                });
+
+                addFilterMenus(menu);
+                menu.addSeparator();
+            }
 
             String litterName = litterEntity == null ? "Litter Menu" : litterEntity.getDisplayName();
 
             // //add a label at the top with the stock name
             menu.addComponentAsFirst(UIUtilities.getContextMenuHeader(litterName));
 
-            String addNewMenuTitle = "Add new litter";
-            GridMenuItem<Litter> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));
-            addNewMenu.addMenuItemClickListener(click -> {
-                //open litter edit dialog - to be create yet
-                LitterEditor editor = getOrCreateLitterEditor();
-                if (editor != null) {
-                    editor.dialogOpen(new Litter(), LitterEditor.DialogMode.CREATE, litterEntity == null ? null : litterEntity.getStockType());
-                }
-                
-            });
+            if (litterEntity == null) {
+                String addNewMenuTitle = "Add new litter";
+                GridMenuItem<Litter> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+                addNewMenu.addMenuItemClickListener(click -> {
+                    //open litter edit dialog - to be create yet
+                    LitterEditor editor = getOrCreateLitterEditor();
+                    if (editor != null) {
+                        editor.dialogOpen(new Litter(), LitterEditor.DialogMode.CREATE, null);
+                    }
+                });
 
-            GridMenuItem<Litter> addTaskMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
-            addTaskMenu.addMenuItemClickListener(click -> {
-                //open task edit dialog
-                //create a new task for this litter with default values
-                Task newTask = new Task();
-                newTask.setLinkType(Utility.TaskLinkType.LITTER);
-                newTask.setLinkLitterId(litterEntity == null ? null : litterEntity.getId());
+                GridMenuItem<Litter> addTaskMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+                addTaskMenu.addMenuItemClickListener(click -> {
+                    //open task edit dialog for a new litter task
+                    Task newTask = new Task();
+                    newTask.setLinkType(Utility.TaskLinkType.LITTER);
+                    newTask.setLinkLitterId(null);
 
-                TaskEditor editor = getOrCreateTaskEditor();
-                if (editor != null) {
-                    editor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, litterEntity == null ? null : litterEntity.getStockType());
-                }
-                
-            });
+                    TaskEditor editor = getOrCreateTaskEditor();
+                    if (editor != null) {
+                        editor.dialogOpen(newTask, TaskEditor.DialogMode.CREATE, null);
+                    }
+                });
+            }
 
             if(litterEntity!= null){
+                GridMenuItem<Litter> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
+                editMenu.addMenuItemClickListener(click -> {
+                    //open litter edit dialog with the selected litter
+                    LitterEditor editor = getOrCreateLitterEditor();
+                    if (editor != null) {
+                        editor.dialogOpen(litterEntity, LitterEditor.DialogMode.EDIT, litterEntity.getStockType());
+                    }
+                });
                 menu.addSeparator();
                 GridMenuItem<Litter> addKitMenu = menu.addItem(new Item("Add kit to Litter", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
                 addKitMenu.addMenuItemClickListener(click -> {
@@ -886,14 +896,6 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
                     confirm.open();
                 });
 
-                GridMenuItem<Litter> editMenu = menu.addItem(new Item("Edit", Utility.ICONS.ACTION_EDIT.getIconSource()));
-                editMenu.addMenuItemClickListener(click -> {
-                    //open litter edit dialog with the selected litter
-                    LitterEditor editor = getOrCreateLitterEditor();
-                    if (editor != null) {
-                        editor.dialogOpen(litterEntity, LitterEditor.DialogMode.EDIT, litterEntity.getStockType());
-                    }
-                });
                 menu.addSeparator();
                 GridMenuItem<Litter> deleteMenu = menu.addItem(new Item("Delete", Utility.ICONS.ACTION_DELETE.getIconSource()));
                 deleteMenu.addMenuItemClickListener(click -> {

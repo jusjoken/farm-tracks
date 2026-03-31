@@ -198,6 +198,15 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
         setEmptyStateText("No data available to display");
 
+        if (displayAsTile) {
+            // Tile mode should not carry list/value-mode sorting UI or state.
+            if (sortListenerRegistration != null) {
+                sortListenerRegistration.remove();
+                sortListenerRegistration = null;
+            }
+            sort(List.of());
+        }
+
     }
 
     private void configureValueView() {
@@ -260,14 +269,16 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private void configureTileView() {
         addColumn(stockCardRenderer)
             .setHeader(createTileHeaderActions())
-            .setKey("name");
+            .setKey("name")
+            .setSortable(false);
     }
 
     private void configureValueTileView() {
         addColumn(stockValueCardRenderer)
             .setHeader(createTileHeaderActions())
             .setKey("name")
-            .setFooter(getValueFooter());
+            .setFooter(getValueFooter())
+            .setSortable(false);
     }
 
     private void configureListView() {
@@ -768,10 +779,14 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         if(stockGridType != StockGridType.STOCK){
             dataProvider.refreshAll();
         }
-        // Data provider resets can clear visual sort state, so restore persisted sort.
-        applySavedSortOrder();
-        if (stockGridType != StockGridType.STOCK) {
-            refreshClientGridState();
+        if (!displayAsTile) {
+            // Data provider resets can clear visual sort state, so restore persisted sort.
+            applySavedSortOrder();
+            if (stockGridType != StockGridType.STOCK) {
+                refreshClientGridState();
+            }
+        } else {
+            sort(List.of());
         }
     }
 
@@ -930,14 +945,15 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
         menu.setDynamicContentHandler(stockEntity -> {
             if(stockEntity==null){
-                if(displayAsTile){
-                    return false;
-                }else{
-                    menu.removeAll();
+                menu.removeAll();
+                addGridLevelViewOptions(menu);
+                addHeaderCreateStockOption(menu);
+                if (!displayAsTile) {
+                    menu.addSeparator();
                     menu.addComponent(createColumnSelector());
-                    
-                    return true;
                 }
+                menu.addComponentAsFirst(UIUtilities.getContextMenuHeader("Stock Grid"));
+                return true;
 
             }else{
                 // Ensure row actions also establish grid selection so parent views
@@ -948,58 +964,11 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
                 }
 
                 menu.removeAll();
-                GridMenuItem<Stock> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
-                displayAsTileMenu.setCheckable(true);
-                displayAsTileMenu.setChecked(displayAsTile);
-                displayAsTileMenu.addMenuItemClickListener(click -> {
-                    displayAsTile = displayAsTileMenu.isChecked();
-                    if(currentStockSavedQuery != null){
-                        currentStockSavedQuery.setDisplayAsTile(displayAsTile);
-                    } else {
-                        saveDisplayAsTilePreference();
-                    }
-                    configureGrid();
-                    notifySidebarChanged(true);
-                    refreshGrid();
-                });
-
-                GridMenuItem<Stock> valueLayoutMenu = menu.addItem(new Item("Display as Value Layout", Utility.ICONS.ACTION_VIEW.getIconSource()));
-                valueLayoutMenu.setCheckable(true);
-                valueLayoutMenu.setChecked(valueLayout);
-                valueLayoutMenu.addMenuItemClickListener(click -> {
-                    valueLayout = valueLayoutMenu.isChecked();
-                    if(currentStockSavedQuery != null){
-                        currentStockSavedQuery.setValueLayout(valueLayout);
-                    } else {
-                        saveValueLayoutPreference();
-                    }
-                    configureGrid();
-                    notifySidebarChanged(true);
-                    refreshGrid();
-                });
-                menu.addSeparator();
 
                 String stockName = stockEntity.getDisplayName();
                 
                 //add a label at the top with the stock name
                 menu.addComponentAsFirst(UIUtilities.getContextMenuHeader(stockName));
-
-                String addNewMenuTitle = "Add new " + stockEntity.getStockType().getNameSingular();
-                GridMenuItem<Stock> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));
-                addNewMenu.addMenuItemClickListener(click -> {
-                    //open stock edit dialog
-                    Stock newStock = new Stock();
-                    newStock.setExternal(false);
-                    newStock.setBreeder(true);
-                    newStock.setStockType(stockEntity.getStockType());
-                    newStock.setWeight(0);
-                    //newStock.setStatus("active");
-                    //newStock.setStatusDate(LocalDateTime.now());
-                    
-                    dialogCommon.setDialogTitle("Create new");
-                    dialogCommon.dialogOpen(newStock,StockEditor.DisplayMode.STOCK_DETAILS);
-                    
-                });
 
                 GridMenuItem<Stock> addTaskMenu = menu.addItem(new Item("Add Task", Utility.ICONS.ACTION_ADDNEW.getIconSource()));
                 addTaskMenu.addMenuItemClickListener(click -> {
@@ -1090,6 +1059,69 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
         });
 
         return menu;
+    }
+
+    private void addHeaderCreateStockOption(GridContextMenu<Stock> menu) {
+        StockType typeForCreate = resolveCreateStockType();
+        String typeNameSingular = typeForCreate != null && typeForCreate.getNameSingular() != null
+                ? typeForCreate.getNameSingular()
+                : "Stock";
+        String addNewMenuTitle = "Add new " + typeNameSingular;
+        GridMenuItem<Stock> addNewMenu = menu.addItem(new Item(addNewMenuTitle, Utility.ICONS.ACTION_ADDNEW.getIconSource()));
+        addNewMenu.addMenuItemClickListener(click -> openCreateStockDialog(typeForCreate));
+    }
+
+    private StockType resolveCreateStockType() {
+        if (stockType != null) {
+            return stockType;
+        }
+        if (stock != null && stock.getStockType() != null) {
+            return stock.getStockType();
+        }
+        return stockTypeService.findRabbits();
+    }
+
+    private void openCreateStockDialog(StockType typeForCreate) {
+        Stock newStock = new Stock();
+        newStock.setExternal(false);
+        newStock.setBreeder(true);
+        newStock.setStockType(typeForCreate != null ? typeForCreate : stockTypeService.findRabbits());
+        newStock.setWeight(0);
+
+        dialogCommon.setDialogTitle("Create new");
+        dialogCommon.dialogOpen(newStock, StockEditor.DisplayMode.STOCK_DETAILS);
+    }
+
+    private void addGridLevelViewOptions(GridContextMenu<Stock> menu) {
+        GridMenuItem<Stock> displayAsTileMenu = menu.addItem(new Item("Display as Tile", Utility.ICONS.ACTION_VIEW.getIconSource()));
+        displayAsTileMenu.setCheckable(true);
+        displayAsTileMenu.setChecked(displayAsTile);
+        displayAsTileMenu.addMenuItemClickListener(click -> {
+            displayAsTile = displayAsTileMenu.isChecked();
+            if(currentStockSavedQuery != null){
+                currentStockSavedQuery.setDisplayAsTile(displayAsTile);
+            } else {
+                saveDisplayAsTilePreference();
+            }
+            configureGrid();
+            notifySidebarChanged(true);
+            refreshGrid();
+        });
+
+        GridMenuItem<Stock> valueLayoutMenu = menu.addItem(new Item("Display as Value Layout", Utility.ICONS.ACTION_VIEW.getIconSource()));
+        valueLayoutMenu.setCheckable(true);
+        valueLayoutMenu.setChecked(valueLayout);
+        valueLayoutMenu.addMenuItemClickListener(click -> {
+            valueLayout = valueLayoutMenu.isChecked();
+            if(currentStockSavedQuery != null){
+                currentStockSavedQuery.setValueLayout(valueLayout);
+            } else {
+                saveValueLayoutPreference();
+            }
+            configureGrid();
+            notifySidebarChanged(true);
+            refreshGrid();
+        });
     }
 
     public boolean consumeSuppressDetailOpenOnNextSelection() {

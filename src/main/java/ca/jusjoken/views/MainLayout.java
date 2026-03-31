@@ -334,11 +334,11 @@ public class MainLayout extends AppLayout implements ListRefreshNeededListener, 
 
         if(accessChecker.hasAccess(MaintenanceView.class) || accessChecker.hasAccess(StockTypeView.class) || accessChecker.hasAccess(PlanTemplateView.class) || accessChecker.hasAccess(UserManagementView.class) || accessChecker.hasAccess(AppSettingsView.class)){
             SideNavItem utilityItem = new SideNavItem("Utility");
-            utilityItem.setExpanded(true);
+            utilityItem.setExpanded(false);
             nav.addItem(utilityItem);
-            if(accessChecker.hasAccess(MaintenanceView.class)){
-                utilityItem.addItem(new SideNavItem("Import", MaintenanceView.class, FontAwesome.Solid.COGS.create()));
-            }
+            // if(accessChecker.hasAccess(MaintenanceView.class)){
+            //     utilityItem.addItem(new SideNavItem("Import", MaintenanceView.class, FontAwesome.Solid.COGS.create()));
+            // }
             if(accessChecker.hasAccess(StockTypeView.class)){
                 utilityItem.addItem(new SideNavItem("Stock Types", StockTypeView.class, FontAwesome.Solid.COGS.create()));
             }
