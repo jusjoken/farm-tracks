@@ -8,7 +8,6 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.dependency.StyleSheet;
 import com.vaadin.flow.component.page.AppShellConfigurator;
-import com.vaadin.flow.component.page.Push;
 import com.vaadin.flow.server.AppShellSettings;
 import com.vaadin.flow.theme.lumo.Lumo;
 
@@ -20,7 +19,6 @@ import com.vaadin.flow.theme.lumo.Lumo;
  *
  */
 @SpringBootApplication
-@Push
 @EnableAsync
 @StyleSheet("styles.css")
 @StyleSheet(Lumo.STYLESHEET)

@@ -276,7 +276,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     }
 
     private Button createHeaderMenuButton() {
-        Button menuButton = new Button(VaadinIcon.ELLIPSIS_DOTS_V.create());
+        Button menuButton = new Button(VaadinIcon.MENU.create());
         menuButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
         menuButton.getElement().setAttribute("title", "Grid actions");
         menuButton.getElement().setAttribute("aria-label", "Open litter grid menu");

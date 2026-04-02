@@ -35,7 +35,7 @@ public class LoginView extends Main implements BeforeEnterObserver {
         this.appVersionService = appVersionService;
         //addClassNames(LumoUtility.Display.FLEX, LumoUtility.JustifyContent.CENTER,LumoUtility.AlignItems.CENTER);
         login = new LoginForm();
-        login.setAction("login");
+        login.setAction("/login?remember-me=true");
         login.addForgotPasswordListener(e ->
             Notification.show("Please contact your administrator to reset your password.",
                     6000, Notification.Position.MIDDLE));

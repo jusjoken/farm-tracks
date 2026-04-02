@@ -6,6 +6,7 @@ import java.util.Date;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.rememberme.InvalidCookieException;
@@ -38,22 +39,110 @@ public class FarmTracksRememberMeServices extends PersistentTokenBasedRememberMe
 
     private final PersistentTokenRepository tokenRepo;
     private final JdbcTemplate jdbc;
+    private final long concurrentRaceWindowMs;
+    private final boolean suppressLoginFailCookieClear;
     /**
      * If a token mismatch is detected but the stored token was rotated within this window
      * (in milliseconds), assume a Vaadin concurrent-request race condition rather than actual
      * cookie theft.  The concurrent request is allowed to authenticate using the already-rotated
      * token value without triggering another rotation.
      */
-    private static final long CONCURRENT_RACE_WINDOW_MS = 10_000L;
-
-
     public FarmTracksRememberMeServices(String key, UserDetailsService userDetailsService,
-            PersistentTokenRepository tokenRepository, JdbcTemplate jdbcTemplate) {
+            PersistentTokenRepository tokenRepository, JdbcTemplate jdbcTemplate,
+            long concurrentRaceWindowMs,
+            boolean suppressLoginFailCookieClear) {
         super(key, userDetailsService, tokenRepository);
         this.tokenRepo = tokenRepository;
         this.jdbc = jdbcTemplate;
+        this.concurrentRaceWindowMs = Math.max(10_000L, concurrentRaceWindowMs);
+        this.suppressLoginFailCookieClear = suppressLoginFailCookieClear;
         setTokenValiditySeconds(60 * 60 * 24 * 30); // 30 days
         setAlwaysRemember(true);
+        log.debug("Remember-me service initialized: tokenValiditySeconds={} concurrentRaceWindowMs={} suppressLoginFailCookieClear={}",
+            getTokenValiditySeconds(), this.concurrentRaceWindowMs, this.suppressLoginFailCookieClear);
+    }
+
+    @Override
+    public void loginFail(HttpServletRequest request, HttpServletResponse response) {
+        if (suppressLoginFailCookieClear) {
+            log.debug("Remember-me loginFail intercepted without cookie clear: {}",
+                    buildRequestContext(request));
+            return;
+        }
+        super.loginFail(request, response);
+    }
+
+    @Override
+    public void loginSuccess(HttpServletRequest request, HttpServletResponse response,
+            Authentication successfulAuthentication) {
+        String username = successfulAuthentication != null ? successfulAuthentication.getName() : "unknown";
+        log.debug("Remember-me loginSuccess: issuing canonical cookie for user='{}' {}",
+            username, buildRequestContext(request));
+
+        // Use a single controlled issuance path so the browser receives one stable
+        // remember-me cookie variant with explicit attributes.
+        forceIssuePersistentToken(request, response, successfulAuthentication);
+    }
+
+    private void forceIssuePersistentToken(HttpServletRequest request,
+            HttpServletResponse response,
+            Authentication successfulAuthentication) {
+        if (successfulAuthentication == null || successfulAuthentication.getName() == null) {
+            log.error("Remember-me manual issuance aborted: missing authentication principal");
+            return;
+        }
+
+        String username = successfulAuthentication.getName();
+        try {
+            PersistentRememberMeToken manualToken = new PersistentRememberMeToken(
+                    username,
+                    generateSeriesData(),
+                    generateTokenData(),
+                    new Date());
+
+            tokenRepo.createNewToken(manualToken);
+            addExplicitRememberMeHeader(manualToken, request, response);
+
+                log.debug("Remember-me manual issuance succeeded for user='{}'", username);
+                log.debug("Remember-me manual headers now: '{}'",
+                    String.join(" | ", response.getHeaders("Set-Cookie")));
+        } catch (Exception ex) {
+            log.error("Remember-me manual issuance failed for user='{}'", username, ex);
+        }
+    }
+
+    private void addExplicitRememberMeHeader(PersistentRememberMeToken token,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        String encodedValue = encodeCookie(new String[] { token.getSeries(), token.getTokenValue() });
+        addExplicitRememberMeHeaderForValue(encodedValue, request, response);
+    }
+
+    private void addExplicitRememberMeHeaderForValue(String encodedValue,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        int maxAge = getTokenValiditySeconds();
+
+        StringBuilder cookie = new StringBuilder();
+        cookie.append("remember-me=").append(encodedValue)
+                .append("; Max-Age=").append(maxAge)
+                .append("; Path=/")
+                .append("; HttpOnly")
+                .append("; SameSite=Lax");
+
+        if (request.isSecure()) {
+            cookie.append("; Secure");
+        }
+
+        response.addHeader("Set-Cookie", cookie.toString());
+    }
+
+    private void writeRememberMeCookie(String series,
+            String tokenValue,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        String encodedValue = encodeCookie(new String[] { series, tokenValue });
+        addExplicitRememberMeHeaderForValue(encodedValue, request, response);
     }
 
     @Override
@@ -71,6 +160,8 @@ public class FarmTracksRememberMeServices extends PersistentTokenBasedRememberMe
         PersistentRememberMeToken token = tokenRepo.getTokenForSeries(presentedSeries);
 
         if (token == null) {
+            log.warn("Remember-me series not found: series='{}' {}",
+                presentedSeries, buildRequestContext(request));
             throw new RememberMeAuthenticationException(
                     "No persistent token found for series id: " + presentedSeries);
         }
@@ -88,27 +179,47 @@ public class FarmTracksRememberMeServices extends PersistentTokenBasedRememberMe
                 // (B) Genuine stale/stolen cookie (hours/days old): remove only THIS series
                 //     (not all user tokens so other devices are unaffected) and force re-login.
                 long tokenAgeMs = System.currentTimeMillis() - token.getDate().getTime();
-                if (tokenAgeMs <= CONCURRENT_RACE_WINDOW_MS) {
-                log.debug("Remember-me concurrent-request race detected: user='{}' series='{}' "
-                    + "token rotated {}ms ago via request='{}' — authenticating with current "
-                    + "stored token, updating browser cookie (no extra rotation).",
-                    token.getUsername(), presentedSeries, tokenAgeMs, request.getRequestURI());
+                if (tokenAgeMs <= concurrentRaceWindowMs) {
+                log.debug("Remember-me concurrent-request race accepted: user='{}' series='{}' "
+                    + "tokenAgeMs={} raceWindowMs={} presentedTokenPrefix='{}' storedTokenPrefix='{}' {}",
+                    token.getUsername(), presentedSeries, tokenAgeMs, concurrentRaceWindowMs,
+                    tokenPrefix(presentedToken), tokenPrefix(token.getTokenValue()),
+                    buildRequestContext(request));
                 // Give the browser the already-rotated token so future requests work correctly.
-                setCookie(new String[] { token.getSeries(), token.getTokenValue() },
-                    getTokenValiditySeconds(), request, response);
+                writeRememberMeCookie(token.getSeries(), token.getTokenValue(), request, response);
                 return getUserDetailsService().loadUserByUsername(token.getUsername());
                 }
-                log.warn("Remember-me token mismatch: user='{}' series='{}' request='{}' "
-                    + "token is {}ms old — removing stale series only (not purging all user tokens).",
-                    token.getUsername(), presentedSeries, request.getRequestURI(), tokenAgeMs);
-                jdbc.update("DELETE FROM persistent_logins WHERE series = ?", presentedSeries);
-                cancelCookie(request, response);
-                throw new RememberMeAuthenticationException(
-                    "Remember-me token mismatch for series '" + presentedSeries + "' — re-login required");
+                log.debug("Remember-me token mismatch outside race window: user='{}' series='{}' tokenAgeMs={} "
+                    + "raceWindowMs={} presentedTokenPrefix='{}' storedTokenPrefix='{}' {} "
+                    + "-> rotating token and reissuing remember-me cookie",
+                    token.getUsername(), presentedSeries, tokenAgeMs, concurrentRaceWindowMs,
+                    tokenPrefix(presentedToken), tokenPrefix(token.getTokenValue()),
+                    buildRequestContext(request));
+
+                // Avoid deleting the browser cookie on mismatch. In this app, intermittent
+                // concurrent/internal requests can present stale tokens after idle.
+                // Self-heal by rotating the stored token and issuing a fresh cookie.
+                PersistentRememberMeToken healedToken = new PersistentRememberMeToken(
+                        token.getUsername(), token.getSeries(), generateTokenData(), new Date());
+                try {
+                    tokenRepo.updateToken(healedToken.getSeries(), healedToken.getTokenValue(), healedToken.getDate());
+                    writeRememberMeCookie(healedToken.getSeries(), healedToken.getTokenValue(), request, response);
+                    return getUserDetailsService().loadUserByUsername(token.getUsername());
+                } catch (Exception ex) {
+                    log.error("Remember-me mismatch recovery failed for user='{}' series='{}' -> removing stale series",
+                            token.getUsername(), presentedSeries, ex);
+                    jdbc.update("DELETE FROM persistent_logins WHERE series = ?", presentedSeries);
+                    throw new RememberMeAuthenticationException(
+                            "Remember-me token recovery failed for series '" + presentedSeries + "'");
+                }
         }
 
         if (token.getDate().getTime() + getTokenValiditySeconds() * 1000L < System.currentTimeMillis()) {
-            log.info("Remember-me token expired for user='{}'", token.getUsername());
+            log.warn("Remember-me token expired: user='{}' series='{}' tokenAgeMs={} maxAgeMs={} {}",
+                    token.getUsername(), token.getSeries(),
+                    (System.currentTimeMillis() - token.getDate().getTime()),
+                    (getTokenValiditySeconds() * 1000L),
+                    buildRequestContext(request));
             throw new RememberMeAuthenticationException("Remember-me login has expired");
         }
 
@@ -119,14 +230,31 @@ public class FarmTracksRememberMeServices extends PersistentTokenBasedRememberMe
                 token.getUsername(), token.getSeries(), generateTokenData(), new Date());
         try {
             tokenRepo.updateToken(newToken.getSeries(), newToken.getTokenValue(), newToken.getDate());
-            // mirrors the private addCookie() method in PersistentTokenBasedRememberMeServices
-            setCookie(new String[] { newToken.getSeries(), newToken.getTokenValue() },
-                    getTokenValiditySeconds(), request, response);
+            writeRememberMeCookie(newToken.getSeries(), newToken.getTokenValue(), request, response);
         } catch (Exception ex) {
             log.error("Failed to update remember-me token for user='{}'", token.getUsername(), ex);
             throw new RememberMeAuthenticationException("Autologin failed due to data access problem");
         }
 
         return getUserDetailsService().loadUserByUsername(token.getUsername());
+    }
+
+    private String buildRequestContext(HttpServletRequest request) {
+        String sessionId = request.getSession(false) != null ? request.getSession(false).getId() : "none";
+        String requestedSessionId = request.getRequestedSessionId() != null ? request.getRequestedSessionId() : "none";
+        String query = request.getQueryString() != null ? request.getQueryString() : "";
+        String pathWithQuery = query.isEmpty() ? request.getRequestURI() : request.getRequestURI() + "?" + query;
+        return "request='" + request.getMethod() + " " + pathWithQuery + "'"
+                + " sessionId='" + sessionId + "'"
+                + " requestedSessionId='" + requestedSessionId + "'"
+                + " remoteAddr='" + request.getRemoteAddr() + "'";
+    }
+
+    private String tokenPrefix(String token) {
+        if (token == null || token.isEmpty()) {
+            return "none";
+        }
+        int end = Math.min(8, token.length());
+        return token.substring(0, end);
     }
 }
