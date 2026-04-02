@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Optional;
 
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.badge.Badge;
+import com.vaadin.flow.component.badge.BadgeVariant;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.card.Card;
@@ -33,7 +35,6 @@ import ca.jusjoken.data.entity.StockWeightHistory;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockWeightHistoryService;
 import ca.jusjoken.data.service.UserUiSettingsService;
-import ca.jusjoken.utility.BadgeVariant;
 
 public class WeightGrid extends Grid<StockWeightHistory> implements ListRefreshNeededListener {
     private static final String ACTION_COLUMN_KEY = "row-actions";
@@ -166,7 +167,7 @@ public class WeightGrid extends Grid<StockWeightHistory> implements ListRefreshN
         }
 
         if (weightHistory.hasNote()) {
-            Badge noteBadge = UIUtilities.createBadge("Note", weightHistory.getNote(), BadgeVariant.PRIMARY);
+            Badge noteBadge = UIUtilities.createBadge("Note", weightHistory.getNote());
             noteBadge.getElement().setAttribute("title", weightHistory.getNote());
             noteBadge.getStyle().set("max-width", "100%");
             noteBadge.getStyle().set("overflow", "hidden");

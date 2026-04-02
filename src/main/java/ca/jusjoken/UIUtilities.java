@@ -6,12 +6,15 @@ package ca.jusjoken;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.Text;
+import com.vaadin.flow.component.badge.Badge;
+import com.vaadin.flow.component.badge.BadgeVariant;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
@@ -23,11 +26,9 @@ import com.vaadin.flow.component.textfield.TextFieldVariant;
 import com.vaadin.flow.theme.lumo.LumoUtility.FontSize;
 import com.vaadin.flow.theme.lumo.LumoUtility.FontWeight;
 
-import ca.jusjoken.component.Badge;
 import ca.jusjoken.component.ButtonNumberField;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Stock;
-import ca.jusjoken.utility.BadgeVariant;
 
 /**
  *
@@ -334,9 +335,27 @@ public class UIUtilities {
         }
         Badge badge = new Badge(text);
         badge.addClassNames(FontSize.SMALL, FontWeight.MEDIUM);
-        badge.addThemeVariants(BadgeVariant.PILL);
         badge.addThemeVariants(variants);
         return badge;
+    }
+
+    public static Button createGridHeaderContextMenuButton(String ariaLabel) {
+        Button menuButton = new Button(VaadinIcon.COGS.create());
+        menuButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
+        menuButton.getElement().setAttribute("title", "Grid actions");
+        menuButton.getElement().setAttribute(
+                "aria-label",
+                ariaLabel == null || ariaLabel.isBlank() ? "Open grid menu" : ariaLabel);
+        menuButton.getStyle().set("flex-shrink", "0");
+        menuButton.addClickListener(event -> menuButton.getElement().executeJs(
+                "const btn=this;"
+                        + "const grid=btn.closest('vaadin-grid');"
+                        + "if(!grid){return;}"
+                        + "const rect=btn.getBoundingClientRect();"
+                        + "grid.dispatchEvent(new MouseEvent('contextmenu', {"
+                        + "bubbles:true,cancelable:true,composed:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom"
+                        + "}));"));
+        return menuButton;
     }
 
 }

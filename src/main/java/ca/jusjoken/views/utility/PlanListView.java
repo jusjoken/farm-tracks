@@ -2,8 +2,12 @@ package ca.jusjoken.views.utility;
 
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.DetachEvent;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.Main;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.tabs.Tab;
@@ -33,6 +37,10 @@ public class PlanListView extends Main {
     private final Tab litterTab = new Tab("Litter");
     private final Tabs typeTabs = new Tabs(allTypesTab, generalTab, breederTab, litterTab);
     private final Span rowCount = new Span();
+    private final HorizontalLayout filterStatusBar = new HorizontalLayout();
+    private final Icon filterStatusIcon = new Icon(Utility.ICONS.ACTION_FILTER.getIconSource());
+    private final HorizontalLayout filterChipLayout = new HorizontalLayout();
+    private final Button clearAllFiltersButton = new Button("Clear all");
 
     public PlanListView() {
         setSizeFull();
@@ -57,9 +65,13 @@ public class PlanListView extends Main {
                 planGrid.setTypeFilter(null);
             }
             updateRowCount();
+            refreshFilterStatusBar();
         });
 
-        planGrid.addRefreshListener(this::updateRowCount);
+        planGrid.addRefreshListener(() -> {
+            updateRowCount();
+            refreshFilterStatusBar();
+        });
 
         HorizontalLayout filterLayout = new HorizontalLayout(typeTabs);
         filterLayout.setPadding(true);
@@ -72,6 +84,8 @@ public class PlanListView extends Main {
         rowCount.getStyle().set("white-space", "nowrap");
         filterLayout.add(rowCount);
 
+        configureFilterStatusBar();
+
         VerticalLayout layout = new VerticalLayout();
         layout.setPadding(false);
         layout.setSpacing(false);
@@ -81,6 +95,7 @@ public class PlanListView extends Main {
         layout.getStyle().set("overflow", "hidden");
 
         add(filterLayout);
+        add(filterStatusBar);
         planGrid.setWidthFull();
         planGrid.getStyle().set("flex", "1 1 auto");
         planGrid.getStyle().set("min-height", "0");
@@ -90,6 +105,98 @@ public class PlanListView extends Main {
         add(layout);
         planGrid.refreshGrid();
         updateRowCount();
+        refreshFilterStatusBar();
+    }
+
+    private void configureFilterStatusBar() {
+        filterStatusBar.setWidthFull();
+        filterStatusBar.setPadding(false);
+        filterStatusBar.setSpacing(true);
+        filterStatusBar.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
+        filterStatusBar.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
+        filterStatusBar.getStyle().set("padding", "0 var(--lumo-space-m) var(--lumo-space-xs) var(--lumo-space-m)");
+
+        filterStatusIcon.getStyle().set("color", "var(--lumo-secondary-text-color)");
+        filterStatusIcon.getStyle().set("cursor", "pointer");
+        filterStatusIcon.getElement().setAttribute("aria-label", "Active filters");
+        filterStatusIcon.getElement().setAttribute("title", "Edit filters");
+        filterStatusIcon.getElement().setAttribute("tabindex", "0");
+        filterStatusIcon.getElement().addEventListener("click", e -> openGridHeaderMenu());
+        filterStatusIcon.getElement().addEventListener("keydown", e -> openGridHeaderMenu())
+                .setFilter("event.key === 'Enter' || event.key === ' '");
+
+        filterChipLayout.setSpacing(true);
+        filterChipLayout.setPadding(false);
+
+        clearAllFiltersButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_SMALL);
+        clearAllFiltersButton.addClickListener(click -> clearAllFilters());
+
+        HorizontalLayout statusLeft = new HorizontalLayout(filterStatusIcon, filterChipLayout);
+        statusLeft.setPadding(false);
+        statusLeft.setSpacing(true);
+        statusLeft.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
+
+        filterStatusBar.add(statusLeft, clearAllFiltersButton);
+    }
+
+    private void refreshFilterStatusBar() {
+        int activeCount = planGrid.getActiveFilterCount();
+        boolean hasFilters = activeCount > 0;
+
+        filterStatusBar.setVisible(hasFilters);
+        clearAllFiltersButton.setVisible(activeCount > 1);
+        if (!hasFilters) {
+            return;
+        }
+
+        filterChipLayout.removeAll();
+        for (TaskPlanGrid.FilterChip chip : planGrid.getActiveFilterChips()) {
+            filterChipLayout.add(createRemovableChip(chip));
+        }
+    }
+
+    private HorizontalLayout createRemovableChip(TaskPlanGrid.FilterChip chip) {
+        Span label = new Span(chip.getLabel());
+        label.getStyle().set("font-size", "var(--lumo-font-size-xs)");
+        label.getStyle().set("color", "var(--lumo-secondary-text-color)");
+        label.getStyle().set("white-space", "nowrap");
+
+        Button remove = new Button(com.vaadin.flow.component.icon.VaadinIcon.CLOSE_SMALL.create());
+        remove.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
+        remove.getElement().setAttribute("aria-label", "Remove filter " + chip.getLabel());
+        remove.addClickListener(click -> removeFilterChip(chip));
+
+        HorizontalLayout chipLayout = new HorizontalLayout(label, remove);
+        chipLayout.setPadding(false);
+        chipLayout.setSpacing(false);
+        chipLayout.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
+        chipLayout.getStyle().set("padding", "0.1rem 0.2rem 0.1rem 0.45rem");
+        chipLayout.getStyle().set("border-radius", "999px");
+        chipLayout.getStyle().set("background", "var(--lumo-contrast-10pct)");
+        return chipLayout;
+    }
+
+    private void clearAllFilters() {
+        planGrid.clearAllUserFilters();
+        refreshFilterStatusBar();
+    }
+
+    private void removeFilterChip(TaskPlanGrid.FilterChip chip) {
+        if (chip == null) {
+            return;
+        }
+        planGrid.clearFilter(chip.getType());
+        refreshFilterStatusBar();
+    }
+
+    private void openGridHeaderMenu() {
+        planGrid.getElement().executeJs(
+                "const grid=this;"
+                        + "const rect=grid.getBoundingClientRect();"
+                        + "grid.dispatchEvent(new MouseEvent('contextmenu', {"
+                        + "bubbles:true,cancelable:true,composed:true,view:window,"
+                        + "clientX:rect.left + Math.min(120, Math.max(16, rect.width * 0.2)),clientY:rect.top + 18"
+                        + "}));");
     }
 
     @Override

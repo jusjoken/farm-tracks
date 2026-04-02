@@ -6,15 +6,15 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.vaadin.flow.component.badge.Badge;
+import com.vaadin.flow.component.badge.BadgeVariant;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 
-import ca.jusjoken.component.Badge;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.entity.Stock;
 import ca.jusjoken.data.entity.Task;
 import ca.jusjoken.data.entity.TaskPlan;
-import ca.jusjoken.utility.BadgeVariant;
 import ca.jusjoken.utility.TaskType;
 import jakarta.transaction.Transactional;
 
@@ -226,7 +226,7 @@ public class TaskPlanService {
     public Badge getDisplayNameBadge(TaskPlan taskPlan) {
         if (taskPlan == null) {
             Badge fallbackBadge = new Badge("General Plan");
-            fallbackBadge.addThemeVariants(BadgeVariant.PILL, BadgeVariant.WARNING);
+            fallbackBadge.addThemeVariants(BadgeVariant.WARNING);
             return fallbackBadge;
         }
 
@@ -249,7 +249,6 @@ public class TaskPlanService {
             }
         }
         Badge badge = new Badge(linkTypeInfo + " Plan: " + dateInfo);
-        badge.addThemeVariants(BadgeVariant.PILL);
         if(linkTypeInfo.equals("Breeder")) {
             badge.addThemeVariants(BadgeVariant.SUCCESS);
         } else if (linkTypeInfo.equals("Litter")) {

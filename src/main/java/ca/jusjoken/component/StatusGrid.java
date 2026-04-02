@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Optional;
 
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.badge.Badge;
+import com.vaadin.flow.component.badge.BadgeVariant;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.card.Card;
@@ -33,7 +35,6 @@ import ca.jusjoken.data.entity.StockStatusHistory;
 import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.UserUiSettingsService;
-import ca.jusjoken.utility.BadgeVariant;
 
 public class StatusGrid extends Grid<StockStatusHistory> implements ListRefreshNeededListener {
     private static final String ACTION_COLUMN_KEY = "row-actions";
@@ -166,7 +167,7 @@ public class StatusGrid extends Grid<StockStatusHistory> implements ListRefreshN
         }
 
         if (statusHistory.hasNote()) {
-            Badge noteBadge = UIUtilities.createBadge("Note", statusHistory.getNote(), BadgeVariant.PRIMARY);
+            Badge noteBadge = UIUtilities.createBadge("Note", statusHistory.getNote());
             noteBadge.getElement().setAttribute("title", statusHistory.getNote());
             noteBadge.getStyle().set("max-width", "100%");
             noteBadge.getStyle().set("overflow", "hidden");
@@ -184,8 +185,11 @@ public class StatusGrid extends Grid<StockStatusHistory> implements ListRefreshN
             case "active", "listed" -> BadgeVariant.SUCCESS;
             case "deposit", "sold", "butchered" -> BadgeVariant.WARNING;
             case "died", "culled", "archived" -> BadgeVariant.CONTRAST;
-            default -> BadgeVariant.PRIMARY;
+            default -> null;
         };
+        if (badgeVariant == null) {
+            return UIUtilities.createBadge(null, statusName);
+        }
         return UIUtilities.createBadge(null, statusName, badgeVariant);
     }
 

@@ -18,6 +18,8 @@ import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.vaadin.flow.component.avatar.Avatar;
 import com.vaadin.flow.component.avatar.AvatarVariant;
+import com.vaadin.flow.component.badge.Badge;
+import com.vaadin.flow.component.badge.BadgeVariant;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.SvgIcon;
@@ -28,7 +30,6 @@ import com.vaadin.flow.server.streams.DownloadHandler;
 
 import ca.jusjoken.UIUtilities;
 import ca.jusjoken.component.AvatarDiv;
-import ca.jusjoken.component.Badge;
 import ca.jusjoken.component.Layout;
 import ca.jusjoken.data.Utility;
 import ca.jusjoken.data.Utility.Gender;
@@ -37,7 +38,6 @@ import ca.jusjoken.data.service.LocalDateCsvConverter;
 import ca.jusjoken.data.service.LocalDateCsvConverterDDMMYYYY;
 import ca.jusjoken.data.service.StockStatus;
 import ca.jusjoken.utility.AgeBetween;
-import ca.jusjoken.utility.BadgeVariant;
 import jakarta.persistence.Access;
 import jakarta.persistence.AccessType;
 import jakarta.persistence.CascadeType;
@@ -895,12 +895,12 @@ public class Stock {
             if(!getPrefix().isEmpty()){
                 badge.setText(getPrefix());
             }
-            badge.addThemeVariants(BadgeVariant.PILL, BadgeVariant.SMALL);
+            badge.addThemeVariants(BadgeVariant.SMALL);
             nameAndPrefix.add(badge);
         }else{
             if(!getPrefix().isEmpty()){
                 Badge badge = new Badge(getPrefix());
-                badge.addThemeVariants(BadgeVariant.PILL, BadgeVariant.SMALL);
+                badge.addThemeVariants(BadgeVariant.SMALL);
                 nameAndPrefix.add(badge);
             }
         }

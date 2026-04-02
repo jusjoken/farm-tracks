@@ -6,6 +6,8 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.badge.Badge;
+import com.vaadin.flow.component.badge.BadgeVariant;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.card.Card;
@@ -36,10 +38,31 @@ import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.TaskPlanService;
 import ca.jusjoken.data.service.TaskService;
 import ca.jusjoken.data.service.UserUiSettingsService;
-import ca.jusjoken.utility.BadgeVariant;
 import ca.jusjoken.utility.TaskType;
 
 public class TaskPlanGrid extends Grid<TaskPlan> {
+
+    public enum FilterType {
+        STATUS
+    }
+
+    public static final class FilterChip {
+        private final FilterType type;
+        private final String label;
+
+        public FilterChip(FilterType type, String label) {
+            this.type = type;
+            this.label = label;
+        }
+
+        public FilterType getType() {
+            return type;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+    }
 
     private enum StatusFilter {
         ACTIVE("Active", Utility.TaskPlanStatus.ACTIVE),
@@ -262,12 +285,12 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
     private Component buildStatusBadge(TaskPlan plan) {
         Utility.TaskPlanStatus status = plan.getStatus() != null ? plan.getStatus() : Utility.TaskPlanStatus.ACTIVE;
         Badge badge = new Badge(getStatusBadgeLabel(plan, status));
-        badge.addThemeVariants(ca.jusjoken.utility.BadgeVariant.PILL);
         switch (status) {
-            case ACTIVE -> badge.addThemeVariants(ca.jusjoken.utility.BadgeVariant.SUCCESS);
-            case INACTIVE -> badge.addThemeVariants(ca.jusjoken.utility.BadgeVariant.CONTRAST);
-            case INCOMPLETE -> badge.addThemeVariants(ca.jusjoken.utility.BadgeVariant.WARNING);
-            default -> badge.addThemeVariants(ca.jusjoken.utility.BadgeVariant.PRIMARY);
+            case ACTIVE -> badge.addThemeVariants(BadgeVariant.SUCCESS);
+            case INACTIVE -> badge.addThemeVariants(BadgeVariant.CONTRAST);
+            case INCOMPLETE -> badge.addThemeVariants(BadgeVariant.WARNING);
+            default -> {
+            }
         }
         return badge;
     }
@@ -301,7 +324,7 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
         // Parents badge
         String parents = getParentsLabel(plan);
         if (!parents.isBlank()) {
-            card.addToFooter(UIUtilities.createBadge(null, parents, BadgeVariant.PRIMARY));
+            card.addToFooter(UIUtilities.createBadge(null, parents));
         }
 
         // Tasks badge
@@ -328,20 +351,7 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
     }
 
     private Button createHeaderMenuButton() {
-        Button menuButton = new Button(VaadinIcon.MENU.create());
-        menuButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
-        menuButton.getElement().setAttribute("title", "Grid actions");
-        menuButton.getElement().setAttribute("aria-label", "Open task plan grid menu");
-        menuButton.getStyle().set("flex-shrink", "0");
-        menuButton.addClickListener(event -> menuButton.getElement().executeJs(
-                "const btn=this;"
-                        + "const grid=btn.closest('vaadin-grid');"
-                        + "if(!grid){return;}"
-                        + "const rect=btn.getBoundingClientRect();"
-                        + "grid.dispatchEvent(new MouseEvent('contextmenu', {"
-                        + "bubbles:true,cancelable:true,composed:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom"
-                        + "}));"));
-        return menuButton;
+        return UIUtilities.createGridHeaderContextMenuButton("Open task plan grid menu");
     }
 
     private HorizontalLayout createTileHeaderActions() {
@@ -427,8 +437,7 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
                     filterItem.setCheckable(true);
                     filterItem.setChecked(currentStatusFilter == filter);
                     filterItem.addMenuItemClickListener(click -> {
-                        currentStatusFilter = filter;
-                        refreshGrid();
+                        setStatusFilter(filter);
                     });
                 }
 
@@ -562,6 +571,44 @@ public class TaskPlanGrid extends Grid<TaskPlan> {
 
     public void setTypeFilter(Utility.TaskLinkType typeFilter) {
         this.currentTypeFilter = typeFilter;
+        refreshGrid();
+    }
+
+    public void setStatusFilterToDefault() {
+        setStatusFilter(StatusFilter.ACTIVE);
+    }
+
+    public boolean hasActiveFilters() {
+        return !getActiveFilterChips().isEmpty();
+    }
+
+    public List<FilterChip> getActiveFilterChips() {
+        List<FilterChip> chips = new ArrayList<>();
+        if (currentStatusFilter != StatusFilter.ALL) {
+            chips.add(new FilterChip(FilterType.STATUS, currentStatusFilter.label));
+        }
+        return chips;
+    }
+
+    public int getActiveFilterCount() {
+        return getActiveFilterChips().size();
+    }
+
+    public void clearFilter(FilterType type) {
+        if (type == null) {
+            return;
+        }
+        if (type == FilterType.STATUS) {
+            setStatusFilter(StatusFilter.ALL);
+        }
+    }
+
+    public void clearAllUserFilters() {
+        setStatusFilter(StatusFilter.ALL);
+    }
+
+    private void setStatusFilter(StatusFilter filter) {
+        currentStatusFilter = (filter == null) ? StatusFilter.ACTIVE : filter;
         refreshGrid();
     }
 

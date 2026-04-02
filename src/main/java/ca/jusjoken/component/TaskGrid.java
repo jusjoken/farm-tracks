@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.badge.Badge;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.card.Card;
@@ -39,6 +40,28 @@ import ca.jusjoken.data.service.UserUiSettingsService;
 import ca.jusjoken.utility.TaskType;
 
 public class TaskGrid extends Grid<Task> {
+    public enum FilterType {
+        COMPLETION
+    }
+
+    public static final class FilterChip {
+        private final FilterType type;
+        private final String label;
+
+        public FilterChip(FilterType type, String label) {
+            this.type = type;
+            this.label = label;
+        }
+
+        public FilterType getType() {
+            return type;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+    }
+
     private ListDataProvider<Task> dataProvider;
     private final TaskService taskService;
     private final StockService stockService;
@@ -243,20 +266,7 @@ public class TaskGrid extends Grid<Task> {
     }
 
     private Button createHeaderMenuButton() {
-        Button menuButton = new Button(VaadinIcon.MENU.create());
-        menuButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
-        menuButton.getElement().setAttribute("title", "Grid actions");
-        menuButton.getElement().setAttribute("aria-label", "Open task grid menu");
-        menuButton.getStyle().set("flex-shrink", "0");
-        menuButton.addClickListener(event -> menuButton.getElement().executeJs(
-                "const btn=this;"
-                        + "const grid=btn.closest('vaadin-grid');"
-                        + "if(!grid){return;}"
-                        + "const rect=btn.getBoundingClientRect();"
-                        + "grid.dispatchEvent(new MouseEvent('contextmenu', {"
-                        + "bubbles:true,cancelable:true,composed:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom"
-                        + "}));"));
-        return menuButton;
+        return UIUtilities.createGridHeaderContextMenuButton("Open task grid menu");
     }
 
     private Button createRowMenuButton() {
@@ -315,10 +325,7 @@ public class TaskGrid extends Grid<Task> {
                     menuItem.setCheckable(true);
                     menuItem.setChecked(currentCompletionFilter.equals(filter.filterName));
                     menuItem.addMenuItemClickListener(click -> {
-                        currentCompletionFilter = filter.filterName;
-                        updateCompletionFilter(currentCompletionFilter);
-                        updateSortOrder();
-                        notifyRefreshListeners();
+                        setCompletionFilter(filter.filterName);
                     });
                 }
 
@@ -556,6 +563,45 @@ public class TaskGrid extends Grid<Task> {
         } else if (Utility.TaskCompletionFilter.ACTIVE.filterName.equals(filterValue)) {
             dataProvider.addFilter(task -> !task.getCompleted());
         }
+    }
+
+    public void setCompletionFilter(String filterValue) {
+        String normalized = (filterValue == null || filterValue.isBlank())
+                ? Utility.TaskCompletionFilter.ACTIVE.filterName
+                : filterValue;
+        currentCompletionFilter = normalized;
+        updateCompletionFilter(currentCompletionFilter);
+        updateSortOrder();
+        notifyRefreshListeners();
+    }
+
+    public boolean hasActiveFilters() {
+        return !getActiveFilterChips().isEmpty();
+    }
+
+    public List<FilterChip> getActiveFilterChips() {
+        List<FilterChip> chips = new ArrayList<>();
+        if (!Utility.TaskCompletionFilter.ALL.filterName.equals(currentCompletionFilter)) {
+            chips.add(new FilterChip(FilterType.COMPLETION, currentCompletionFilter));
+        }
+        return chips;
+    }
+
+    public int getActiveFilterCount() {
+        return getActiveFilterChips().size();
+    }
+
+    public void clearFilter(FilterType type) {
+        if (type == null) {
+            return;
+        }
+        if (type == FilterType.COMPLETION) {
+            setCompletionFilter(Utility.TaskCompletionFilter.ALL.filterName);
+        }
+    }
+
+    public void clearAllUserFilters() {
+        setCompletionFilter(Utility.TaskCompletionFilter.ALL.filterName);
     }
 
     private void updateSortOrder(){

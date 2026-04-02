@@ -3,13 +3,13 @@ package ca.jusjoken.data.entity;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
+import com.vaadin.flow.component.badge.Badge;
+import com.vaadin.flow.component.badge.BadgeVariant;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 
 import ca.jusjoken.UIUtilities;
-import ca.jusjoken.component.Badge;
 import ca.jusjoken.data.Utility;
-import ca.jusjoken.utility.BadgeVariant;
 import ca.jusjoken.utility.TaskType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

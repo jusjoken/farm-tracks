@@ -10,6 +10,7 @@ import java.util.Optional;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
+import com.vaadin.flow.component.badge.BadgeVariant;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.card.Card;
@@ -42,7 +43,6 @@ import ca.jusjoken.data.service.Registry;
 import ca.jusjoken.data.service.StockService;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.data.service.UserUiSettingsService;
-import ca.jusjoken.utility.BadgeVariant;
 
 public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListener{
     private ListDataProvider<Litter> dataProvider;
@@ -78,6 +78,31 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
         ALL,
         ACTIVE,
         ARCHIVED
+    }
+
+    public enum FilterType {
+        LITTER_ID,
+        PARENT_NAME,
+        DISPLAY_MODE,
+        STOCK_TYPE
+    }
+
+    public static final class FilterChip {
+        private final FilterType type;
+        private final String label;
+
+        public FilterChip(FilterType type, String label) {
+            this.type = type;
+            this.label = label;
+        }
+
+        public FilterType getType() {
+            return type;
+        }
+
+        public String getLabel() {
+            return label;
+        }
     }
 
     public LitterGrid() {
@@ -175,28 +200,40 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
         addRowActionsColumn();
 
-        //setHeight("200px");
+        // Give Name explicit priority: autoWidth can under-allocate when many columns compete.
+        Grid.Column<Litter> nameColumn = addComponentColumn(litter -> litter.getnameAndPrefix(false,true))
+            .setHeader("Name")
+            .setWidth("11rem")
+            .setFlexGrow(0)
+            .setFrozen(true)
+            .setResizable(true)
+            .setKey("name");
 
-        addComponentColumn(litter -> {
-            return litter.getnameAndPrefix(false,true);
-        }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name");
+        nameColumn.setAutoWidth(false);
 
-        addColumn(Litter::getParentsFormatted).setHeader("Parents").setSortable(true).setResizable(true).setAutoWidth(true).setKey("parents");
+        addColumn(Litter::getParentsFormatted)
+            .setHeader("Parents")
+            .setSortable(true)
+            .setResizable(true)
+            .setWidth("14rem")
+            .setFlexGrow(1)
+            .setKey("parents");
         bornColumn = addColumn(new LocalDateRenderer<>(Litter::getDoB,"MM-dd-YYYY"))
-            .setHeader("Born").setSortable(true).setComparator(Litter::getDoB).setResizable(true).setKey("born");
+            .setHeader("Born").setSortable(true).setComparator(Litter::getDoB).setResizable(true).setAutoWidth(true).setFlexGrow(0).setKey("born");
         bredColumn = addColumn(new LocalDateRenderer<>(Litter::getBred,"MM-dd-YYYY"))
-            .setHeader("Bred").setSortable(true).setComparator(Litter::getBred).setResizable(true).setKey("bred");
+            .setHeader("Bred").setSortable(true).setComparator(Litter::getBred).setResizable(true).setAutoWidth(true).setFlexGrow(0).setKey("bred");
         String kitsHeader = (stockType != null && stockType.getNonBreederName() != null)
             ? stockType.getNonBreederName()
             : "Kits";
-        kitsCountColumn = addColumn(this::getDisplayKitsCount).setHeader(kitsHeader).setSortable(true).setResizable(true).setKey("kits");
-        diedKitsCountColumn = addColumn(item -> item.getDiedKitsCount()).setHeader("Died").setSortable(true).setResizable(true).setKey("died");
-        kitsSurvivedCountColumn = addColumn(this::getDisplayKitsSurvivedCount).setHeader("Survived").setSortable(true).setResizable(true).setKey("survived");
-        survivalRateColumn = addColumn(this::getDisplaySurvivalRate).setHeader("Survival Rate").setSortable(true).setResizable(true).setKey("survival");
+        kitsCountColumn = addColumn(this::getDisplayKitsCount).setHeader(kitsHeader).setWidth("6.5rem").setFlexGrow(0).setSortable(true).setResizable(true).setKey("kits");
+        diedKitsCountColumn = addColumn(item -> item.getDiedKitsCount()).setHeader("Died").setWidth("6.5rem").setFlexGrow(0).setSortable(true).setResizable(true).setKey("died");
+        kitsSurvivedCountColumn = addColumn(this::getDisplayKitsSurvivedCount).setHeader("Survived").setWidth("8rem").setFlexGrow(0).setSortable(true).setResizable(true).setKey("survived");
+        survivalRateColumn = addColumn(this::getDisplaySurvivalRate).setHeader("Survival Rate").setWidth("9rem").setFlexGrow(0).setSortable(true).setResizable(true).setKey("survival");
         Grid.Column<Litter> statusColumn = addComponentColumn(litter -> {
             return litter.getActiveBadge();
         }).setHeader("Status")
           .setAutoWidth(true)
+          .setFlexGrow(0)
           .setResizable(true)
           .setKey("status")
           .setSortable(true);
@@ -276,20 +313,7 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
     }
 
     private Button createHeaderMenuButton() {
-        Button menuButton = new Button(VaadinIcon.MENU.create());
-        menuButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
-        menuButton.getElement().setAttribute("title", "Grid actions");
-        menuButton.getElement().setAttribute("aria-label", "Open litter grid menu");
-        menuButton.getStyle().set("flex-shrink", "0");
-        menuButton.addClickListener(event -> menuButton.getElement().executeJs(
-                "const btn=this;"
-                        + "const grid=btn.closest('vaadin-grid');"
-                        + "if(!grid){return;}"
-                        + "const rect=btn.getBoundingClientRect();"
-                        + "grid.dispatchEvent(new MouseEvent('contextmenu', {"
-                        + "bubbles:true,cancelable:true,composed:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom"
-                        + "}));"));
-        return menuButton;
+        return UIUtilities.createGridHeaderContextMenuButton("Open litter grid menu");
     }
 
     private Button createRowMenuButton() {
@@ -471,6 +495,174 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
     public void setLitterIdFilter(Integer litterIdFilter) {
         this.litterIdFilter = litterIdFilter;
+        applyFilters();
+    }
+
+    public boolean hasActiveFilters() {
+        return !getActiveFilterChips().isEmpty();
+    }
+
+    public List<String> getActiveFilterLabels() {
+        List<String> labels = new ArrayList<>();
+        for (FilterChip chip : getActiveFilterChips()) {
+            labels.add(chip.getLabel());
+        }
+        return labels;
+    }
+
+    public List<FilterChip> getActiveFilterChips() {
+        List<FilterChip> chips = new ArrayList<>();
+
+        if (litterIdFilter != null) {
+            chips.add(new FilterChip(FilterType.LITTER_ID, getLitterFilterChipLabel()));
+        }
+        if (litterDisplayMode != LitterDisplayMode.ALL) {
+            chips.add(new FilterChip(FilterType.DISPLAY_MODE, getDisplayModeLabel(litterDisplayMode).replace(" Litters", "")));
+        }
+        if (stockType != null) {
+            String stockTypeName = stockType.getName() == null ? "Unknown" : stockType.getName();
+            chips.add(new FilterChip(FilterType.STOCK_TYPE, stockTypeName));
+        }
+
+        return chips;
+    }
+
+    public int getActiveFilterCount() {
+        return getActiveFilterChips().size();
+    }
+
+    public void clearAllUserFilters() {
+        parentNameFilter = "";
+        litterDisplayMode = LitterDisplayMode.ALL;
+        litterIdFilter = null;
+        stockType = null;
+        refreshGrid();
+    }
+
+    public void clearFilter(FilterType type) {
+        if (type == null) {
+            return;
+        }
+
+        switch (type) {
+            case LITTER_ID -> setLitterIdFilter(null);
+            case PARENT_NAME -> setParentNameFilter("");
+            case DISPLAY_MODE -> setLitterDisplayMode(LitterDisplayMode.ALL);
+            case STOCK_TYPE -> {
+                if (stockType != null) {
+                    stockType = null;
+                    refreshGrid();
+                }
+            }
+        }
+    }
+
+    public StockType getSelectedStockTypeFilter() {
+        return stockType;
+    }
+
+    public void clearStockTypeFilter() {
+        if (stockType == null) {
+            return;
+        }
+        stockType = null;
+        refreshGrid();
+    }
+
+    public void setStockTypeFilter(StockType stockType) {
+        setStockType(stockType);
+        refreshGrid();
+    }
+
+    public boolean hasStockTypeFilter() {
+        return stockType != null;
+    }
+
+    public String getStockTypeFilterLabel() {
+        if (stockType == null) {
+            return null;
+        }
+        String stockTypeName = stockType.getName();
+        return "Stock Type: " + (stockTypeName == null ? "Unknown" : stockTypeName);
+    }
+
+    public Integer getLitterIdFilter() {
+        return litterIdFilter;
+    }
+
+    public String getParentNameFilter() {
+        return parentNameFilter;
+    }
+
+    public void clearLitterIdFilter() {
+        setLitterIdFilter(null);
+    }
+
+    public void clearParentNameFilter() {
+        setParentNameFilter("");
+    }
+
+    public void clearDisplayModeFilter() {
+        setLitterDisplayMode(LitterDisplayMode.ALL);
+    }
+
+    public boolean hasLitterIdFilter() {
+        return litterIdFilter != null;
+    }
+
+    public boolean hasParentNameFilter() {
+        return parentNameFilter != null && !parentNameFilter.isBlank();
+    }
+
+    public boolean hasDisplayModeFilter() {
+        return litterDisplayMode != LitterDisplayMode.ALL;
+    }
+
+    public String getDisplayModeFilterLabel() {
+        if (litterDisplayMode == LitterDisplayMode.ALL) {
+            return null;
+        }
+        return "Status: " + getDisplayModeLabel(litterDisplayMode);
+    }
+
+    public String getParentNameFilterLabel() {
+        if (parentNameFilter == null || parentNameFilter.isBlank()) {
+            return null;
+        }
+        return "Parent: " + parentNameFilter;
+    }
+
+    public String getLitterIdFilterLabel() {
+        if (litterIdFilter == null) {
+            return null;
+        }
+        return getLitterFilterChipLabel();
+    }
+
+    private String getLitterFilterChipLabel() {
+        if (litterIdFilter == null) {
+            return "";
+        }
+
+        if (initializeServicesIfNeeded() && litterService != null) {
+            Litter litter = litterService.findById(litterIdFilter);
+            if (litter != null && litter.getName() != null && !litter.getName().isBlank()) {
+                return litter.getName().trim();
+            }
+        }
+
+        return "#" + litterIdFilter;
+    }
+
+    public List<String> getFilterSummaryLabels() {
+        return getActiveFilterLabels();
+    }
+
+    public int getFilterSummaryCount() {
+        return getActiveFilterCount();
+    }
+
+    public void clearAllFilters() {
         applyFilters();
     }
 
@@ -964,6 +1156,10 @@ public class LitterGrid extends Grid<Litter>  implements ListRefreshNeededListen
 
     public void addListener(ListRefreshNeededListener listener) {
         listRefreshNeededListeners.add(listener);
+    }
+
+    public void removeListener(ListRefreshNeededListener listener) {
+        listRefreshNeededListeners.remove(listener);
     }
 
     private void notifyRefreshNeeded() {

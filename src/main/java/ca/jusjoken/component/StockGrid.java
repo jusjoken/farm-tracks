@@ -16,6 +16,8 @@ import java.util.Set;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.avatar.Avatar;
+import com.vaadin.flow.component.badge.Badge;
+import com.vaadin.flow.component.badge.BadgeVariant;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.card.Card;
@@ -65,7 +67,6 @@ import ca.jusjoken.data.service.StockStatusHistoryService;
 import ca.jusjoken.data.service.StockTypeService;
 import ca.jusjoken.data.service.StockWeightHistoryService;
 import ca.jusjoken.data.service.UserUiSettingsService;
-import ca.jusjoken.utility.BadgeVariant;
 import ca.jusjoken.utility.TaskType;
 import ca.jusjoken.views.stock.StockPedigreeEditor;
 import ca.jusjoken.views.utility.LitterListView;
@@ -289,19 +290,29 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
 
         addRowActionsColumn();
 
-        addComponentColumn(stockEntity -> {
+        Grid.Column<Stock> nameColumn = addComponentColumn(stockEntity -> {
             return createNameCell(stockEntity);
-                }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(false).setKey("name")
+                }).setHeader("Name").setAutoWidth(true).setFrozen(true).setResizable(true).setKey("name")
                     .setComparator(Stock::getDisplayName).setSortable(true);
 
+        // In litter detail grids, prevent Name from collapsing while still letting it use leftover space.
         if (stockGridType == StockGridType.LITTER) {
-            addComponentColumn(this::createFosterIndicatorBadge)
+            nameColumn.setAutoWidth(false);
+            nameColumn.setWidth("11rem");
+            nameColumn.setFlexGrow(1);
+        }
+
+        if (stockGridType == StockGridType.LITTER) {
+            Grid.Column<Stock> fosterColumn = addComponentColumn(this::createFosterIndicatorBadge)
                     .setHeader("Foster")
                     .setResizable(true)
-                    .setAutoWidth(true)
+                    .setWidth("13rem")
+                    .setAutoWidth(false)
+                    .setFlexGrow(0)
                     .setKey("foster")
                     .setComparator(this::getFosterSortValue)
                     .setSortable(true);
+
         }
 
         if(stockGridType == StockGridType.STOCK){
@@ -611,7 +622,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     private Component createFosterIndicatorBadge(Stock stockEntity) {
         FosterPlacement placement = getFosterPlacementForCurrentLitter(stockEntity);
         if (placement == FosterPlacement.FOSTER_IN) {
-            Badge badge = UIUtilities.createBadge(null, "Foster In", BadgeVariant.PRIMARY);
+            Badge badge = UIUtilities.createBadge(null, "Foster In");
             String birthLitterName = getBirthLitterDisplayName(stockEntity);
             if (!birthLitterName.isBlank()) {
                 badge.getElement().setProperty("title", "Born in: " + birthLitterName);
@@ -624,9 +635,14 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
             String tooltip = fosterLitterName.isBlank()
                     ? "Moved to foster litter"
                     : "Now in: " + fosterLitterName;
-            badge.getElement().setProperty("title", tooltip + " (click for details)");
-            badge.getStyle().set("cursor", "pointer");
-            badge.addClickListener(event -> openFosterLitterDialog(stockEntity));
+            badge.getElement().setProperty("title", tooltip + " (use icon for details)");
+            Button detailsButton = new Button(VaadinIcon.EXTERNAL_LINK.create());
+            detailsButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE,
+                    ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
+            detailsButton.getElement().setAttribute("aria-label", "Open foster destination details");
+            detailsButton.getElement().setAttribute("title", "Open foster destination details");
+            detailsButton.addClickListener(event -> openFosterLitterDialog(stockEntity));
+            badge.getElement().appendChild(detailsButton.getElement());
             return badge;
         }
         return new Div();
@@ -1152,20 +1168,7 @@ public class StockGrid extends Grid<Stock> implements ListRefreshNeededListener{
     }
 
     private Button createHeaderMenuButton() {
-        Button menuButton = new Button(VaadinIcon.MENU.create());
-        menuButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY_INLINE, ButtonVariant.LUMO_ICON, ButtonVariant.LUMO_SMALL);
-        menuButton.getElement().setAttribute("title", "Grid actions");
-        menuButton.getElement().setAttribute("aria-label", "Open stock grid menu");
-        menuButton.getStyle().set("flex-shrink", "0");
-        menuButton.addClickListener(event -> menuButton.getElement().executeJs(
-                "const btn=this;"
-                        + "const grid=btn.closest('vaadin-grid');"
-                        + "if(!grid){return;}"
-                        + "const rect=btn.getBoundingClientRect();"
-                        + "grid.dispatchEvent(new MouseEvent('contextmenu', {"
-                        + "bubbles:true,cancelable:true,composed:true,view:window,clientX:rect.left + rect.width/2,clientY:rect.bottom"
-                        + "}));"));
-        return menuButton;
+        return UIUtilities.createGridHeaderContextMenuButton("Open stock grid menu");
     }
 
     private Button createRowMenuButton() {
