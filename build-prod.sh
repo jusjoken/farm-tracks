@@ -13,8 +13,9 @@
 # USAGE:
 #   ./build-prod.sh              # build only (reuses cached bundle if available)
 #   ./build-prod.sh --clean      # build with fresh frontend (deletes cached bundle)
-#   ./build-prod.sh --deploy     # build + deploy docker stack
-#   ./build-prod.sh --clean --deploy  # fresh build + deploy
+#   ./build-prod.sh --deploy     # build + deploy local Portainer-style container
+#   ./build-prod.sh --clean --deploy  # fresh build + local deploy
+#   ./build-prod.sh --skip-build --deploy  # deploy existing JAR only
 
 set -euo pipefail
 
@@ -22,20 +23,25 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 JAR_SRC="target/farm-tracks-1.0-SNAPSHOT.jar"
-JAR_DST="/home/birch/appdata/farmtracks/app.jar"
-COMPOSE_CMD="docker compose -f docker-compose.yml -f docker-compose.local-swag.yml"
-CONTAINER="farmtracks"
+LOCAL_DEPLOY_SCRIPT="./deploy/local/deploy-local-jar.sh"
 
 # Parse command-line arguments
 CLEAN=false
 DEPLOY=false
+SKIP_BUILD=false
 for arg in "$@"; do
     case "$arg" in
         --clean)  CLEAN=true ;;
         --deploy) DEPLOY=true ;;
+        --skip-build) SKIP_BUILD=true ;;
         *)        echo "Unknown argument: $arg"; exit 1 ;;
     esac
 done
+
+if [ "$SKIP_BUILD" = true ] && [ "$CLEAN" = true ]; then
+    echo "--clean cannot be used with --skip-build"
+    exit 1
+fi
 
 # ── 1. Handle root-owned target/ left behind by dev-mode inside Docker ─────────
 if [ -d "target" ] && [ "$(stat -c '%u' target)" = "0" ]; then
@@ -55,19 +61,26 @@ if [ "$CLEAN" = true ]; then
     fi
 fi
 
-# ── 3. Step 1: build Vaadin frontend (spire hidden via vaadin-frontend-fix) ────
-echo ""
-echo "══════════════════════════════════════════════════════════════"
-echo "  Step 1/2 — Vaadin frontend build"
-echo "══════════════════════════════════════════════════════════════"
-./mvnw vaadin:build-frontend -Pproduction,vaadin-frontend-fix -DskipTests
+if [ "$SKIP_BUILD" = false ]; then
+    # ── 3. Step 1: build Vaadin frontend (spire hidden via vaadin-frontend-fix) ─
+    echo ""
+    echo "══════════════════════════════════════════════════════════════"
+    echo "  Step 1/2 — Vaadin frontend build"
+    echo "══════════════════════════════════════════════════════════════"
+    ./mvnw vaadin:build-frontend -Pproduction,vaadin-frontend-fix -DskipTests
 
-# ── 4. Step 2: compile Java + package JAR (spire on compile classpath) ─────────
-echo ""
-echo "══════════════════════════════════════════════════════════════"
-echo "  Step 2/2 — Java compile + package (frontend already built)"
-echo "══════════════════════════════════════════════════════════════"
-./mvnw package -Pproduction -DskipTests -Dvaadin.skip=true
+    # ── 4. Step 2: compile Java + package JAR (frontend already built) ─────────
+    echo ""
+    echo "══════════════════════════════════════════════════════════════"
+    echo "  Step 2/2 — Java compile + package (frontend already built)"
+    echo "══════════════════════════════════════════════════════════════"
+    ./mvnw package -Pproduction -DskipTests -Dvaadin.skip=true
+else
+    echo ""
+    echo "══════════════════════════════════════════════════════════════"
+    echo "  Skipping build steps (--skip-build)"
+    echo "══════════════════════════════════════════════════════════════"
+fi
 
 # ── 5. Verify JAR was produced ─────────────────────────────────────────────────
 if [ ! -f "$JAR_SRC" ]; then
@@ -83,32 +96,10 @@ echo "✓  BUILD SUCCESS — $JAR_SRC ($JAR_SIZE)"
 if [ "$DEPLOY" = true ]; then
     echo ""
     echo "══════════════════════════════════════════════════════════════"
-    echo "  Deploying to Docker stack"
+    echo "  Deploying to local container"
     echo "══════════════════════════════════════════════════════════════"
 
-    if [ ! -f ".env.prod" ]; then
-        echo "✗  .env.prod not found. Create it with production datasource credentials."
-        exit 1
-    fi
-
-    cp -f "$JAR_SRC" "$JAR_DST"
-    echo "  Copied JAR → $JAR_DST"
-
-    $COMPOSE_CMD --env-file .env.prod up -d --force-recreate "$CONTAINER"
-    echo ""
-    echo "  Waiting for application startup (up to 60 s)..."
-    for i in $(seq 1 12); do
-        sleep 5
-        if docker logs "${CONTAINER}-app" 2>&1 | grep -q "Started Application"; then
-            echo "  ✓ Application started successfully"
-            docker logs "${CONTAINER}-app" 2>&1 | grep "Started Application"
-            break
-        fi
-        if [ "$i" -eq 12 ]; then
-            echo "  ⚠  Timed out waiting — check logs:"
-            echo "     docker logs ${CONTAINER}-app"
-        fi
-    done
+    "$LOCAL_DEPLOY_SCRIPT" "$JAR_SRC"
 fi
 
 echo ""

@@ -1,0 +1,23 @@
+# Copy to remote-deploy.conf (same folder) and adjust for your remote server.
+# This file is sourced only by deploy/remote/deploy-remote-jar.sh.
+
+REMOTE_HOST=your.server.example
+REMOTE_USER=youruser
+
+# SSH settings
+SSH_PORT=22
+# SSH_KEY_PATH=~/.ssh/id_ed25519
+
+# Remote app / stack settings
+REMOTE_APP_JAR=/home/birch/appdata/farmtracks/app.jar
+# Container to restart after JAR copy.
+# Also used for health-check log polling.
+REMOTE_APP_CONTAINER=ft
+
+# Optional startup validation tuning.
+# REMOTE_STARTUP_TIMEOUT_SEC=60
+# REMOTE_STARTUP_LOG_REGEX="Started Application"
+
+# Optional override for hosts where user needs sudo to use docker.
+# Example: REMOTE_DOCKER_CMD="sudo -n docker"
+# REMOTE_DOCKER_CMD="sudo -n docker"

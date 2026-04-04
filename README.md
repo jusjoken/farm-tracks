@@ -36,6 +36,12 @@ Notes:
 
 Use the project script to run the validated production build flow.
 
+Recommended staged flow:
+
+1. Build and test JAR directly in VS Code.
+2. Deploy the same built JAR to local Portainer-managed container and test again.
+3. Deploy the same tested JAR to remote host.
+
 ### Build production JAR only
 
 ```
@@ -48,10 +54,16 @@ Output artifact:
 target/farm-tracks-1.0-SNAPSHOT.jar
 ```
 
-### Build and deploy to local Docker SWAG stack
+### Build and deploy to local Portainer-style container
 
 ```
 ./build-prod.sh --deploy
+```
+
+If you already built/tested the JAR and only want to redeploy locally:
+
+```bash
+./build-prod.sh --skip-build --deploy
 ```
 
 What this does:
@@ -59,7 +71,17 @@ What this does:
 - Builds frontend with the required workaround profile.
 - Packages the production JAR.
 - Copies JAR to `/home/birch/appdata/farmtracks/app.jar`.
-- Recreates Docker services using `docker-compose.yml` and `docker-compose.local-swag.yml`.
+- Restarts the local app container (`deploy/local/deploy-local-jar.sh`).
+
+Configure local container/JAR path:
+
+```bash
+cp deploy/local/local-deploy.conf.example deploy/local/local-deploy.conf
+# edit deploy/local/local-deploy.conf
+```
+
+If startup validation times out, tune `LOCAL_STARTUP_TIMEOUT_SEC` and
+`LOCAL_STARTUP_LOG_REGEX` in `deploy/local/local-deploy.conf`.
 
 ### Optional: run the built JAR directly
 
@@ -67,9 +89,58 @@ What this does:
 java -jar target/farm-tracks-1.0-SNAPSHOT.jar
 ```
 
-## Deploying using Docker
+### Deploy tested JAR to remote host
 
-If you need to deploy to the local SWAG stack from an already-built JAR, run
+Preferred: use a dedicated remote deploy config file.
+
+```bash
+cp deploy/remote/remote-deploy.conf.example deploy/remote/remote-deploy.conf
+# edit deploy/remote/remote-deploy.conf for your server
+./deploy/remote/deploy-remote-jar.sh
+```
+
+Portainer-only remote stack (no `docker-compose.yml` on server):
+
+- Set `REMOTE_APP_CONTAINER` to the running app container name on remote host.
+
+This copies the JAR to the remote host and runs `docker restart <container>`.
+
+If the remote user cannot access Docker directly, set:
+
+```bash
+export REMOTE_DOCKER_CMD="sudo -n docker"
+```
+
+Or put `REMOTE_DOCKER_CMD="sudo -n docker"` in
+`deploy/remote/remote-deploy.conf`.
+
+If you want to use a custom config path:
+
+```bash
+./deploy/remote/deploy-remote-jar.sh --config /path/to/remote-deploy.conf
+```
+
+Legacy env-variable mode also works:
+
+```bash
+export REMOTE_HOST=your.server.example
+export REMOTE_USER=youruser
+./deploy/remote/deploy-remote-jar.sh
+```
+
+Optional variables:
+
+```bash
+export SSH_PORT=22
+export SSH_KEY_PATH=~/.ssh/id_ed25519
+export REMOTE_APP_JAR=/home/birch/appdata/farmtracks/app.jar
+export REMOTE_APP_CONTAINER=farmtracks-app
+export REMOTE_DOCKER_CMD="sudo -n docker"
+```
+
+## Legacy Local SWAG (optional)
+
+If you still need the old docker-compose SWAG flow from an already-built JAR, run
 
 ```
 cp -f target/farm-tracks-1.0-SNAPSHOT.jar /home/birch/appdata/farmtracks/app.jar

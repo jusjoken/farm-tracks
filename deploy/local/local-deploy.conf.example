@@ -1,0 +1,16 @@
+# Copy to local-deploy.conf (same folder) and adjust for your local machine.
+# This file is sourced only by deploy/local/deploy-local-jar.sh.
+
+LOCAL_APP_JAR=/home/birch/appdata/farmtracks/app.jar
+LOCAL_APP_CONTAINER=ft
+
+# Optional tuning for startup validation.
+# Timeout in seconds before declaring startup failure.
+# LOCAL_STARTUP_TIMEOUT_SEC=90
+
+# Regex used when no Docker healthcheck is available.
+# LOCAL_STARTUP_LOG_REGEX='Started Application|Started .* in [0-9.]+ seconds'
+
+# Set true to fail deploy when startup signal is not found before timeout.
+# Default false avoids false negatives when logs are delayed/rotated.
+# LOCAL_VALIDATION_STRICT=false
