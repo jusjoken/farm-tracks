@@ -314,6 +314,9 @@ public class LitterEditor {
     }
 
     private void dialogSave() {
+        if (currentStockType == null) {
+            currentStockType = resolveStockTypeFromSelectedParents();
+        }
         litter.setStockType(currentStockType != null ? currentStockType : litter.getStockType());
         litter.setPrefix(trimOrNull(prefix.getValue()));
         litter.setName(trimOrNull(name.getValue()));
@@ -422,8 +425,15 @@ public class LitterEditor {
             return;
         }
 
-        father.setValue(selectedPlan.getLinkFatherId() == null ? null : stockService.findById(selectedPlan.getLinkFatherId()));
-        mother.setValue(selectedPlan.getLinkMotherId() == null ? null : stockService.findById(selectedPlan.getLinkMotherId()));
+        Stock selectedFather = selectedPlan.getLinkFatherId() == null ? null : stockService.findById(selectedPlan.getLinkFatherId());
+        Stock selectedMother = selectedPlan.getLinkMotherId() == null ? null : stockService.findById(selectedPlan.getLinkMotherId());
+
+        father.setValue(selectedFather);
+        mother.setValue(selectedMother);
+
+        if (currentStockType == null) {
+            currentStockType = resolveStockTypeFromParents(selectedMother, selectedFather);
+        }
 
         LocalDate bredFromTask = findTaskDateByTaskType(selectedPlan, TaskType.BREED);
         if (bredFromTask != null) {
@@ -437,6 +447,20 @@ public class LitterEditor {
         breed.setValue(getBreedFromTaskPlan(selectedPlan));
 
         updateSaveEnabled();
+    }
+
+    private StockType resolveStockTypeFromSelectedParents() {
+        return resolveStockTypeFromParents(mother.getValue(), father.getValue());
+    }
+
+    private StockType resolveStockTypeFromParents(Stock motherStock, Stock fatherStock) {
+        if (motherStock != null && motherStock.getStockType() != null) {
+            return motherStock.getStockType();
+        }
+        if (fatherStock != null && fatherStock.getStockType() != null) {
+            return fatherStock.getStockType();
+        }
+        return null;
     }
 
     private List<TaskPlan> loadBreedTaskPlans() {

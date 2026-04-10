@@ -105,6 +105,27 @@ Portainer-only remote stack (no `docker-compose.yml` on server):
 
 This copies the JAR to the remote host and runs `docker restart <container>`.
 
+Optional and recommended for rollback safety: publish the exact JAR to GitHub
+Releases before remote deployment.
+
+1. Ensure `gh` is installed and authenticated (`gh auth login`).
+2. Set release repo in `deploy/remote/remote-deploy.conf`:
+
+```bash
+GITHUB_RELEASE_REPO=owner/repo
+```
+
+3. Deploy with pre-publish enabled:
+
+```bash
+./deploy/remote/deploy-remote-jar.sh --publish-release --release-tag v1.2.3
+```
+
+If `--release-tag` is omitted, the default tag follows the app's displayed
+version scheme: `v<app.version.major>.<git total commit count>`.
+`GITHUB_RELEASE_TARGET` is optional; if unset, GitHub uses the default branch.
+If the release publish step fails, remote deployment is aborted.
+
 If the remote user cannot access Docker directly, set:
 
 ```bash

@@ -33,6 +33,7 @@ import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout;
 import com.vaadin.flow.component.masterdetaillayout.MasterDetailLayout.Orientation;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.Scroller;
+import com.vaadin.flow.component.orderedlayout.Scroller.ScrollDirection;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.select.Select;
@@ -868,14 +869,18 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
 
     private VerticalLayout createTabOverview(Stock stock) {
         VerticalLayout overviewLayout = UIUtilities.getVerticalLayout(Boolean.TRUE, Boolean.TRUE, Boolean.FALSE);
+        overviewLayout.setSizeFull();
+        overviewLayout.getStyle().set("min-height", "0");
+
         Scroller scroll = new Scroller(new StockDetailsFormLayout(stock));
+        scroll.setScrollDirection(ScrollDirection.VERTICAL);
         scroll.setWidthFull();
         if(mobileDevice){
             scroll.setHeight(500,Unit.PIXELS);
         }else{      
             scroll.setHeight(270,Unit.PIXELS);
         }
-        overviewLayout.setSizeUndefined();
+        scroll.getStyle().set("min-height", "0");
         overviewLayout.add(scroll);
         return overviewLayout;
     }

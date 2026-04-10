@@ -18,6 +18,19 @@ REMOTE_APP_CONTAINER=ft
 # REMOTE_STARTUP_TIMEOUT_SEC=60
 # REMOTE_STARTUP_LOG_REGEX="Started Application"
 
+# Optional: publish the JAR to a GitHub Release before remote deploy.
+# Requires GitHub CLI (`gh`) authenticated locally.
+# GITHUB_RELEASE_ENABLED=true
+# GITHUB_RELEASE_REPO=owner/repo
+# If GITHUB_RELEASE_TAG is not set, deploy script defaults to
+# v<app.version.major>.<git total commit count>.
+# GITHUB_RELEASE_TAG=v1.2.3
+# Optional: branch, tag, or full commit SHA in GitHub repo.
+# Leave unset to let GitHub use the repo default branch.
+# GITHUB_RELEASE_TARGET=main
+# GITHUB_RELEASE_DRAFT=false
+# GITHUB_RELEASE_PRERELEASE=false
+
 # Optional override for hosts where user needs sudo to use docker.
 # Example: REMOTE_DOCKER_CMD="sudo -n docker"
 # REMOTE_DOCKER_CMD="sudo -n docker"

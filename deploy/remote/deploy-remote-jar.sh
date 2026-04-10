@@ -9,6 +9,8 @@ DEFAULT_CONFIG_FILE="$SCRIPT_DIR/remote-deploy.conf"
 
 JAR_SRC="target/farm-tracks-1.0-SNAPSHOT.jar"
 CONFIG_FILE="$DEFAULT_CONFIG_FILE"
+PUBLISH_GITHUB_RELEASE=""
+CLI_RELEASE_TAG=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -17,8 +19,16 @@ while [ "$#" -gt 0 ]; do
             [ "$#" -gt 0 ] || { echo "Missing value for --config"; exit 1; }
             CONFIG_FILE="$1"
             ;;
+        --publish-release)
+            PUBLISH_GITHUB_RELEASE="true"
+            ;;
+        --release-tag)
+            shift
+            [ "$#" -gt 0 ] || { echo "Missing value for --release-tag"; exit 1; }
+            CLI_RELEASE_TAG="$1"
+            ;;
         --help|-h)
-            echo "Usage: $0 [jar-path] [--config path]"
+            echo "Usage: $0 [jar-path] [--config path] [--publish-release] [--release-tag tag]"
             exit 0
             ;;
         *)
@@ -33,6 +43,32 @@ if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 fi
 
+resolve_default_release_tag() {
+    local app_major="${APP_VERSION_MAJOR:-}"
+    local commit_count=""
+
+    if [ -z "$app_major" ] && [ -f "src/main/resources/application.properties" ]; then
+        app_major="$(sed -n 's/^app\.version\.major=\${APP_VERSION_MAJOR:\([0-9][0-9]*\)}$/\1/p' src/main/resources/application.properties | head -n1)"
+    fi
+    if [ -z "$app_major" ]; then
+        app_major="1"
+    fi
+
+    if git rev-parse --git-dir >/dev/null 2>&1; then
+        commit_count="$(git rev-list --count HEAD 2>/dev/null || true)"
+    fi
+
+    if [ -z "$commit_count" ] && [ -f "target/classes/git.properties" ]; then
+        commit_count="$(sed -n 's/^git\.total\.commit\.count=\([0-9][0-9]*\)$/\1/p' target/classes/git.properties | head -n1)"
+    fi
+
+    if [ -z "$commit_count" ]; then
+        commit_count="0"
+    fi
+
+    printf 'v%s.%s' "$app_major" "$commit_count"
+}
+
 if [ ! -f "$JAR_SRC" ]; then
     echo "JAR not found: $JAR_SRC"
     echo "Build first with ./build-prod.sh"
@@ -41,6 +77,13 @@ fi
 
 : "${REMOTE_HOST:?Set REMOTE_HOST}"
 : "${REMOTE_USER:?Set REMOTE_USER}"
+
+PUBLISH_GITHUB_RELEASE="${PUBLISH_GITHUB_RELEASE:-${GITHUB_RELEASE_ENABLED:-false}}"
+GITHUB_RELEASE_TAG="${CLI_RELEASE_TAG:-${GITHUB_RELEASE_TAG:-}}"
+GITHUB_RELEASE_REPO="${GITHUB_RELEASE_REPO:-}"
+GITHUB_RELEASE_TARGET="${GITHUB_RELEASE_TARGET:-}"
+GITHUB_RELEASE_DRAFT="${GITHUB_RELEASE_DRAFT:-false}"
+GITHUB_RELEASE_PRERELEASE="${GITHUB_RELEASE_PRERELEASE:-false}"
 
 REMOTE_APP_JAR="${REMOTE_APP_JAR:-/home/birch/appdata/farmtracks/app.jar}"
 REMOTE_APP_CONTAINER="${REMOTE_APP_CONTAINER:-farmtracks-app}"
@@ -60,6 +103,69 @@ if [ -n "$SSH_KEY_PATH" ]; then
 fi
 
 REMOTE_TMP_JAR="${REMOTE_APP_JAR}.upload"
+
+if [ "$PUBLISH_GITHUB_RELEASE" = "true" ]; then
+    if ! command -v gh >/dev/null 2>&1; then
+        echo "GitHub CLI not found. Install 'gh' to use --publish-release."
+        exit 1
+    fi
+
+    : "${GITHUB_RELEASE_REPO:?Set GITHUB_RELEASE_REPO (example: owner/repo)}"
+
+    if [ -z "$GITHUB_RELEASE_TAG" ]; then
+        GITHUB_RELEASE_TAG="$(resolve_default_release_tag)"
+    fi
+
+    if ! gh auth status >/dev/null 2>&1; then
+        echo "GitHub CLI is not authenticated. Run 'gh auth login' first."
+        exit 1
+    fi
+
+    SAFE_RELEASE_TAG="${GITHUB_RELEASE_TAG//\//-}"
+    CHECKSUM_FILE="$(mktemp)"
+    trap 'rm -f "$CHECKSUM_FILE"' EXIT
+
+    sha256sum "$JAR_SRC" | awk '{print $1}' > "$CHECKSUM_FILE"
+
+    RELEASE_JAR_ASSET="farm-tracks-${SAFE_RELEASE_TAG}.jar"
+    RELEASE_SHA_ASSET="${RELEASE_JAR_ASSET}.sha256"
+    RELEASE_TITLE="Farm Tracks ${GITHUB_RELEASE_TAG}"
+    RELEASE_NOTES="Automated release published before remote deploy."
+
+    if gh release view "$GITHUB_RELEASE_TAG" --repo "$GITHUB_RELEASE_REPO" >/dev/null 2>&1; then
+        echo "GitHub release '$GITHUB_RELEASE_TAG' already exists; uploading assets with --clobber"
+        gh release upload "$GITHUB_RELEASE_TAG" \
+            "$JAR_SRC#$RELEASE_JAR_ASSET" \
+            "$CHECKSUM_FILE#$RELEASE_SHA_ASSET" \
+            --clobber \
+            --repo "$GITHUB_RELEASE_REPO"
+    else
+        CREATE_ARGS=(
+            release create "$GITHUB_RELEASE_TAG"
+            "$JAR_SRC#$RELEASE_JAR_ASSET"
+            "$CHECKSUM_FILE#$RELEASE_SHA_ASSET"
+            --repo "$GITHUB_RELEASE_REPO"
+            --title "$RELEASE_TITLE"
+            --notes "$RELEASE_NOTES"
+        )
+
+        if [ -n "$GITHUB_RELEASE_TARGET" ]; then
+            CREATE_ARGS+=(--target "$GITHUB_RELEASE_TARGET")
+        fi
+
+        if [ "$GITHUB_RELEASE_DRAFT" = "true" ]; then
+            CREATE_ARGS+=(--draft)
+        fi
+        if [ "$GITHUB_RELEASE_PRERELEASE" = "true" ]; then
+            CREATE_ARGS+=(--prerelease)
+        fi
+
+        echo "Creating GitHub release '$GITHUB_RELEASE_TAG' in $GITHUB_RELEASE_REPO"
+        gh "${CREATE_ARGS[@]}"
+    fi
+
+    echo "Published release asset to GitHub: $GITHUB_RELEASE_REPO ($GITHUB_RELEASE_TAG)"
+fi
 
 printf -v ESC_REMOTE_DOCKER_CMD '%q' "$REMOTE_DOCKER_CMD"
 

@@ -1022,8 +1022,11 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
                 // System.out.println("createPedigreePDF: Geno:" + item.getGenotype());
                 
 
-                //add Geno as a paragraph as it typically takes full width
-                addParagraph(document, counter, bp, "Geno:", item.getGenotype(),includeGeno);
+                // Use a compact genotype value with no label to save space.
+                String compactGenotype = formatCompactGenotype(item.getGenotype());
+                if (!compactGenotype.isBlank()) {
+                    addParagraph(document, counter, bp, "", compactGenotype, includeGeno);
+                }
                 //add detail to table if toplevel otherwise add directly to bodypart
                 if(topLevelGenerations.contains(counter)){
                     Table table = new Table(document, true);
@@ -1046,7 +1049,7 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
                     }
                     addParagraphToTable(table, "Colour:", item.getColor(),includeColor);
                     addParagraphToTable(table, "Breed:", item.getBreed(),includeBreed);
-                    addParagraphToTable(table, "Weight:", item.getWeightInLbsOz(),includeWeight);
+                    addParagraphToTable(table, "", item.getWeightInLbsOz(),includeWeight);
                     addParagraphToTable(table, "Legs:", item.getLegs(),includeLegs);
                     addParagraphToTable(table, "ChampNo:", item.getChampNo(),includeChampNo);
                     addParagraphToTable(table, "RegNo:", item.getRegNo(),includeRegNo);
@@ -1152,12 +1155,30 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
         para.getFormat().setAfterSpacing(0);
         return para;
     }
+
+    private String formatCompactGenotype(String rawGenotype) {
+        if (rawGenotype == null || rawGenotype.isBlank()) {
+            return "";
+        }
+
+        // Compact form for pedigree PDF: remove separators/placeholders and keep only real geno chars.
+        return rawGenotype
+                .replace(",", "")
+                .replace(" ", "")
+                .replace("_", "")
+                .trim();
+    }
     
     private void addParagraph(Document document, Integer counter, TextBodyPart bp, String itemLabel, String itemValue, Checkbox itemInclude){
         
         if(itemInclude==null || (itemInclude.getValue())){
             Paragraph para = new Paragraph(document);
-            para.setText(itemLabel + ":" + itemValue);
+            String safeLabel = itemLabel == null ? "" : itemLabel.trim();
+            if (safeLabel.endsWith(":")) {
+                safeLabel = safeLabel.substring(0, safeLabel.length() - 1);
+            }
+            String safeValue = itemValue == null ? "" : itemValue;
+            para.setText(safeLabel.isEmpty() ? safeValue : (safeLabel + ":" + safeValue));
             bp.getBodyItems().add(para);
             //para.getFormat().setAfterSpacing(0);
             //para.getFormat().setBeforeSpacing(0);
@@ -1179,7 +1200,12 @@ public class StockPedigreeEditor extends Main implements ListRefreshNeededListen
             para.getFormat().setAfterAutoSpacing(false);
             para.getFormat().setBeforeSpacing(0);
             para.getFormat().setAfterSpacing(0);
-            para.setText(itemLabel + ":" + itemValue);
+            String safeLabel = itemLabel == null ? "" : itemLabel.trim();
+            if (safeLabel.endsWith(":")) {
+                safeLabel = safeLabel.substring(0, safeLabel.length() - 1);
+            }
+            String safeValue = itemValue == null ? "" : itemValue;
+            para.setText(safeLabel.isEmpty() ? safeValue : (safeLabel + ":" + safeValue));
             para.applyStyle(topLevelDetailsStyle);
             rowCounter++;
             if(Objects.equals(rowCounter, tableRows)){

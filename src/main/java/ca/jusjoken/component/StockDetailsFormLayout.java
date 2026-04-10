@@ -82,7 +82,8 @@ public class StockDetailsFormLayout extends FormLayout{
     private TextField fieldSaleStatus = new TextField();
 
     public StockDetailsFormLayout(Stock stock) {
-        setSizeFull();
+        // Keep natural height so parent Scroller can detect overflow and scroll.
+        setHeight(null);
         setWidthFull();
         this.stockEntity = stock;
         binder = new Binder<Stock>(Stock.class);
