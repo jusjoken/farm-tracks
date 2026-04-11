@@ -886,7 +886,6 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
     }
     
     private LazyComponent createTabLitters(Stock stock) {
-        Layout layout = new Layout();
         // litterGrid.setHeight("270px");
         System.out.println("createTabLitters: mobileDevice:" + mobileDevice);
         // Use mobile as the default only when no saved preference exists.
@@ -897,13 +896,22 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         }else{
             litterGrid.setHeight("270px");
         }
+        litterGrid.setWidthFull();
         litterGrid.createGrid();
-        layout.add(litterGrid);
-        return new LazyComponent(() -> layout);
+        LazyComponent lazyLittersContent = new LazyComponent(() -> {
+            Div container = new Div(litterGrid);
+            container.setSizeFull();
+            container.getStyle().set("min-height", "0");
+            container.getStyle().set("overflow", "hidden");
+            return container;
+        });
+        lazyLittersContent.setSizeFull();
+        lazyLittersContent.getStyle().set("min-height", "0");
+        return lazyLittersContent;
     }
 
     private LazyComponent createTabKits(Stock stock) {
-        return new LazyComponent(() -> {
+        LazyComponent lazyKitsContent = new LazyComponent(() -> {
             StockGrid stockGrid = new StockGrid();
             stockGrid.setId(stock.getId(), StockGrid.StockGridType.KITS);
             stockGrid.setPreferenceScopeKey(getDeviceScopedPreferenceKey("stock-view.kits"));
@@ -917,16 +925,26 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
             }else{      
                 stockGrid.setHeight("270px");
             }
+            stockGrid.setWidthFull();
             stockGrid.createGrid();
-            return stockGrid;
+            Div container = new Div(stockGrid);
+            container.setSizeFull();
+            container.getStyle().set("min-height", "0");
+            container.getStyle().set("overflow", "hidden");
+            return container;
         });
+        lazyKitsContent.setSizeFull();
+        lazyKitsContent.getStyle().set("min-height", "0");
+        return lazyKitsContent;
     }
 
     private Component createTabNotes(Stock stock) {
         VerticalLayout layout = new VerticalLayout();
+        layout.setSizeFull();
         layout.setPadding(false);
         layout.setSpacing(false);
         layout.setWidthFull();
+        layout.getStyle().set("min-height", "0");
 
         Button editNotesButton = new Button(FontAwesome.Solid.PENCIL_ALT.create());
         editNotesButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
@@ -1006,11 +1024,16 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         statusGrid.setHeight(mobileDevice ? "500px" : "270px");
         statusGrid.createGrid();
 
-        return new LazyComponent(() -> {
+        LazyComponent lazyStatusesContent = new LazyComponent(() -> {
             Div container = new Div(statusGrid);
-            container.setWidthFull();
+            container.setSizeFull();
+            container.getStyle().set("min-height", "0");
+            container.getStyle().set("overflow", "hidden");
             return container;
         });
+        lazyStatusesContent.setSizeFull();
+        lazyStatusesContent.getStyle().set("min-height", "0");
+        return lazyStatusesContent;
     }
 
     private LazyComponent createTabWeights(Stock stock) {
@@ -1021,11 +1044,16 @@ public class StockView extends Main implements ListRefreshNeededListener, Sideba
         weightGrid.setHeight(mobileDevice ? "500px" : "270px");
         weightGrid.createGrid();
 
-        return new LazyComponent(() -> {
+        LazyComponent lazyWeightsContent = new LazyComponent(() -> {
             Div container = new Div(weightGrid);
-            container.setWidthFull();
+            container.setSizeFull();
+            container.getStyle().set("min-height", "0");
+            container.getStyle().set("overflow", "hidden");
             return container;
         });
+        lazyWeightsContent.setSizeFull();
+        lazyWeightsContent.getStyle().set("min-height", "0");
+        return lazyWeightsContent;
     }
 
     private Layout createTags(Stock stock, Boolean topLayout){
