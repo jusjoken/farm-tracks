@@ -67,7 +67,7 @@ public class LitterEditor {
     private final IntegerField kitsCount = new IntegerField("Total Kits");
     private final IntegerField diedKitsCount = new IntegerField("Dead Kits");
     private final TextArea notes = new TextArea("Notes");
-    private final Select<TaskPlan> taskPlanSelect = new Select<>("Incomplete Breed Plans");
+    private final Select<TaskPlan> taskPlanSelect = new Select<>("Incomplete Breed Plans (optional)");
     private final TaskPlanService taskPlanService;
     private final PlanTemplateService planTemplateService;
     private final TaskService taskService;
@@ -212,7 +212,11 @@ public class LitterEditor {
         name.setValue(litter.getName() == null ? getNextLitterName() : litter.getName());
         breed.setValue(litter.getBreed() == null ? getBreedFromTaskPlan(taskPlan) : litter.getBreed());
         bred.setValue(litter.getBred());
-        doB.setValue(litter.getDoB());
+        LocalDate initialBornDate = litter.getDoB();
+        if (initialBornDate == null && dialogMode == DialogMode.CREATE) {
+            initialBornDate = LocalDate.now();
+        }
+        doB.setValue(initialBornDate);
         father.setValue(litter.getFather());
         mother.setValue(litter.getMother());
         kitsCount.setValue(zeroIfNull(litter.getKitsCount()));
@@ -301,7 +305,6 @@ public class LitterEditor {
     }
 
     private void updateSaveEnabled() {
-        boolean hasTaskPlan = taskPlanSelect.getValue() != null;
         boolean hasPrefix = prefix.getValue() != null && !prefix.getValue().trim().isEmpty();
         boolean hasName = name.getValue() != null && !name.getValue().trim().isEmpty();
         boolean hasBreed = breed.getValue() != null && !breed.getValue().trim().isEmpty();
@@ -310,7 +313,7 @@ public class LitterEditor {
         boolean hasParents = father.getValue() != null && mother.getValue() != null;
         boolean hasKits = kitsCount.getValue() != null && kitsCount.getValue() > 0;
         boolean hasValidDeaths = diedKitsCount.getValue() != null && diedKitsCount.getValue() >= 0;
-        dialogOkButton.setEnabled(hasTaskPlan && hasPrefix && hasName && hasBreed && hasBred && hasDob && hasParents && hasKits && hasValidDeaths);
+        dialogOkButton.setEnabled(hasPrefix && hasName && hasBreed && hasBred && hasDob && hasParents && hasKits && hasValidDeaths);
     }
 
     private void dialogSave() {
@@ -330,22 +333,29 @@ public class LitterEditor {
         litter.setNotes(trimOrNull(notes.getValue()));
 
         if (dialogMode == DialogMode.CREATE) {
+            TaskPlan selectedPlan = taskPlanSelect.getValue();
             ConfirmDialog confirm = new ConfirmDialog();
             confirm.setHeader("Create litter:");
-            confirm.setText("This will record the birth as complete, create the litter as well as create the " + litter.getKitsCount() + " stock record(s) for this litter (" + litter.getDiedKitsCount() + " marked as Dead).");
+            if (selectedPlan != null && selectedPlan.getId() != null) {
+                confirm.setText("This will record the birth as complete, create the litter as well as create the " + litter.getKitsCount() + " stock record(s) for this litter (" + litter.getDiedKitsCount() + " marked as Dead).");
+            } else {
+                confirm.setText("This will create the litter as well as create the " + litter.getKitsCount() + " stock record(s) for this litter (" + litter.getDiedKitsCount() + " marked as Dead).");
+            }
             confirm.setCancelable(true);
             confirm.setCancelText("No");
             confirm.setConfirmText("Yes");
             confirm.addConfirmListener(event -> {
                 Litter saved = litterService.save(litter);
                 clearOverrideNextLitterNumberIfConsumed(saved);
-                //mark the associated birth task as complete
-                Task birthTask = taskService.findByPlanId(taskPlanSelect.getValue().getId()).stream()
-                        .filter(t -> t.getType() == TaskType.BIRTH)
-                        .findFirst()
-                        .orElse(null);
-                if (birthTask != null) {
-                    taskService.setTaskCompleted(birthTask, true);
+                if (selectedPlan != null && selectedPlan.getId() != null) {
+                    // Mark the associated birth task as complete when a plan is selected.
+                    Task birthTask = taskService.findByPlanId(selectedPlan.getId()).stream()
+                            .filter(t -> t.getType() == TaskType.BIRTH)
+                            .findFirst()
+                            .orElse(null);
+                    if (birthTask != null) {
+                        taskService.setTaskCompleted(birthTask, true);
+                    }
                 }
                 litterService.createKitStocks(saved.getId(), zeroIfNull(saved.getKitsCount()), zeroIfNull(saved.getDiedKitsCount()));
 
@@ -440,9 +450,8 @@ public class LitterEditor {
             bred.setValue(bredFromTask);
         }
 
-        LocalDate bornFromTask = findTaskDateByTaskType(selectedPlan, TaskType.BIRTH);
-        if (bornFromTask != null) {
-            doB.setValue(bornFromTask);
+        if (dialogMode == DialogMode.CREATE && doB.getValue() == null) {
+            doB.setValue(LocalDate.now());
         }
         breed.setValue(getBreedFromTaskPlan(selectedPlan));
 
